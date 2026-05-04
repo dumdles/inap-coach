@@ -8,3 +8,21 @@ if (!supabaseUrl || !supabasePublishableKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabasePublishableKey)
+
+// Get current session
+export async function getSession() {
+    const { data: { session }, error } = await supabase.auth.getSession()
+    if (error) console.error('Session error:', error)
+        return session
+}
+
+// TODO: Get current user
+export async function getCurrentUser() {
+    const { data: { user }, error } = await supabase.auth.getUser()
+    if (error) console.error('User error:', error)
+    return user
+}
+
+// TODO: Sign up new user
+
+// TODO: Sign in existing user with email + password (can change)
