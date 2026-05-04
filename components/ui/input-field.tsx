@@ -20,7 +20,7 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
                 {label && (
                     <label
                         htmlFor={id}
-                        className="text-sm font-medium text-gray-700"
+                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
                         {label}
                         {required && <span className="text-danger ml-1">*</span>}
@@ -29,7 +29,7 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
 
                 <div className="relative flex items-center">
                     {prefix && (
-                        <div className="absolute left-3 text-gray-500 pointer-events-none">
+                        <div className="absolute left-3 text-gray-500 dark:text-gray-400 pointer-events-none">
                             {prefix}
                         </div>
                     )}
@@ -44,7 +44,7 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
                         {...props}
                     />
                     {suffix && (
-                        <div className="absolute right-3 text-gray-500 pointer-events-none">
+                        <div className="absolute right-3 text-gray-500 dark:text-gray-400 pointer-events-none">
                             {suffix}
                         </div>
                     )}

@@ -42,26 +42,26 @@ function StepIndicator({ currentStep }: { currentStep: 1 | 2 }) {
         <div className="flex items-center gap-2 mb-8">
             <div className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 transition-colors duration-300',
-                currentStep === 1 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-400'
+                currentStep === 1 ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-[#344563] text-gray-400'
             )}>
                 1
             </div>
             <span className={cn(
                 'text-sm font-medium transition-colors duration-300',
-                currentStep === 1 ? 'text-primary' : 'text-gray-400'
+                currentStep === 1 ? 'text-primary' : 'text-gray-400 dark:text-gray-500'
             )}>
                 Account
             </span>
-            <div className="flex-1 h-px bg-gray-200" />
+            <div className="flex-1 h-px bg-gray-200 dark:bg-[#344563]" />
             <div className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 transition-colors duration-300',
-                currentStep === 2 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-400'
+                currentStep === 2 ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-[#344563] text-gray-400'
             )}>
                 2
             </div>
             <span className={cn(
                 'text-sm font-medium transition-colors duration-300',
-                currentStep === 2 ? 'text-primary' : 'text-gray-400'
+                currentStep === 2 ? 'text-primary' : 'text-gray-400 dark:text-gray-500'
             )}>
                 Profile & Goal
             </span>
@@ -167,7 +167,7 @@ export const SignUpForm: React.FC = () => {
     }
 
     const footer = (
-        <p className="text-center text-sm text-gray-500 mt-4">
+        <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
             Already have an account?{' '}
             <Link href="/login" className="text-primary hover:text-primary-dark font-medium">
                 Sign in
@@ -177,25 +177,25 @@ export const SignUpForm: React.FC = () => {
 
     return (
         // Stable card — never remounts, so no jarring layout shift
-        <div className="w-full max-w-md mx-auto p-8 bg-white rounded-2xl border border-gray-200 shadow-lg animate-fade-in overflow-hidden">
+        <div className="w-full max-w-md mx-auto p-8 bg-white dark:bg-[#172B4D] rounded-2xl border border-gray-200 dark:border-[#344563] shadow-lg animate-fade-in overflow-hidden">
             {/* key={step} forces remount → animation replays on each transition */}
             <div
                 key={step}
                 className={direction === 'forward' ? 'animate-step-forward' : 'animate-step-back'}
             >
-                <div className="font-display text-4xl font-extrabold tracking-tight text-gray-900 mb-6">
+                <div className="font-display text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-6">
                     INAP<span className="text-primary">·</span>Coach
                 </div>
 
                 {step === 1 ? (
                     <>
-                        <h1 className="text-2xl font-bold text-gray-900 mb-1">Create your account</h1>
-                        <p className="text-sm text-gray-500 mb-6">Set up your INAP Coach account.</p>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Create your account</h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Set up your INAP Coach account.</p>
                     </>
                 ) : (
                     <>
-                        <h1 className="text-2xl font-bold text-gray-900 mb-1">Your profile</h1>
-                        <p className="text-sm text-gray-500 mb-6">We use this to calculate your daily targets.</p>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Your profile</h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">We use this to calculate your daily targets.</p>
                     </>
                 )}
 
@@ -217,7 +217,7 @@ export const SignUpForm: React.FC = () => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="flex flex-col gap-2">
-                                <label className="text-sm font-medium text-gray-700">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Rank <span className="text-danger">*</span>
                                 </label>
                                 <Select
@@ -227,7 +227,7 @@ export const SignUpForm: React.FC = () => {
                                         if (validationErrors.rank) setValidationErrors(prev => ({ ...prev, rank: '' }))
                                     }}
                                 >
-                                    <SelectTrigger className="w-full h-10 rounded-md border border-gray-300 bg-white px-3 text-sm">
+                                    <SelectTrigger className="w-full h-10 rounded-md border border-gray-300 dark:border-[#344563] bg-white dark:bg-[#0D1F3C] px-3 text-sm text-gray-800 dark:text-gray-100">
                                         <SelectValue placeholder="Select rank" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -242,7 +242,7 @@ export const SignUpForm: React.FC = () => {
                             </div>
 
                             <div className="flex flex-col gap-2">
-                                <label className="text-sm font-medium text-gray-700">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Wing <span className="text-danger">*</span>
                                 </label>
                                 <Select
@@ -252,7 +252,7 @@ export const SignUpForm: React.FC = () => {
                                         if (validationErrors.wing) setValidationErrors(prev => ({ ...prev, wing: '' }))
                                     }}
                                 >
-                                    <SelectTrigger className="w-full h-10 rounded-md border border-gray-300 bg-white px-3 text-sm">
+                                    <SelectTrigger className="w-full h-10 rounded-md border border-gray-300 dark:border-[#344563] bg-white dark:bg-[#0D1F3C] px-3 text-sm text-gray-800 dark:text-gray-100">
                                         <SelectValue placeholder="Select wing" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -317,7 +317,7 @@ export const SignUpForm: React.FC = () => {
                         </div>
 
                         <div>
-                            <label className="text-sm font-medium text-gray-700 mb-3 block">Goal mode</label>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">Goal mode</label>
                             <div className="grid grid-cols-2 gap-3">
                                 {GOAL_MODES.map(({ value, label, description }) => (
                                     <button
@@ -327,17 +327,17 @@ export const SignUpForm: React.FC = () => {
                                         className={cn(
                                             'text-left p-4 rounded-xl border-2 transition-all duration-150',
                                             step2.goalMode === value
-                                                ? 'border-primary bg-primary-light'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                                ? 'border-primary bg-primary-light dark:bg-primary/20'
+                                                : 'border-gray-200 dark:border-[#344563] hover:border-gray-300 dark:hover:border-[#505F79]'
                                         )}
                                     >
                                         <div className={cn(
                                             'font-semibold text-sm mb-0.5 transition-colors duration-150',
-                                            step2.goalMode === value ? 'text-primary' : 'text-gray-900'
+                                            step2.goalMode === value ? 'text-primary' : 'text-gray-900 dark:text-gray-100'
                                         )}>
                                             {label}
                                         </div>
-                                        <div className="text-xs text-gray-400">{description}</div>
+                                        <div className="text-xs text-gray-400 dark:text-gray-500">{description}</div>
                                     </button>
                                 ))}
                             </div>

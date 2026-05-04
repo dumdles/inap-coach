@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button'
 import { InputField } from '@/components/ui/input-field'
 import { Alert } from '@/components/ui/alert'
 import Link from 'next/link'
+import { Checkbox } from '../ui/checkbox'
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+
 
 export const LoginForm: React.FC = () => {
     const router = useRouter()
@@ -61,15 +64,15 @@ export const LoginForm: React.FC = () => {
     }
 
     return (
-        <div className="w-full max-w-md mx-auto p-8 bg-white rounded-2xl border border-gray-200 shadow-lg animate-fade-in">
+        <div className="w-full max-w-md mx-auto p-8 bg-white dark:bg-[#172B4D] rounded-2xl border border-gray-200 dark:border-[#344563] shadow-lg animate-fade-in">
             <div className="mb-8">
-                <div className="font-display text-4xl font-extrabold tracking-tight text-gray-900 mb-6">
+                <div className="font-display text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-6">
                     INAP<span className="text-primary">·</span>Coach
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                     Welcome Back
                 </h1>
-                <p className="text-gray-500">
+                <p className="text-gray-500 dark:text-gray-400">
                     Sign in to your INAP Coach account
                 </p>
             </div>
@@ -101,6 +104,15 @@ export const LoginForm: React.FC = () => {
                     error={validationErrors.password}
                 />
 
+                <FieldGroup className="mx-auto w-full">
+                    <Field orientation="horizontal">
+                        <Checkbox id="remember-me" name="remember-me" className='border-primary-mid' />
+                        <FieldLabel htmlFor="remember-me">
+                            Remember me
+                        </FieldLabel>
+                    </Field>
+                </FieldGroup>
+
                 <Button
                     type="submit"
                     size="lg"
@@ -120,7 +132,7 @@ export const LoginForm: React.FC = () => {
                     Forgot password?
                 </Link>
 
-                <p className="text-center text-sm text-gray-500">
+                <p className="text-center text-sm text-gray-500 dark:text-gray-400">
                     Don't have an account?{' '}
                     <Link
                         href="/signup"
