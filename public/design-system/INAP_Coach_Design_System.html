@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INAP Coach — Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     DESIGN TOKENS
+     ============================================================ */
+  :root {
+    /* Brand Colors */
+    --primary:       #0052CC;
+    --primary-light: #DEEBFF;
+    --primary-dark:  #003A8C;
+    --primary-mid:   #2684FF;
+
+    --success:       #00875A;
+    --success-light: #E3FCEF;
+    --success-dark:  #006644;
+
+    --warning:       #FF991F;
+    --warning-light: #FFFAE6;
+    --warning-dark:  #974F0C;
+
+    --danger:        #DE350B;
+    --danger-light:  #FFEBE6;
+    --danger-dark:   #BF2600;
+
+    /* Neutrals */
+    --gray-0:   #FFFFFF;
+    --gray-50:  #F5F7FA;
+    --gray-100: #EBECF0;
+    --gray-200: #DFE1E6;
+    --gray-300: #C1C7D0;
+    --gray-400: #A5ADBA;
+    --gray-500: #6B778C;
+    --gray-600: #505F79;
+    --gray-700: #344563;
+    --gray-800: #172B4D;
+    --gray-900: #091E42;
+
+    /* Typography */
+    --font-display: 'Syne', sans-serif;
+    --font-body:    'DM Sans', sans-serif;
+
+    /* Spacing Scale (4px base) */
+    --space-1:  4px;
+    --space-2:  8px;
+    --space-3:  12px;
+    --space-4:  16px;
+    --space-5:  20px;
+    --space-6:  24px;
+    --space-8:  32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+
+    /* Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 24px;
+    --radius-full: 9999px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 3px rgba(9,30,66,0.08), 0 0 1px rgba(9,30,66,0.08);
+    --shadow-md: 0 3px 8px rgba(9,30,66,0.12), 0 0 1px rgba(9,30,66,0.08);
+    --shadow-lg: 0 8px 24px rgba(9,30,66,0.12), 0 0 1px rgba(9,30,66,0.08);
+
+    /* Borders */
+    --border: 1px solid var(--gray-200);
+    --border-focus: 2px solid var(--primary);
+
+    /* Transitions */
+    --transition: 150ms ease;
+    --transition-slow: 250ms ease;
+  }
+
+  /* ============================================================
+     RESET & BASE
+     ============================================================ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--gray-800);
+    background: var(--gray-50);
+  }
+
+  /* ============================================================
+     DOC LAYOUT
+     ============================================================ */
+  .doc-header {
+    background: var(--gray-900);
+    color: white;
+    padding: var(--space-16) var(--space-8);
+    text-align: center;
+  }
+  .doc-header h1 {
+    font-family: var(--font-display);
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: white;
+    margin-bottom: var(--space-2);
+  }
+  .doc-header p {
+    color: var(--gray-400);
+    font-size: 15px;
+    font-weight: 300;
+  }
+  .doc-header .tag {
+    display: inline-block;
+    background: var(--primary);
+    color: white;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    margin-bottom: var(--space-4);
+  }
+
+  .doc-nav {
+    background: white;
+    border-bottom: var(--border);
+    padding: 0 var(--space-8);
+    display: flex;
+    gap: var(--space-6);
+    overflow-x: auto;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .doc-nav a {
+    display: block;
+    padding: var(--space-4) 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-500);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color var(--transition), border-color var(--transition);
+  }
+  .doc-nav a:hover { color: var(--gray-800); }
+  .doc-nav a.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+  .doc-body {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: var(--space-12) var(--space-6);
+  }
+
+  section { margin-bottom: var(--space-16); }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gray-900);
+    letter-spacing: -0.02em;
+    margin-bottom: var(--space-2);
+    padding-bottom: var(--space-3);
+    border-bottom: 2px solid var(--gray-100);
+  }
+
+  .section-desc {
+    font-size: 14px;
+    color: var(--gray-500);
+    margin-bottom: var(--space-8);
+    font-weight: 300;
+  }
+
+  .subsection { margin-bottom: var(--space-10); }
+  .subsection-title {
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-400);
+    margin-bottom: var(--space-4);
+  }
+
+  .spec-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-4);
+    margin-bottom: var(--space-2);
+    font-size: 13px;
+  }
+  .spec-label { color: var(--gray-500); min-width: 140px; font-size: 12px; }
+  .spec-value { color: var(--gray-800); font-family: 'Courier New', monospace; font-size: 12px; background: var(--gray-100); padding: 2px 6px; border-radius: 3px; }
+
+  /* Canvas for showing components */
+  .canvas {
+    background: white;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-8);
+    margin-bottom: var(--space-4);
+  }
+  .canvas-gray { background: var(--gray-50); }
+
+  /* ============================================================
+     SECTION 1: COLOR PALETTE
+     ============================================================ */
+  .color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--space-3);
+  }
+  .color-chip {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: var(--border);
+  }
+  .color-swatch {
+    height: 60px;
+  }
+  .color-info {
+    padding: var(--space-2) var(--space-3);
+    background: white;
+  }
+  .color-name { font-size: 12px; font-weight: 500; color: var(--gray-800); }
+  .color-hex  { font-size: 11px; color: var(--gray-400); font-family: monospace; }
+
+  .neutral-row {
+    display: flex;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: var(--border);
+    margin-bottom: var(--space-3);
+  }
+  .neutral-chip { flex: 1; }
+  .neutral-swatch { height: 40px; }
+  .neutral-label {
+    font-size: 10px;
+    text-align: center;
+    padding: 3px;
+    color: var(--gray-500);
+    font-family: monospace;
+    background: white;
+    border-top: var(--border);
+  }
+
+  /* ============================================================
+     SECTION 2: TYPOGRAPHY
+     ============================================================ */
+  .type-specimen { margin-bottom: var(--space-6); }
+  .type-display-xl { font-family: var(--font-display); font-size: 40px; font-weight: 800; letter-spacing: -0.03em; color: var(--gray-900); line-height: 1.1; }
+  .type-display-lg { font-family: var(--font-display); font-size: 32px; font-weight: 700; letter-spacing: -0.025em; color: var(--gray-900); line-height: 1.15; }
+  .type-display-md { font-family: var(--font-display); font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: var(--gray-900); line-height: 1.2; }
+  .type-heading    { font-family: var(--font-display); font-size: 20px; font-weight: 600; letter-spacing: -0.01em; color: var(--gray-900); line-height: 1.3; }
+  .type-subheading { font-family: var(--font-body); font-size: 17px; font-weight: 500; color: var(--gray-800); line-height: 1.4; }
+  .type-body       { font-family: var(--font-body); font-size: 15px; font-weight: 400; color: var(--gray-700); line-height: 1.6; }
+  .type-body-sm    { font-family: var(--font-body); font-size: 13px; font-weight: 400; color: var(--gray-600); line-height: 1.5; }
+  .type-caption    { font-family: var(--font-body); font-size: 12px; font-weight: 400; color: var(--gray-500); line-height: 1.4; }
+  .type-label      { font-family: var(--font-body); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gray-400); }
+  .type-num        { font-family: var(--font-display); font-size: 36px; font-weight: 700; color: var(--gray-900); line-height: 1; letter-spacing: -0.02em; }
+
+  /* ============================================================
+     SECTION 3: SPACING
+     ============================================================ */
+  .spacing-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+  .spacing-bar { background: var(--primary-light); border-left: 3px solid var(--primary); height: 24px; }
+  .spacing-info { font-size: 12px; color: var(--gray-500); min-width: 160px; font-family: monospace; }
+
+  /* ============================================================
+     SECTION 4: BUTTONS
+     ============================================================ */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-family: var(--font-body);
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    transition: all var(--transition);
+    text-decoration: none;
+    white-space: nowrap;
+    line-height: 1;
+  }
+  .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(0,82,204,0.3); }
+
+  /* Sizes */
+  .btn-sm  { font-size: 12px; padding: 6px 12px; }
+  .btn-md  { font-size: 14px; padding: 9px 16px; }
+  .btn-lg  { font-size: 15px; padding: 12px 22px; }
+  .btn-xl  { font-size: 16px; padding: 14px 28px; }
+
+  /* Variants */
+  .btn-primary   { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-dark); }
+
+  .btn-secondary { background: var(--primary-light); color: var(--primary); border-color: var(--primary-light); }
+  .btn-secondary:hover { background: #C0D5F0; }
+
+  .btn-outline   { background: transparent; color: var(--primary); border-color: var(--gray-300); }
+  .btn-outline:hover { border-color: var(--primary); background: var(--primary-light); }
+
+  .btn-ghost     { background: transparent; color: var(--gray-600); border-color: transparent; }
+  .btn-ghost:hover { background: var(--gray-100); color: var(--gray-800); }
+
+  .btn-danger    { background: var(--danger); color: white; }
+  .btn-danger:hover { background: var(--danger-dark); }
+
+  .btn-success   { background: var(--success); color: white; }
+  .btn-success:hover { background: var(--success-dark); }
+
+  .btn:disabled  { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+
+  .btn-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-6); }
+
+  /* Icon button */
+  .btn-icon { padding: 9px; border-radius: var(--radius-md); background: var(--gray-100); border: var(--border); color: var(--gray-600); cursor: pointer; display:inline-flex; align-items:center; justify-content:center; transition: all var(--transition); }
+  .btn-icon:hover { background: var(--gray-200); }
+
+  /* ============================================================
+     SECTION 5: FORM ELEMENTS
+     ============================================================ */
+  .form-group { margin-bottom: var(--space-5); }
+
+  .form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-700);
+    margin-bottom: var(--space-2);
+  }
+  .form-label .required { color: var(--danger); margin-left: 2px; }
+  .form-hint { font-size: 12px; color: var(--gray-400); margin-top: var(--space-1); }
+  .form-error { font-size: 12px; color: var(--danger); margin-top: var(--space-1); }
+
+  .input {
+    width: 100%;
+    height: 40px;
+    padding: 0 var(--space-3);
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--gray-800);
+    background: white;
+    border: 1.5px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+    -webkit-appearance: none;
+  }
+  .input::placeholder { color: var(--gray-400); }
+  .input:hover  { border-color: var(--gray-400); }
+  .input:focus  { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,82,204,0.12); }
+  .input.error  { border-color: var(--danger); }
+  .input.error:focus  { box-shadow: 0 0 0 3px rgba(222,53,11,0.12); }
+  .input.success { border-color: var(--success); }
+  .input:disabled { background: var(--gray-100); color: var(--gray-400); cursor: not-allowed; }
+
+  .input-group { position: relative; }
+  .input-prefix, .input-suffix {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: var(--gray-500);
+    pointer-events: none;
+  }
+  .input-prefix { left: var(--space-3); }
+  .input-suffix { right: var(--space-3); }
+  .input-group .input.has-prefix { padding-left: 36px; }
+  .input-group .input.has-suffix { padding-right: 40px; }
+
+  select.input { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B778C' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+
+  textarea.input { height: auto; padding: var(--space-3); resize: vertical; line-height: 1.5; }
+
+  .checkbox-group { display: flex; align-items: flex-start; gap: var(--space-3); }
+  .checkbox {
+    width: 18px; height: 18px; min-width: 18px;
+    border: 1.5px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    background: white;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 2px;
+    transition: all var(--transition);
+  }
+  .checkbox.checked { background: var(--primary); border-color: var(--primary); }
+  .checkbox.checked::after { content: ''; width: 10px; height: 6px; border-left: 2px solid white; border-bottom: 2px solid white; transform: rotate(-45deg) translateY(-1px); display: block; }
+
+  /* ============================================================
+     SECTION 6: CARDS
+     ============================================================ */
+  .card {
+    background: white;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5) var(--space-6);
+    transition: box-shadow var(--transition-slow);
+  }
+  .card:hover { box-shadow: var(--shadow-md); }
+  .card-flat  { box-shadow: none !important; }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-4);
+    border-bottom: var(--border);
+  }
+  .card-title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-900);
+    letter-spacing: -0.01em;
+  }
+
+  /* Stat card */
+  .stat-card {
+    background: white;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+  }
+  .stat-label { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: var(--gray-400); margin-bottom: var(--space-2); }
+  .stat-value { font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--gray-900); letter-spacing: -0.02em; line-height: 1; margin-bottom: var(--space-2); }
+  .stat-sub   { font-size: 13px; color: var(--gray-500); }
+  .stat-delta { font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: var(--radius-full); }
+  .stat-delta.up   { background: var(--success-light); color: var(--success-dark); }
+  .stat-delta.down { background: var(--danger-light); color: var(--danger-dark); }
+  .stat-delta.neutral { background: var(--gray-100); color: var(--gray-500); }
+
+  /* Progress */
+  .progress-track { height: 6px; background: var(--gray-100); border-radius: var(--radius-full); overflow: hidden; margin: var(--space-2) 0; }
+  .progress-fill { height: 100%; border-radius: var(--radius-full); transition: width 0.4s ease; }
+
+  /* Meal log card */
+  .meal-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .meal-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .meal-icon { width: 36px; height: 36px; border-radius: var(--radius-md); display:flex; align-items:center; justify-content:center; font-size: 16px; flex-shrink: 0; }
+  .meal-info { flex: 1; min-width: 0; }
+  .meal-name { font-size: 14px; font-weight: 500; color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meal-meta { font-size: 12px; color: var(--gray-400); }
+  .meal-cal  { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--primary); white-space: nowrap; }
+
+  /* ============================================================
+     SECTION 7: BADGES & TAGS
+     ============================================================ */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: var(--radius-sm);
+    line-height: 1;
+  }
+  .badge-primary   { background: var(--primary-light); color: #0747A6; }
+  .badge-success   { background: var(--success-light); color: var(--success-dark); }
+  .badge-warning   { background: var(--warning-light); color: var(--warning-dark); }
+  .badge-danger    { background: var(--danger-light);  color: var(--danger-dark); }
+  .badge-neutral   { background: var(--gray-100); color: var(--gray-600); }
+
+  /* Wing badge */
+  .wing-badge {
+    display: inline-flex; align-items: center;
+    background: var(--gray-900);
+    color: white;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+  }
+
+  /* Goal mode pill */
+  .goal-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    border: 1.5px solid;
+  }
+  .goal-bulk     { color: #0747A6; border-color: #0747A6; background: var(--primary-light); }
+  .goal-cut      { color: var(--danger-dark); border-color: var(--danger); background: var(--danger-light); }
+  .goal-maintain { color: var(--success-dark); border-color: var(--success); background: var(--success-light); }
+  .goal-ippt     { color: var(--warning-dark); border-color: var(--warning); background: var(--warning-light); }
+
+  /* ============================================================
+     SECTION 8: NAVIGATION
+     ============================================================ */
+  .topnav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--space-6);
+    height: 60px;
+    background: white;
+    border-bottom: var(--border);
+    gap: var(--space-4);
+  }
+  .topnav-logo {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--gray-900);
+    letter-spacing: -0.03em;
+    text-decoration: none;
+  }
+  .topnav-logo span { color: var(--primary); }
+
+  .topnav-links { display: flex; gap: var(--space-1); }
+  .topnav-link {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gray-500);
+    text-decoration: none;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    transition: all var(--transition);
+  }
+  .topnav-link:hover { background: var(--gray-50); color: var(--gray-800); }
+  .topnav-link.active { background: var(--primary-light); color: var(--primary); }
+
+  .avatar {
+    width: 36px; height: 36px; border-radius: var(--radius-full);
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    font-size: 13px;
+    font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid var(--primary-light);
+    flex-shrink: 0;
+  }
+
+  /* Bottom tab bar (mobile) */
+  .bottom-nav {
+    display: flex;
+    background: white;
+    border-top: var(--border);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    overflow: hidden;
+    box-shadow: 0 -4px 20px rgba(9,30,66,0.08);
+  }
+  .bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-3) 0;
+    gap: 3px;
+    cursor: pointer;
+    transition: background var(--transition);
+  }
+  .bottom-nav-item.active { background: var(--primary-light); }
+  .bottom-nav-icon { font-size: 18px; line-height: 1; }
+  .bottom-nav-label { font-size: 10px; font-weight: 500; color: var(--gray-400); }
+  .bottom-nav-item.active .bottom-nav-label { color: var(--primary); }
+
+  /* ============================================================
+     SECTION 9: DATA / TABLES
+     ============================================================ */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .data-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gray-400);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 2px solid var(--gray-100);
+    background: var(--gray-50);
+  }
+  .data-table td {
+    padding: var(--space-3) var(--space-4);
+    color: var(--gray-700);
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--gray-50); }
+  .data-table .rank-num { font-family: var(--font-display); font-weight: 700; color: var(--gray-900); }
+  .rank-1 { color: #B45309 !important; }
+  .rank-2 { color: var(--gray-500) !important; }
+  .rank-3 { color: #92400E !important; }
+
+  /* ============================================================
+     SECTION 10: ALERTS / TOASTS
+     ============================================================ */
+  .alert {
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    font-size: 14px;
+    border-left: 4px solid;
+    margin-bottom: var(--space-3);
+  }
+  .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .alert-body { flex: 1; }
+  .alert-title { font-weight: 500; margin-bottom: 2px; }
+  .alert-info    { background: #E6F0FF; border-color: var(--primary); color: #0747A6; }
+  .alert-success { background: var(--success-light); border-color: var(--success); color: var(--success-dark); }
+  .alert-warning { background: var(--warning-light); border-color: var(--warning); color: var(--warning-dark); }
+  .alert-danger  { background: var(--danger-light); border-color: var(--danger); color: var(--danger-dark); }
+
+  /* Toast */
+  .toast {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+    background: var(--gray-900);
+    color: white;
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-lg);
+    font-size: 14px;
+    box-shadow: var(--shadow-lg);
+  }
+  .toast-action { font-size: 13px; font-weight: 600; color: var(--primary-mid); cursor: pointer; }
+
+  /* ============================================================
+     LAYOUT UTILITIES
+     ============================================================ */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-4); }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
+  .flex    { display: flex; }
+  .flex-col { flex-direction: column; }
+  .items-center { align-items: center; }
+  .justify-between { justify-content: space-between; }
+  .gap-2 { gap: var(--space-2); }
+  .gap-3 { gap: var(--space-3); }
+  .gap-4 { gap: var(--space-4); }
+  .mb-2 { margin-bottom: var(--space-2); }
+  .mb-4 { margin-bottom: var(--space-4); }
+  .mb-6 { margin-bottom: var(--space-6); }
+
+  /* ============================================================
+     DIVIDER
+     ============================================================ */
+  .divider { height: 1px; background: var(--gray-100); margin: var(--space-6) 0; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 3px; }
+
+  @media (max-width: 600px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .topnav-links { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="doc-header">
+  <div class="tag">Design System v1.0</div>
+  <h1>INAP Coach</h1>
+  <p>Clean Performance — Component Specifications for Yu Li & Benoit</p>
+</div>
+
+<!-- NAV -->
+<nav class="doc-nav">
+  <a href="#colors" class="active">Colors</a>
+  <a href="#typography">Typography</a>
+  <a href="#spacing">Spacing</a>
+  <a href="#buttons">Buttons</a>
+  <a href="#forms">Forms</a>
+  <a href="#cards">Cards</a>
+  <a href="#badges">Badges</a>
+  <a href="#navigation">Navigation</a>
+  <a href="#tables">Tables</a>
+  <a href="#alerts">Alerts</a>
+</nav>
+
+<div class="doc-body">
+
+  <!-- ==================== COLORS ==================== -->
+  <section id="colors">
+    <h2 class="section-title">Color palette</h2>
+    <p class="section-desc">All colors defined as CSS custom properties. Never hardcode hex values in components — always reference the token.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">Brand colors</div>
+      <div class="color-grid">
+        <div class="color-chip">
+          <div class="color-swatch" style="background:#0052CC;"></div>
+          <div class="color-info"><div class="color-name">Primary</div><div class="color-hex">--primary · #0052CC</div></div>
+        </div>
+        <div class="color-chip">
+          <div class="color-swatch" style="background:#DEEBFF;"></div>
+          <div class="color-info"><div class="color-name">Primary light</div><div class="color-hex">--primary-light · #DEEBFF</div></div>
+        </div>
+        <div class="color-chip">
+          <div class="color-swatch" style="background:#003A8C;"></div>
+          <div class="color-info"><div class="color-name">Primary dark</div><div class="color-hex">--primary-dark · #003A8C</div></div>
+        </div>
+        <div class="color-chip">
+          <div class="color-swatch" style="background:#00875A;"></div>
+          <div class="color-info"><div class="color-name">Success</div><div class="color-hex">--success · #00875A</div></div>
+        </div>
+        <div class="color-chip">
+          <div class="color-swatch" style="background:#E3FCEF;"></div>
+          <div class="color-info"><div class="color-name">Success light</div><div class="color-hex">--success-light · #E3FCEF</div></div>
+        </div>
+        <div class="color-chip">
+          <div class="color-swatch" style="background:#FF991F;"></div>
+          <div class="color-info"><div class="color-name">Warning</div><div class="color-hex">--warning · #FF991F</div></div>
+        </div>
+        <div class="color-chip">
+          <div class="color-swatch" style="background:#DE350B;"></div>
+          <div class="color-info"><div class="color-name">Danger</div><div class="color-hex">--danger · #DE350B</div></div>
+        </div>
+        <div class="color-chip">
+          <div class="color-swatch" style="background:#FFEBE6;"></div>
+          <div class="color-info"><div class="color-name">Danger light</div><div class="color-hex">--danger-light · #FFEBE6</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Neutral scale</div>
+      <div class="neutral-row">
+        <div class="neutral-chip"><div class="neutral-swatch" style="background:#FFFFFF; border-right:1px solid #eee;"></div><div class="neutral-label">0</div></div>
+        <div class="neutral-chip"><div class="neutral-swatch" style="background:#F5F7FA;"></div><div class="neutral-label">50</div></div>
+        <div class="neutral-chip"><div class="neutral-swatch" style="background:#EBECF0;"></div><div class="neutral-label">100</div></div>
+        <div class="neutral-chip"><div class="neutral-swatch" style="background:#DFE1E6;"></div><div class="neutral-label">200</div></div>
+        <div class="neutral-chip"><div class="neutral-swatch" style="background:#C1C7D0;"></div><div class="neutral-label">300</div></div>
+        <div class="neutral-chip"><div class="neutral-swatch" style="background:#A5ADBA;"></div><div class="neutral-label">400</div></div>
+        <div class="neutral-chip"><div class="neutral-swatch" style="background:#6B778C;"></div><div class="neutral-label">500</div></div>
+        <div class="neutral-chip"><div class="neutral-swatch" style="background:#505F79;"></div><div class="neutral-label">600</div></div>
+        <div class="neutral-chip"><div class="neutral-swatch" style="background:#344563;"></div><div class="neutral-label">700</div></div>
+        <div class="neutral-chip"><div class="neutral-swatch" style="background:#172B4D;"></div><div class="neutral-label">800</div></div>
+        <div class="neutral-chip"><div class="neutral-swatch" style="background:#091E42;"></div><div class="neutral-label">900</div></div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Usage rules</div>
+      <div class="canvas card-flat" style="padding: var(--space-5);">
+        <div class="spec-row"><span class="spec-label">Page background</span><span class="spec-value">--gray-50</span></div>
+        <div class="spec-row"><span class="spec-label">Card / surface</span><span class="spec-value">--gray-0 (white)</span></div>
+        <div class="spec-row"><span class="spec-label">Primary text</span><span class="spec-value">--gray-800</span></div>
+        <div class="spec-row"><span class="spec-label">Secondary text</span><span class="spec-value">--gray-500</span></div>
+        <div class="spec-row"><span class="spec-label">Disabled text</span><span class="spec-value">--gray-300</span></div>
+        <div class="spec-row"><span class="spec-label">Default border</span><span class="spec-value">--gray-200</span></div>
+        <div class="spec-row"><span class="spec-label">Hover border</span><span class="spec-value">--gray-400</span></div>
+        <div class="spec-row"><span class="spec-label">Focus ring</span><span class="spec-value">--primary at 30% opacity, 3px spread</span></div>
+        <div class="spec-row"><span class="spec-label">Interactive accent</span><span class="spec-value">--primary</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TYPOGRAPHY ==================== -->
+  <section id="typography">
+    <h2 class="section-title">Typography</h2>
+    <p class="section-desc">Two fonts: <strong>Syne</strong> for headings and display numbers (expressive, distinctive), <strong>DM Sans</strong> for all body text (clean, readable). Import both from Google Fonts.</p>
+
+    <div class="canvas mb-4">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="type-label mb-2">Display XL — Syne 800 · 40px · −0.03em</div>
+          <div class="type-display-xl">2,184 kcal</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="mb-4">
+        <div class="type-label mb-2">Display LG — Syne 700 · 32px · −0.025em</div>
+        <div class="type-display-lg">Weekly Progress</div>
+      </div>
+      <div class="divider"></div>
+      <div class="mb-4">
+        <div class="type-label mb-2">Display MD — Syne 600 · 24px · −0.02em</div>
+        <div class="type-display-md">Dashboard</div>
+      </div>
+      <div class="divider"></div>
+      <div class="mb-4">
+        <div class="type-label mb-2">Heading — Syne 600 · 20px · −0.01em</div>
+        <div class="type-heading">Today's meal log</div>
+      </div>
+      <div class="divider"></div>
+      <div class="mb-4">
+        <div class="type-label mb-2">Subheading — DM Sans 500 · 17px</div>
+        <div class="type-subheading">Your nutrition targets for the week</div>
+      </div>
+      <div class="divider"></div>
+      <div class="mb-4">
+        <div class="type-label mb-2">Body — DM Sans 400 · 15px · line-height 1.6</div>
+        <div class="type-body">Cadets in OCS training place high physical demands on their bodies. Tracking daily caloric intake and macronutrient balance helps optimise performance and recovery.</div>
+      </div>
+      <div class="divider"></div>
+      <div class="mb-4">
+        <div class="type-label mb-2">Body SM — DM Sans 400 · 13px · line-height 1.5</div>
+        <div class="type-body-sm">Last updated 3 hours ago · DIS Wing</div>
+      </div>
+      <div class="divider"></div>
+      <div class="mb-4">
+        <div class="type-label mb-2">Caption — DM Sans 400 · 12px</div>
+        <div class="type-caption">Nutritional data sourced from Singapore cookhouse records.</div>
+      </div>
+      <div class="divider"></div>
+      <div>
+        <div class="type-label mb-2">Label / overline — DM Sans 500 · 11px · uppercase · 0.08em tracking</div>
+        <div class="type-label">Section header</div>
+      </div>
+    </div>
+
+    <div class="canvas card-flat" style="padding: var(--space-5);">
+      <div class="subsection-title" style="margin-bottom: var(--space-3);">Google Fonts import</div>
+      <code style="font-size:12px; color: var(--gray-600); display:block; background: var(--gray-50); padding: var(--space-3); border-radius: var(--radius-md); border: var(--border);">
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+      </code>
+    </div>
+  </section>
+
+  <!-- ==================== SPACING ==================== -->
+  <section id="spacing">
+    <h2 class="section-title">Spacing</h2>
+    <p class="section-desc">4px base unit. All spacing uses multiples of 4. Use these tokens — never arbitrary pixel values.</p>
+
+    <div class="canvas">
+      <div class="spacing-row"><div class="spacing-bar" style="width:4px;"></div><span class="spacing-info">--space-1 · 4px · micro gap</span></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:8px;"></div><span class="spacing-info">--space-2 · 8px · icon–label gap</span></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:12px;"></div><span class="spacing-info">--space-3 · 12px · input padding</span></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:16px;"></div><span class="spacing-info">--space-4 · 16px · card inner gap</span></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:20px;"></div><span class="spacing-info">--space-5 · 20px · card padding</span></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:24px;"></div><span class="spacing-info">--space-6 · 24px · section gap</span></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:32px;"></div><span class="spacing-info">--space-8 · 32px · large section gap</span></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:40px;"></div><span class="spacing-info">--space-10 · 40px · page gutter (mobile)</span></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:48px;"></div><span class="spacing-info">--space-12 · 48px · section header margin</span></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:64px;"></div><span class="spacing-info">--space-16 · 64px · page section spacing</span></div>
+    </div>
+
+    <div class="canvas card-flat" style="padding: var(--space-5); margin-top: var(--space-4);">
+      <div class="subsection-title" style="margin-bottom: var(--space-3);">Border radius tokens</div>
+      <div style="display:flex; gap: var(--space-4); flex-wrap: wrap; align-items: flex-end;">
+        <div style="text-align:center;">
+          <div style="width:40px;height:40px;background:var(--primary-light);border:1.5px solid var(--primary);border-radius:4px;margin:0 auto var(--space-2);"></div>
+          <div class="type-caption">--radius-sm<br>4px</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:48px;height:48px;background:var(--primary-light);border:1.5px solid var(--primary);border-radius:8px;margin:0 auto var(--space-2);"></div>
+          <div class="type-caption">--radius-md<br>8px</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:56px;height:56px;background:var(--primary-light);border:1.5px solid var(--primary);border-radius:12px;margin:0 auto var(--space-2);"></div>
+          <div class="type-caption">--radius-lg<br>12px (cards)</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:64px;height:64px;background:var(--primary-light);border:1.5px solid var(--primary);border-radius:16px;margin:0 auto var(--space-2);"></div>
+          <div class="type-caption">--radius-xl<br>16px</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:72px;height:72px;background:var(--primary-light);border:1.5px solid var(--primary);border-radius:24px;margin:0 auto var(--space-2);"></div>
+          <div class="type-caption">--radius-2xl<br>24px</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:48px;height:32px;background:var(--primary-light);border:1.5px solid var(--primary);border-radius:9999px;margin:0 auto var(--space-2);"></div>
+          <div class="type-caption">--radius-full<br>pills/tags</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== BUTTONS ==================== -->
+  <section id="buttons">
+    <h2 class="section-title">Buttons</h2>
+    <p class="section-desc">All button sizes and variants. Minimum touch target: 44×44px on mobile. Always include a hover and focus state.</p>
+
+    <div class="canvas">
+      <div class="subsection-title">Variants</div>
+      <div class="btn-row">
+        <button class="btn btn-primary btn-md">Primary</button>
+        <button class="btn btn-secondary btn-md">Secondary</button>
+        <button class="btn btn-outline btn-md">Outline</button>
+        <button class="btn btn-ghost btn-md">Ghost</button>
+        <button class="btn btn-danger btn-md">Danger</button>
+        <button class="btn btn-success btn-md">Success</button>
+      </div>
+
+      <div class="subsection-title">Sizes</div>
+      <div class="btn-row" style="align-items: center;">
+        <button class="btn btn-primary btn-sm">Small</button>
+        <button class="btn btn-primary btn-md">Medium</button>
+        <button class="btn btn-primary btn-lg">Large</button>
+        <button class="btn btn-primary btn-xl">Extra large</button>
+      </div>
+
+      <div class="subsection-title">States</div>
+      <div class="btn-row">
+        <button class="btn btn-primary btn-md">Default</button>
+        <button class="btn btn-primary btn-md" style="background:var(--primary-dark);">Hover</button>
+        <button class="btn btn-primary btn-md" style="box-shadow:0 0 0 3px rgba(0,82,204,0.3);">Focus</button>
+        <button class="btn btn-primary btn-md" disabled>Disabled</button>
+      </div>
+
+      <div class="subsection-title">Specs (medium)</div>
+      <div class="canvas card-flat" style="padding: var(--space-4);">
+        <div class="spec-row"><span class="spec-label">Font size</span><span class="spec-value">14px · DM Sans 500</span></div>
+        <div class="spec-row"><span class="spec-label">Padding</span><span class="spec-value">9px 16px</span></div>
+        <div class="spec-row"><span class="spec-label">Border radius</span><span class="spec-value">--radius-md (8px)</span></div>
+        <div class="spec-row"><span class="spec-label">Border width</span><span class="spec-value">1.5px</span></div>
+        <div class="spec-row"><span class="spec-label">Transition</span><span class="spec-value">150ms ease</span></div>
+        <div class="spec-row"><span class="spec-label">Focus ring</span><span class="spec-value">0 0 0 3px rgba(0,82,204,0.3)</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FORMS ==================== -->
+  <section id="forms">
+    <h2 class="section-title">Form elements</h2>
+    <p class="section-desc">All inputs share a 40px height, 1.5px border, 8px radius. Consistent focus state across every input type.</p>
+
+    <div class="canvas">
+      <div class="grid-2 gap-4" style="margin-bottom: var(--space-6);">
+        <div class="form-group">
+          <label class="form-label">Weight (kg) <span class="required">*</span></label>
+          <div class="input-group">
+            <input class="input has-suffix" type="number" placeholder="72.5">
+            <span class="input-suffix">kg</span>
+          </div>
+          <div class="form-hint">Enter your current body weight.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Height (cm) <span class="required">*</span></label>
+          <div class="input-group">
+            <input class="input has-suffix" type="number" placeholder="175">
+            <span class="input-suffix">cm</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Goal mode</label>
+          <select class="input">
+            <option>Bulk</option>
+            <option>Maintain</option>
+            <option>Cut</option>
+            <option>IPPT</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Wing</label>
+          <select class="input">
+            <option>Alpha</option>
+            <option>Charlie</option>
+            <option>Delta</option>
+            <option>Echo</option>
+            <option>Sierra</option>
+            <option>Tango</option>
+            <option>MIDS</option>
+            <option>Air</option>
+            <option selected>DIS</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Search food</label>
+          <div class="input-group">
+            <span class="input-prefix">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="#6B778C" stroke-width="1.5"/><path d="M11 11l3 3" stroke="#6B778C" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </span>
+            <input class="input has-prefix" type="text" placeholder="e.g. chicken rice">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Error state</label>
+          <input class="input error" type="email" value="notanemail" placeholder="Email">
+          <div class="form-error">Please enter a valid email address.</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="input" rows="3" placeholder="Any additional notes about your meal..."></textarea>
+      </div>
+
+      <div class="subsection-title" style="margin-top: var(--space-5);">Checkboxes</div>
+      <div style="display:flex; flex-direction:column; gap: var(--space-3);">
+        <div class="checkbox-group">
+          <div class="checkbox checked"></div>
+          <div>
+            <div class="type-body-sm" style="color:var(--gray-800); font-weight:500;">I agree to share anonymised data for wing analytics</div>
+            <div class="type-caption">Your individual data remains private.</div>
+          </div>
+        </div>
+        <div class="checkbox-group">
+          <div class="checkbox"></div>
+          <div>
+            <div class="type-body-sm" style="color:var(--gray-800); font-weight:500;">Receive daily nutrition tips</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="subsection-title" style="margin-top: var(--space-5);">Input specs</div>
+      <div class="canvas card-flat" style="padding: var(--space-4);">
+        <div class="spec-row"><span class="spec-label">Height</span><span class="spec-value">40px</span></div>
+        <div class="spec-row"><span class="spec-label">Padding</span><span class="spec-value">0 12px</span></div>
+        <div class="spec-row"><span class="spec-label">Border</span><span class="spec-value">1.5px solid --gray-300</span></div>
+        <div class="spec-row"><span class="spec-label">Border (hover)</span><span class="spec-value">1.5px solid --gray-400</span></div>
+        <div class="spec-row"><span class="spec-label">Border (focus)</span><span class="spec-value">1.5px solid --primary</span></div>
+        <div class="spec-row"><span class="spec-label">Focus shadow</span><span class="spec-value">0 0 0 3px rgba(0,82,204,0.12)</span></div>
+        <div class="spec-row"><span class="spec-label">Font</span><span class="spec-value">DM Sans 400 · 14px</span></div>
+        <div class="spec-row"><span class="spec-label">Placeholder color</span><span class="spec-value">--gray-400</span></div>
+        <div class="spec-row"><span class="spec-label">Disabled bg</span><span class="spec-value">--gray-100</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== CARDS ==================== -->
+  <section id="cards">
+    <h2 class="section-title">Cards</h2>
+    <p class="section-desc">White surface, 1px border, 12px radius. Cards never have colored backgrounds — color lives inside them through badges, progress bars, and numbers.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">Stat cards</div>
+      <div class="grid-3 gap-4 mb-6">
+        <div class="stat-card">
+          <div class="stat-label">Calories today</div>
+          <div class="stat-value">2,184</div>
+          <div class="progress-track"><div class="progress-fill" style="width:72%; background:var(--primary);"></div></div>
+          <div class="flex items-center justify-between" style="margin-top:var(--space-2);">
+            <div class="stat-sub">of 3,040 target</div>
+            <div class="stat-delta neutral">72%</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Protein</div>
+          <div class="stat-value" style="color:var(--success);">148g</div>
+          <div class="progress-track"><div class="progress-fill" style="width:88%; background:var(--success);"></div></div>
+          <div class="flex items-center justify-between" style="margin-top:var(--space-2);">
+            <div class="stat-sub">of 168g target</div>
+            <div class="stat-delta up">On track</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Wing rank</div>
+          <div class="stat-value">#3</div>
+          <div style="margin-top: var(--space-2);">
+            <div class="stat-delta up" style="display:inline-flex;"># 5 last week</div>
+          </div>
+          <div class="stat-sub" style="margin-top:var(--space-2);">Top 15% · DIS Wing</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Content card — meal log</div>
+      <div class="card" style="max-width: 420px;">
+        <div class="card-header">
+          <div class="card-title">Today's meals</div>
+          <button class="btn btn-outline btn-sm">+ Add meal</button>
+        </div>
+        <div class="meal-row">
+          <div class="meal-icon" style="background:var(--warning-light);">🍳</div>
+          <div class="meal-info">
+            <div class="meal-name">Scrambled eggs + toast</div>
+            <div class="meal-meta">Breakfast · 7:30am</div>
+          </div>
+          <div class="meal-cal">410 kcal</div>
+        </div>
+        <div class="meal-row">
+          <div class="meal-icon" style="background:var(--success-light);">🍚</div>
+          <div class="meal-info">
+            <div class="meal-name">Chicken rice (cookhouse)</div>
+            <div class="meal-meta">Lunch · 12:15pm</div>
+          </div>
+          <div class="meal-cal">520 kcal</div>
+        </div>
+        <div class="meal-row">
+          <div class="meal-icon" style="background:var(--primary-light);">🥛</div>
+          <div class="meal-info">
+            <div class="meal-name">Protein shake</div>
+            <div class="meal-meta">Snack · 3:00pm</div>
+          </div>
+          <div class="meal-cal">210 kcal</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="subsection" style="margin-top: var(--space-8);">
+      <div class="subsection-title">Card specs</div>
+      <div class="canvas card-flat" style="padding: var(--space-4);">
+        <div class="spec-row"><span class="spec-label">Background</span><span class="spec-value">white</span></div>
+        <div class="spec-row"><span class="spec-label">Border</span><span class="spec-value">1px solid --gray-200</span></div>
+        <div class="spec-row"><span class="spec-label">Border radius</span><span class="spec-value">--radius-lg (12px)</span></div>
+        <div class="spec-row"><span class="spec-label">Padding</span><span class="spec-value">20px 24px</span></div>
+        <div class="spec-row"><span class="spec-label">Hover shadow</span><span class="spec-value">0 3px 8px rgba(9,30,66,0.12)</span></div>
+        <div class="spec-row"><span class="spec-label">Progress track</span><span class="spec-value">6px height · --gray-100 bg · radius-full</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== BADGES ==================== -->
+  <section id="badges">
+    <h2 class="section-title">Badges & tags</h2>
+    <p class="section-desc">Small, high-information labels. Badges use uppercase + letter-spacing for legibility at small sizes.</p>
+
+    <div class="canvas">
+      <div class="subsection-title">Status badges</div>
+      <div class="flex gap-3 mb-6" style="flex-wrap:wrap;">
+        <span class="badge badge-primary">Bulk</span>
+        <span class="badge badge-success">On track</span>
+        <span class="badge badge-warning">Review</span>
+        <span class="badge badge-danger">Under target</span>
+        <span class="badge badge-neutral">Inactive</span>
+      </div>
+
+      <div class="subsection-title">Meal type badges</div>
+      <div class="flex gap-3 mb-6" style="flex-wrap:wrap;">
+        <span class="badge" style="background:#FFF7ED;color:#92400E;">Breakfast</span>
+        <span class="badge badge-success">Lunch</span>
+        <span class="badge badge-primary">Dinner</span>
+        <span class="badge badge-neutral">Snack</span>
+      </div>
+
+      <div class="subsection-title">Wing badge</div>
+      <div class="flex gap-3 mb-6" style="flex-wrap:wrap;">
+        <span class="wing-badge">DIS Wing</span>
+        <span class="wing-badge">Alpha Wing</span>
+        <span class="wing-badge">Echo Wing</span>
+      </div>
+
+      <div class="subsection-title">Goal mode pills</div>
+      <div class="flex gap-3" style="flex-wrap:wrap;">
+        <span class="goal-pill goal-bulk">Bulk</span>
+        <span class="goal-pill goal-cut">Cut</span>
+        <span class="goal-pill goal-maintain">Maintain</span>
+        <span class="goal-pill goal-ippt">IPPT</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== NAVIGATION ==================== -->
+  <section id="navigation">
+    <h2 class="section-title">Navigation</h2>
+    <p class="section-desc">Top nav for desktop, bottom tab bar for mobile. Both share the same active state colour.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">Top navigation (desktop)</div>
+      <div class="canvas" style="padding: 0; overflow: hidden;">
+        <nav class="topnav">
+          <a href="#" class="topnav-logo">INAP<span>·</span>Coach</a>
+          <div class="topnav-links">
+            <a href="#" class="topnav-link active">Dashboard</a>
+            <a href="#" class="topnav-link">Log meal</a>
+            <a href="#" class="topnav-link">Progress</a>
+            <a href="#" class="topnav-link">Rankings</a>
+            <a href="#" class="topnav-link">Tips</a>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="avatar">DC</div>
+          </div>
+        </nav>
+      </div>
+    </div>
+
+    <div class="subsection" style="margin-top: var(--space-8);">
+      <div class="subsection-title">Bottom tab bar (mobile)</div>
+      <div style="max-width: 375px; border: var(--border); border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-md);">
+        <div class="bottom-nav">
+          <div class="bottom-nav-item active">
+            <div class="bottom-nav-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="2" fill="#0052CC"/><rect x="14" y="3" width="7" height="7" rx="2" fill="#0052CC" opacity="0.4"/><rect x="3" y="14" width="7" height="7" rx="2" fill="#0052CC" opacity="0.4"/><rect x="14" y="14" width="7" height="7" rx="2" fill="#0052CC" opacity="0.4"/></svg>
+            </div>
+            <div class="bottom-nav-label" style="color:var(--primary);">Home</div>
+          </div>
+          <div class="bottom-nav-item">
+            <div class="bottom-nav-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#A5ADBA" stroke-width="1.5"/><path d="M12 8v4l3 3" stroke="#A5ADBA" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div class="bottom-nav-label">Log</div>
+          </div>
+          <div class="bottom-nav-item">
+            <div class="bottom-nav-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke="#A5ADBA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="bottom-nav-label">Progress</div>
+          </div>
+          <div class="bottom-nav-item">
+            <div class="bottom-nav-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 20l4-8 4 4 4-6 4 10" stroke="#A5ADBA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="bottom-nav-label">Rankings</div>
+          </div>
+          <div class="bottom-nav-item">
+            <div class="bottom-nav-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="#A5ADBA" stroke-width="1.5"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#A5ADBA" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div class="bottom-nav-label">Profile</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TABLES ==================== -->
+  <section id="tables">
+    <h2 class="section-title">Tables</h2>
+    <p class="section-desc">Used for leaderboards and food logs. Always include a hover state. Header row uses uppercase labels.</p>
+
+    <div class="canvas" style="padding: 0; overflow: hidden;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:48px;">Rank</th>
+            <th>Cadet</th>
+            <th>Wing</th>
+            <th>Consistency</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="rank-num rank-1">1</span></td>
+            <td style="font-weight:500;color:var(--gray-900);">ME4T Brayden Lim</td>
+            <td><span class="wing-badge" style="font-size:10px;padding:2px 8px;">DIS</span></td>
+            <td>
+              <div class="progress-track" style="width:120px; display:inline-block;">
+                <div class="progress-fill" style="width:95%; background:var(--success);"></div>
+              </div>
+            </td>
+            <td style="font-family:var(--font-display); font-weight:700; color:var(--gray-900);">948</td>
+          </tr>
+          <tr>
+            <td><span class="rank-num rank-2">2</span></td>
+            <td style="font-weight:500;color:var(--gray-900);">ME4T Kalyaan Sundar</td>
+            <td><span class="wing-badge" style="font-size:10px;padding:2px 8px;">DIS</span></td>
+            <td>
+              <div class="progress-track" style="width:120px; display:inline-block;">
+                <div class="progress-fill" style="width:88%; background:var(--primary);"></div>
+              </div>
+            </td>
+            <td style="font-family:var(--font-display); font-weight:700; color:var(--gray-900);">891</td>
+          </tr>
+          <tr>
+            <td><span class="rank-num rank-3">3</span></td>
+            <td style="font-weight:500;color:var(--gray-900);">ME4T Dylan Chong</td>
+            <td><span class="wing-badge" style="font-size:10px;padding:2px 8px;">DIS</span></td>
+            <td>
+              <div class="progress-track" style="width:120px; display:inline-block;">
+                <div class="progress-fill" style="width:82%; background:var(--primary);"></div>
+              </div>
+            </td>
+            <td style="font-family:var(--font-display); font-weight:700; color:var(--gray-900);">834</td>
+          </tr>
+          <tr>
+            <td><span class="rank-num">4</span></td>
+            <td style="font-weight:500;color:var(--gray-900);">ME4T Aloysius Chow</td>
+            <td><span class="wing-badge" style="font-size:10px;padding:2px 8px;">DIS</span></td>
+            <td>
+              <div class="progress-track" style="width:120px; display:inline-block;">
+                <div class="progress-fill" style="width:74%; background:var(--primary);"></div>
+              </div>
+            </td>
+            <td style="font-family:var(--font-display); font-weight:700; color:var(--gray-900);">762</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ==================== ALERTS ==================== -->
+  <section id="alerts">
+    <h2 class="section-title">Alerts & toasts</h2>
+    <p class="section-desc">Inline alerts for contextual feedback. Toasts for transient confirmations (auto-dismiss after 4s).</p>
+
+    <div class="canvas">
+      <div class="subsection-title">Inline alerts</div>
+      <div class="alert alert-info">
+        <div class="alert-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#0052CC" stroke-width="1.5"/><path d="M8 7v4" stroke="#0052CC" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="5" r="0.75" fill="#0052CC"/></svg>
+        </div>
+        <div class="alert-body">
+          <div class="alert-title">Calorie target updated</div>
+          <div>Your new bulk target is 3,040 kcal/day based on your updated weight and activity level.</div>
+        </div>
+      </div>
+      <div class="alert alert-success">
+        <div class="alert-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#00875A" stroke-width="1.5"/><path d="M5 8l2 2 4-4" stroke="#00875A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="alert-body">
+          <div class="alert-title">Meal logged successfully</div>
+          <div>Chicken rice added · 520 kcal · 28g protein</div>
+        </div>
+      </div>
+      <div class="alert alert-warning">
+        <div class="alert-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2L14 13H2L8 2Z" stroke="#FF991F" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 7v3" stroke="#FF991F" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r="0.75" fill="#FF991F"/></svg>
+        </div>
+        <div class="alert-body">
+          <div class="alert-title">Approaching calorie target</div>
+          <div>You've consumed 2,800 of your 3,040 kcal daily target.</div>
+        </div>
+      </div>
+      <div class="alert alert-danger">
+        <div class="alert-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#DE350B" stroke-width="1.5"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="#DE350B" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="alert-body">
+          <div class="alert-title">Protein target missed</div>
+          <div>You're 40g below your protein target for today. Consider a high-protein snack.</div>
+        </div>
+      </div>
+
+      <div class="subsection-title" style="margin-top: var(--space-6);">Toast notifications</div>
+      <div style="display:flex; flex-direction:column; gap: var(--space-3);">
+        <div class="toast">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" fill="#00875A"/><path d="M5 8l2 2 4-4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span style="flex:1; font-size:14px;">Meal logged — 520 kcal added</span>
+          <span class="toast-action">Undo</span>
+        </div>
+        <div class="toast">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" fill="#0052CC"/><path d="M8 7v4" stroke="white" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="5" r="0.75" fill="white"/></svg>
+          <span style="flex:1; font-size:14px;">Profile saved successfully</span>
+          <span class="toast-action">Dismiss</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.doc-nav a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`.doc-nav a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { threshold: 0.3 });
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
