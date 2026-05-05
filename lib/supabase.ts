@@ -24,5 +24,23 @@ export async function getCurrentUser() {
 }
 
 // TODO: Sign up new user
+export async function signUp(email: string, password: string) {
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+    })
+    if (error) console.error('Sign up error:', error)
+    return data
+}
 
 // TODO: Sign in existing user with email + password (can change)
+export async function signIn(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+    })
+    if (error) console.error('Sign in error:', error)
+    return data
+}
+
+// TODO : Connect Supabase auth with users table in database (can change)
