@@ -3,7 +3,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (@media (prefers-color-scheme: dark));
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
@@ -167,8 +167,7 @@
   --transition-slow: 250ms ease;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+.dark {
     /* Brand */
     --primary:       #2684FF;
     --primary-light: rgba(38, 132, 255, 0.15);
@@ -214,7 +213,6 @@
     --sidebar-accent-foreground:  #F5F7FA;
     --sidebar-border:             #344563;
     --sidebar-ring:               #2684FF;
-  }
 }
 
 @layer base {
