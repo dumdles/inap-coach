@@ -90,34 +90,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setError(null)
         setIsLoading(true)
         try {
-            const { data, error } = await supabase.auth.signUp({
-                email,
-                password,
+            const res = await fetch('/api/auth/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, userData }),
             })
 
+            const body = await res.json()
+            if (!res.ok) throw new Error(body.error ?? 'Sign up failed')
+
+            // Establish client session after server-side creation
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password })
             if (error) throw error
-
-            if (!data.user) {
-                throw new Error('User creation failed')
-            }
-
-            // Create user profile
-            const { error: profileError } = await supabase
-                .from('users')
-                .insert([
-                    {
-                        id: data.user.id,
-                        email,
-                        username: email.split('@')[0],
-                        ...userData,
-                    },
-                ])
-
-            if (profileError) {
-                // Clean up auth user if profile fails
-                await supabase.auth.admin.deleteUser(data.user.id)
-                throw profileError
-            }
 
             setUser(data.user)
             setSession(data.session)
