@@ -33,15 +33,14 @@ const WINGS = [
 const GENDERS = [
     { value: 'Male',   label: 'Male' },
     { value: 'Female', label: 'Female' },
-    { value: 'Other',  label: 'Other' },
 ]
 
 const ACTIVITY_LEVELS = [
-    { value: 'sedentary',  label: 'Sedentary',    description: 'Little or no exercise' },
-    { value: 'light',      label: 'Light',         description: '1–3 days/week' },
-    { value: 'moderate',   label: 'Moderate',      description: '3–5 days/week' },
-    { value: 'active',     label: 'Active',        description: '6–7 days/week' },
-    { value: 'very_active', label: 'Very Active',  description: 'Hard daily training' },
+    { value: 'sedentary',   label: 'Sedentary',   description: 'Desk-bound most of the day, little to no exercise' },
+    { value: 'light',       label: 'Light',        description: 'Light exercise or sport 1–3 days a week' },
+    { value: 'moderate',    label: 'Moderate',     description: 'Moderate exercise or sport 3–5 days a week' },
+    { value: 'active',      label: 'Active',       description: 'Hard exercise or sport 6–7 days a week' },
+    { value: 'very_active', label: 'Very Active',  description: 'Hard daily training plus a physical job or twice-a-day sessions' },
 ]
 
 const GOAL_MODES = [
@@ -94,6 +93,8 @@ export const SignUpForm: React.FC = () => {
         username: '',
         rank: '',
         wing: '',
+        platoon: '',
+        section: '',
         email: '',
         password: '',
     })
@@ -120,6 +121,8 @@ export const SignUpForm: React.FC = () => {
         }
         if (!step1.rank) errors.rank = 'Rank is required'
         if (!step1.wing) errors.wing = 'Wing is required'
+        if (!step1.platoon) errors.platoon = 'Platoon is required'
+        if (!step1.section) errors.section = 'Section is required'
         if (!step1.email) {
             errors.email = 'Email is required'
         } else if (!step1.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
@@ -171,6 +174,8 @@ export const SignUpForm: React.FC = () => {
                 username: step1.username,
                 rank: step1.rank,
                 wing: step1.wing,
+                platoon: step1.platoon,
+                section: step1.section,
                 date_of_birth: step2.dateOfBirth,
                 gender: step2.gender,
                 height_cm: parseFloat(step2.heightCm),
@@ -312,6 +317,27 @@ export const SignUpForm: React.FC = () => {
                                     <p className="text-xs text-danger">{validationErrors.wing}</p>
                                 )}
                             </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <InputField
+                                name="platoon"
+                                type="text"
+                                label="Platoon"
+                                placeholder="e.g. 1"
+                                value={step1.platoon}
+                                onChange={handleStep1Change}
+                                error={validationErrors.platoon}
+                            />
+                            <InputField
+                                name="section"
+                                type="text"
+                                label="Section"
+                                placeholder="e.g. A"
+                                value={step1.section}
+                                onChange={handleStep1Change}
+                                error={validationErrors.section}
+                            />
                         </div>
 
                         <InputField
