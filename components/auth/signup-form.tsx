@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { DatePicker } from '@/components/ui/date-picker'
 
 const RANKS = ['OCT', 'ME4T', '2LT', 'LTA', 'CPT', 'MAJ', 'LTC', 'SLTC', 'COL']
 
@@ -121,8 +122,6 @@ export const SignUpForm: React.FC = () => {
         }
         if (!step1.rank) errors.rank = 'Rank is required'
         if (!step1.wing) errors.wing = 'Wing is required'
-        if (!step1.platoon) errors.platoon = 'Platoon is required'
-        if (!step1.section) errors.section = 'Section is required'
         if (!step1.email) {
             errors.email = 'Email is required'
         } else if (!step1.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
@@ -369,14 +368,21 @@ export const SignUpForm: React.FC = () => {
                 ) : step === 2 ? (
                     <div className="space-y-5">
                         <div className="grid grid-cols-2 gap-4">
-                            <InputField
-                                name="dateOfBirth"
-                                type="date"
-                                label="Date of Birth"
-                                value={step2.dateOfBirth}
-                                onChange={handleStep2Change}
-                                error={validationErrors.dateOfBirth}
-                            />
+                            <div className="flex flex-col gap-2">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Date of Birth <span className="text-danger">*</span>
+                                </label>
+                                <DatePicker
+                                    value={step2.dateOfBirth}
+                                    onChange={v => {
+                                        setStep2(prev => ({ ...prev, dateOfBirth: v }))
+                                        if (validationErrors.dateOfBirth) setValidationErrors(prev => ({ ...prev, dateOfBirth: '' }))
+                                    }}
+                                />
+                                {validationErrors.dateOfBirth && (
+                                    <p className="text-xs text-danger">{validationErrors.dateOfBirth}</p>
+                                )}
+                            </div>
                             <div className="flex flex-col gap-2">
                                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Gender <span className="text-danger">*</span>
