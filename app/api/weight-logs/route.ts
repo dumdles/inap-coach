@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabaseAdmin
         .from('weight_logs')
-        .select('id, weight_kg, logged_at')
+        .select('id, weight_kg, body_fat_pct, polar_steps, polar_calories_burned, logged_at')
         .eq('user_id', userId)
         .gte('logged_at', since.toISOString())
         .order('logged_at', { ascending: true })
@@ -28,12 +28,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(data ?? [])
 }
 
-// POST /api/weight-logs  { userId, weight_kg }
+// POST /api/weight-logs  { userId, weight_kg, body_fat_pct? }
 export async function POST(req: NextRequest) {
-    const { userId, weight_kg } = await req.json()
+    const { userId, weight_kg, body_fat_pct } = await req.json()
     if (!userId || !weight_kg) return NextResponse.json({ error: 'missing fields' }, { status: 400 })
 
-    // Upsert for today (one entry per day)
+    const payload: Record<string, unknown> = { weight_kg }
+    if (body_fat_pct != null) payload.body_fat_pct = body_fat_pct
+
+    // Upsert for today — one entry per day
     const today = new Date().toISOString().slice(0, 10)
     const { data: existing } = await supabaseAdmin
         .from('weight_logs')
@@ -44,9 +47,9 @@ export async function POST(req: NextRequest) {
         .single()
 
     if (existing) {
-        await supabaseAdmin.from('weight_logs').update({ weight_kg }).eq('id', existing.id)
+        await supabaseAdmin.from('weight_logs').update(payload).eq('id', existing.id)
     } else {
-        await supabaseAdmin.from('weight_logs').insert({ user_id: userId, weight_kg })
+        await supabaseAdmin.from('weight_logs').insert({ user_id: userId, ...payload })
     }
 
     return NextResponse.json({ ok: true })

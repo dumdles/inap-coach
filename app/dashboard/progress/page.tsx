@@ -7,7 +7,14 @@ import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 
-type WeightLog = { id: string; weight_kg: number; logged_at: string }
+type WeightLog = {
+    id: string
+    weight_kg: number
+    body_fat_pct: number | null
+    polar_steps: number | null
+    polar_calories_burned: number | null
+    logged_at: string
+}
 type UserProfile = {
     weight_kg: number | null
     target_weight_kg: number | null
@@ -60,50 +67,56 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string;
     )
 }
 
-function LogWeightModal({ currentWeight, onLog, onClose }: {
+function LogWeightModal({ currentWeight, currentBodyFat, onLog, onClose }: {
     currentWeight: number | null
-    onLog: (w: number) => Promise<void>
+    currentBodyFat: number | null
+    onLog: (w: number, bf: number | null) => Promise<void>
     onClose: () => void
 }) {
-    const [val, setVal] = useState(currentWeight?.toString() ?? '')
+    const [weight, setWeight] = useState(currentWeight?.toString() ?? '')
+    const [bodyFat, setBodyFat] = useState(currentBodyFat?.toString() ?? '')
     const [saving, setSaving] = useState(false)
+
+    const inputCls = 'h-11 rounded-xl border border-border bg-background px-4 text-[15px] font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 w-full'
+
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
             <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
-                <div className="font-display text-[18px] font-bold text-foreground mb-1">Log today's weight</div>
-                <div className="text-[13px] text-muted-foreground mb-5">Enter your weight in kg to track your progress.</div>
-                <div className="flex items-center gap-3">
-                    <input
-                        autoFocus
-                        type="number"
-                        step="0.1"
-                        value={val}
-                        onChange={e => setVal(e.target.value)}
-                        placeholder="e.g. 72.5"
-                        className="flex-1 h-11 rounded-xl border border-border bg-background px-4 text-[15px] font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    />
-                    <span className="text-[14px] text-muted-foreground font-medium">kg</span>
+                <div className="font-display text-[18px] font-bold text-foreground mb-1">Log today's check-in</div>
+                <div className="text-[13px] text-muted-foreground mb-5">Body fat % is optional — log it if you have a reading.</div>
+                <div className="space-y-3">
+                    <div>
+                        <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Weight</label>
+                        <div className="flex items-center gap-2">
+                            <input autoFocus type="number" step="0.1" value={weight} onChange={e => setWeight(e.target.value)} placeholder="72.5" className={inputCls} />
+                            <span className="text-[13px] text-muted-foreground font-medium flex-shrink-0">kg</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Body fat % <span className="normal-case tracking-normal font-normal">(optional)</span></label>
+                        <div className="flex items-center gap-2">
+                            <input type="number" step="0.1" min="1" max="60" value={bodyFat} onChange={e => setBodyFat(e.target.value)} placeholder="e.g. 18.5" className={inputCls} />
+                            <span className="text-[13px] text-muted-foreground font-medium flex-shrink-0">%</span>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex gap-2 mt-4">
-                    <button
-                        onClick={onClose}
-                        className="flex-1 h-10 rounded-xl border border-border text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-                    >
+                <div className="flex gap-2 mt-5">
+                    <button onClick={onClose} className="flex-1 h-10 rounded-xl border border-border text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors">
                         Cancel
                     </button>
                     <button
                         onClick={async () => {
-                            const w = parseFloat(val)
+                            const w = parseFloat(weight)
                             if (!w || w <= 0) return
                             setSaving(true)
-                            await onLog(w)
+                            await onLog(w, bodyFat ? parseFloat(bodyFat) : null)
                             setSaving(false)
                             onClose()
                         }}
-                        disabled={saving || !parseFloat(val)}
+                        disabled={saving || !parseFloat(weight)}
                         className="flex-1 h-10 rounded-xl bg-primary text-white text-[13px] font-semibold disabled:opacity-50 transition-colors"
                     >
-                        {saving ? 'Saving…' : 'Log weight'}
+                        {saving ? 'Saving…' : 'Save check-in'}
                     </button>
                 </div>
             </div>
@@ -208,21 +221,23 @@ export default function ProgressPage() {
 
     useEffect(() => { fetchData() }, [fetchData])
 
-    const logWeight = async (weight_kg: number) => {
+    const logWeight = async (weight_kg: number, body_fat_pct: number | null) => {
         await fetch('/api/weight-logs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user?.id, weight_kg }),
+            body: JSON.stringify({ userId: user?.id, weight_kg, body_fat_pct }),
         })
-        // Also update users.weight_kg so it's reflected in settings
+        // Keep users.weight_kg in sync for Settings display
         await supabase.from('users').update({ weight_kg }).eq('id', user!.id)
         fetchData()
     }
 
     const hasGoal = profile?.target_weight_kg != null
-    const currentWeight = weightLogs.length > 0
-        ? weightLogs[weightLogs.length - 1].weight_kg
-        : profile?.weight_kg ?? null
+    const latestLog = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1] : null
+    const currentWeight = latestLog?.weight_kg ?? profile?.weight_kg ?? null
+    const latestBodyFat = latestLog?.body_fat_pct ?? null
+    // Latest Polar data (most recent log that has it)
+    const latestPolar = [...weightLogs].reverse().find(l => l.polar_steps != null || l.polar_calories_burned != null) ?? null
 
     // Computed stats
     const startWeight = weightLogs.length > 0 ? weightLogs[0].weight_kg : null
@@ -326,11 +341,14 @@ export default function ProgressPage() {
                     accent
                 />
                 <StatCard
-                    label="Target weight"
-                    value={`${profile!.target_weight_kg} kg`}
-                    sub={profile!.weight_goal_date
-                        ? `by ${new Date(profile!.weight_goal_date).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                        : 'No deadline set'}
+                    label="Body fat"
+                    value={latestBodyFat != null ? `${latestBodyFat}%` : '—'}
+                    sub={latestBodyFat != null
+                        ? latestBodyFat < 10 ? 'Essential / Athletic'
+                          : latestBodyFat < 18 ? 'Fit'
+                          : latestBodyFat < 25 ? 'Average'
+                          : 'Above average'
+                        : 'Log to track'}
                 />
                 <StatCard
                     label={totalChange != null && totalChange < 0 ? 'Lost so far' : 'Gained so far'}
@@ -341,10 +359,35 @@ export default function ProgressPage() {
                     label="Projected arrival"
                     value={projectedDays != null ? `${projectedDays}d` : '—'}
                     sub={projectedDays != null
-                        ? `~${(weeklyRateKg).toFixed(2)} kg/week`
+                        ? `~${weeklyRateKg.toFixed(2)} kg/week`
                         : weightLogs.length < 2 ? 'Log 2+ entries' : 'On target'}
                 />
             </div>
+
+            {/* Polar summary — only show if data exists */}
+            {latestPolar && (
+                <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-4">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                        </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">Latest Polar data</div>
+                        <div className="flex items-center gap-4 flex-wrap">
+                            {latestPolar.polar_steps != null && (
+                                <span className="text-[13px] font-semibold text-foreground">{latestPolar.polar_steps.toLocaleString()} steps</span>
+                            )}
+                            {latestPolar.polar_calories_burned != null && (
+                                <span className="text-[13px] font-semibold text-foreground">{Math.round(latestPolar.polar_calories_burned)} kcal burned</span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground flex-shrink-0">
+                        {new Date(latestPolar.logged_at).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })}
+                    </div>
+                </div>
+            )}
 
             {/* Chart */}
             <div className="bg-card border border-border rounded-2xl p-5">
@@ -424,22 +467,38 @@ export default function ProgressPage() {
                     <div className="px-5 py-3 border-b border-border">
                         <span className="text-[13px] font-semibold text-foreground">Recent check-ins</span>
                     </div>
-                    {[...weightLogs].reverse().slice(0, 10).map(log => {
-                        const prev = weightLogs[weightLogs.indexOf(log) - 1]
+                    {[...weightLogs].reverse().slice(0, 10).map((log, ri, arr) => {
+                        const origIdx = weightLogs.indexOf(log)
+                        const prev = weightLogs[origIdx - 1]
                         const delta = prev ? log.weight_kg - prev.weight_kg : null
                         return (
-                            <div key={log.id} className="flex items-center justify-between px-5 py-3 border-b border-border last:border-0">
-                                <span className="text-[13px] text-muted-foreground">
-                                    {new Date(log.logged_at).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' })}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                    {delta != null && (
-                                        <span className={cn('text-[11px] font-medium', delta < 0 ? 'text-success' : delta > 0 ? 'text-danger' : 'text-muted-foreground')}>
-                                            {delta > 0 ? '+' : ''}{delta.toFixed(1)} kg
-                                        </span>
-                                    )}
-                                    <span className="text-[13px] font-bold text-foreground tabular-nums">{log.weight_kg} kg</span>
+                            <div key={log.id} className="px-5 py-3 border-b border-border last:border-0">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[13px] text-muted-foreground">
+                                        {new Date(log.logged_at).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        {delta != null && (
+                                            <span className={cn('text-[11px] font-medium', delta < 0 ? 'text-success' : delta > 0 ? 'text-danger' : 'text-muted-foreground')}>
+                                                {delta > 0 ? '+' : ''}{delta.toFixed(1)} kg
+                                            </span>
+                                        )}
+                                        <span className="text-[13px] font-bold text-foreground tabular-nums">{log.weight_kg} kg</span>
+                                    </div>
                                 </div>
+                                {(log.body_fat_pct != null || log.polar_steps != null || log.polar_calories_burned != null) && (
+                                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                                        {log.body_fat_pct != null && (
+                                            <span className="text-[11px] text-muted-foreground">{log.body_fat_pct}% body fat</span>
+                                        )}
+                                        {log.polar_steps != null && (
+                                            <span className="text-[11px] text-muted-foreground">{log.polar_steps.toLocaleString()} steps</span>
+                                        )}
+                                        {log.polar_calories_burned != null && (
+                                            <span className="text-[11px] text-muted-foreground">{Math.round(log.polar_calories_burned)} kcal burned</span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )
                     })}
@@ -449,6 +508,7 @@ export default function ProgressPage() {
             {showLogModal && (
                 <LogWeightModal
                     currentWeight={currentWeight}
+                    currentBodyFat={latestBodyFat}
                     onLog={logWeight}
                     onClose={() => setShowLogModal(false)}
                 />
