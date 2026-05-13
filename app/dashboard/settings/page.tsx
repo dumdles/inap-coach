@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
+import { calculateTDEE } from '@/lib/tdee'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/app/context/theme-context'
 import { Button } from '@/components/ui/button'
@@ -42,6 +43,8 @@ interface FormState {
     activity_level: string
     goal_mode: GoalKey
     ippt_date: string
+    target_weight_kg: string
+    weight_goal_date: string
     platoon: string
     section: string
     theme: 'light' | 'dark' | 'auto'
@@ -260,6 +263,7 @@ export default function SettingsPage() {
         full_name: '', username: '', rank: '', wing: '',
         height_cm: '', weight_kg: '', date_of_birth: '', gender: '',
         activity_level: 'moderate', goal_mode: 'bulk', ippt_date: '',
+        target_weight_kg: '', weight_goal_date: '',
         platoon: '', section: '',
         theme: 'auto', units_weight: 'kg', units_height: 'cm',
         notifs: Object.fromEntries(NOTIFS.map(n => [n.id, n.defaultOn])),
@@ -289,6 +293,8 @@ export default function SettingsPage() {
                     activity_level: data.activity_level ?? 'moderate',
                     goal_mode: (data.goal_mode as GoalKey) ?? 'bulk',
                     ippt_date: data.ippt_date ?? '',
+                    target_weight_kg: data.target_weight_kg?.toString() ?? '',
+                    weight_goal_date: data.weight_goal_date ?? '',
                     platoon: data.platoon ?? '',
                     section: data.section ?? '',
                     theme: (data.theme as FormState['theme']) ?? 'auto',
@@ -313,6 +319,23 @@ export default function SettingsPage() {
     const save = async () => {
         if (!user) return
         setSaving(true)
+
+        // Compute calorie_target so the DB trigger can use it when writing daily_summaries
+        let calorie_target: number | null = null
+        if (form.gender && form.weight_kg && form.height_cm && form.date_of_birth && form.activity_level && form.goal_mode) {
+            try {
+                const { calories } = calculateTDEE({
+                    gender: form.gender as Parameters<typeof calculateTDEE>[0]['gender'],
+                    weight_kg: parseFloat(form.weight_kg),
+                    height_cm: parseFloat(form.height_cm),
+                    date_of_birth: form.date_of_birth,
+                    activity_level: form.activity_level as Parameters<typeof calculateTDEE>[0]['activity_level'],
+                    goal_mode: form.goal_mode as Parameters<typeof calculateTDEE>[0]['goal_mode'],
+                })
+                calorie_target = calories
+            } catch { /* incomplete profile — leave null */ }
+        }
+
         const { error } = await supabase.from('users').update({
             full_name: form.full_name,
             username: form.username,
@@ -324,6 +347,8 @@ export default function SettingsPage() {
             activity_level: form.activity_level,
             goal_mode: form.goal_mode,
             ippt_date: form.ippt_date || null,
+            target_weight_kg: parseFloat(form.target_weight_kg) || null,
+            weight_goal_date: form.weight_goal_date || null,
             platoon: form.platoon,
             section: form.section,
             theme: form.theme,
@@ -331,6 +356,7 @@ export default function SettingsPage() {
             units_height: form.units_height,
             notif_prefs: form.notifs,
             privacy_prefs: form.privacy,
+            calorie_target,
         }).eq('id', user.id)
         setSaving(false)
         if (error) { showToast('Error saving — try again'); return }
@@ -613,6 +639,40 @@ export default function SettingsPage() {
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-warning-light text-warning-dark text-[12px] font-semibold">
                                 {days === 0 ? 'Today!' : days === 1 ? '1 day to go' : `${days} days to go`}
                             </span>
+                        </div>
+                    )
+                })()}
+            </SCard>
+            <SCard>
+                <div className="font-display text-[15px] font-bold text-foreground mb-1">Body target</div>
+                <div className="text-[13px] text-muted-foreground mb-4">Set a target weight and optional deadline. The Progress page will track your trajectory.</div>
+                <div className="grid grid-cols-2 gap-3.5">
+                    <InputField
+                        label="Target weight"
+                        hint="kg"
+                        type="number"
+                        value={form.target_weight_kg}
+                        onChange={e => set('target_weight_kg', e.target.value)}
+                        suffix="kg"
+                        placeholder={form.weight_kg || '70'}
+                    />
+                    <FieldLabel label="Target date">
+                        <DatePicker value={form.weight_goal_date} onChange={v => set('weight_goal_date', v)} className="mt-2" />
+                    </FieldLabel>
+                </div>
+                {form.target_weight_kg && form.weight_kg && (() => {
+                    const diff = parseFloat(form.target_weight_kg) - parseFloat(form.weight_kg)
+                    if (Math.abs(diff) < 0.1) return null
+                    const direction = diff < 0 ? 'lose' : 'gain'
+                    return (
+                        <div className="mt-3 text-[12px] text-muted-foreground">
+                            Target: {direction} <span className="font-semibold text-foreground">{Math.abs(diff).toFixed(1)} kg</span>
+                            {form.weight_goal_date && (() => {
+                                const days = Math.ceil((new Date(form.weight_goal_date).getTime() - Date.now()) / 86_400_000)
+                                if (days <= 0) return null
+                                const weeklyRate = (Math.abs(diff) / (days / 7)).toFixed(2)
+                                return <> over {days} days <span className="text-foreground font-medium">({weeklyRate} kg/week)</span></>
+                            })()}
                         </div>
                     )
                 })()}

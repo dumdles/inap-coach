@@ -9,8 +9,6 @@ const supabaseAdmin = createClient(
 )
 
 // GET /api/cadet?cadetId=<uuid>&requesterId=<uuid>
-// Returns cadet profile + last 30 days of meal logs + score + streak
-// Only succeeds if requester is in same wing and is an instructor (checked via DB)
 export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl
     const cadetId = searchParams.get('cadetId')
@@ -25,56 +23,46 @@ export async function GET(req: NextRequest) {
     if (!requester || !cadet) return NextResponse.json({ error: 'not found' }, { status: 404 })
     if (requester.wing !== cadet.wing) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
-    // Fetch last 30 days of meal logs
-    const since = new Date()
-    since.setDate(since.getDate() - 29)
-    since.setHours(0, 0, 0, 0)
-
-    // Fetch full year of logs for streak computation
     const yearAgo = new Date()
     yearAgo.setFullYear(yearAgo.getFullYear() - 1)
 
-    const [{ data: recentLogs }, { data: allLogs }] = await Promise.all([
+    // Fetch last 30 days of daily_summaries + full year of days-with-meals for streak
+    const [{ data: summaries }, { data: allLogDays }] = await Promise.all([
         supabaseAdmin
-            .from('meal_logs')
-            .select('id, meal_type, food_name, calories, protein_g, carbs_g, fat_g, logged_at')
+            .from('daily_summaries')
+            .select('date, total_calories, total_protein_g, total_carbs_g, total_fat_g, calorie_target')
             .eq('user_id', cadetId)
-            .gte('logged_at', since.toISOString())
-            .order('logged_at', { ascending: false }),
+            .gte('date', new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10))
+            .order('date', { ascending: false }),
         supabaseAdmin
-            .from('meal_logs')
-            .select('logged_at')
+            .from('daily_summaries')
+            .select('date')
             .eq('user_id', cadetId)
-            .gte('logged_at', yearAgo.toISOString()),
+            .gte('date', yearAgo.toISOString().slice(0, 10)),
     ])
 
-    // Compute score (last 7 days) and streak
-    const weekAgo = new Date()
-    weekAgo.setDate(weekAgo.getDate() - 6)
-    weekAgo.setHours(0, 0, 0, 0)
-
+    // Compute score (last 7 days) and streak from daily_summaries
+    const weekAgoDate = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10)
+    const daysWithMeals = new Set<string>((allLogDays ?? []).map(r => r.date))
     const mealsByDay: Record<string, number> = {}
-    const daysWithMeals = new Set<string>()
-    for (const log of allLogs ?? []) {
-        const day = log.logged_at.slice(0, 10)
-        daysWithMeals.add(day)
-        if (new Date(log.logged_at) >= weekAgo) {
-            mealsByDay[day] = (mealsByDay[day] ?? 0) + 1
-        }
+    for (const day of daysWithMeals) {
+        if (day >= weekAgoDate) mealsByDay[day] = 1  // presence = logged that day
     }
     const streak = computeStreak(daysWithMeals)
     const score = computeScore(mealsByDay, streak)
 
-    // Build daily summary for last 30 days
-    const dailyMap: Record<string, { calories: number; protein: number; carbs: number; fat: number; meals: number }> = {}
-    for (const log of recentLogs ?? []) {
-        const day = log.logged_at.slice(0, 10)
-        if (!dailyMap[day]) dailyMap[day] = { calories: 0, protein: 0, carbs: 0, fat: 0, meals: 0 }
-        dailyMap[day].calories += log.calories ?? 0
-        dailyMap[day].protein += log.protein_g ?? 0
-        dailyMap[day].carbs += log.carbs_g ?? 0
-        dailyMap[day].fat += log.fat_g ?? 0
-        dailyMap[day].meals++
+    // Shape daily summaries into the map the cadet page expects
+    const dailySummary: Record<string, {
+        calories: number; protein: number; carbs: number; fat: number; calorie_target: number
+    }> = {}
+    for (const row of summaries ?? []) {
+        dailySummary[row.date] = {
+            calories: row.total_calories,
+            protein:  row.total_protein_g,
+            carbs:    row.total_carbs_g,
+            fat:      row.total_fat_g,
+            calorie_target: row.calorie_target ?? 2400,
+        }
     }
 
     return NextResponse.json({
@@ -93,7 +81,6 @@ export async function GET(req: NextRequest) {
         },
         score,
         streak,
-        recentLogs: recentLogs ?? [],
-        dailySummary: dailyMap,
+        dailySummary,
     })
 }

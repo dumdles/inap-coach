@@ -24,6 +24,8 @@ type FoodItem = {
     is_cookhouse_item: boolean
 }
 
+type SearchResult = FoodItem & { source?: 'db' }
+
 export type DailyTotals = { calories: number; protein: number; carbs: number; fat: number }
 export type UserTargets = { calories: number; protein: number }
 
@@ -32,29 +34,51 @@ export type UserTargets = { calories: number; protein: number }
 type Template = Omit<FoodItem, 'id' | 'is_cookhouse_item'> & { category: string }
 
 const TEMPLATES: Template[] = [
+    // Hawker & local dishes
+    { category: 'Hawker Dishes', name: 'Chicken rice', calories_per_100g: 190, protein_g: 15, carbs_g: 24, fat_g: 5 },
+    { category: 'Hawker Dishes', name: 'Char kway teow', calories_per_100g: 175, protein_g: 7, carbs_g: 23, fat_g: 7 },
+    { category: 'Hawker Dishes', name: 'Hokkien mee', calories_per_100g: 160, protein_g: 9, carbs_g: 20, fat_g: 6 },
+    { category: 'Hawker Dishes', name: 'Bak chor mee (dry)', calories_per_100g: 172, protein_g: 10, carbs_g: 22, fat_g: 6 },
+    { category: 'Hawker Dishes', name: 'Wanton mee (dry)', calories_per_100g: 165, protein_g: 9, carbs_g: 22, fat_g: 5 },
+    { category: 'Hawker Dishes', name: 'Nasi lemak', calories_per_100g: 235, protein_g: 8, carbs_g: 30, fat_g: 10 },
+    { category: 'Hawker Dishes', name: 'Mee goreng', calories_per_100g: 175, protein_g: 7, carbs_g: 26, fat_g: 5 },
+    { category: 'Hawker Dishes', name: 'Roti prata (plain)', calories_per_100g: 301, protein_g: 8, carbs_g: 37, fat_g: 14 },
+    { category: 'Hawker Dishes', name: 'Yong tau foo (soup)', calories_per_100g: 85, protein_g: 7, carbs_g: 8, fat_g: 3 },
+    { category: 'Hawker Dishes', name: 'Laksa', calories_per_100g: 120, protein_g: 6, carbs_g: 14, fat_g: 5 },
+    { category: 'Hawker Dishes', name: 'Bak kut teh', calories_per_100g: 95, protein_g: 12, carbs_g: 3, fat_g: 4 },
+    { category: 'Hawker Dishes', name: 'Fishball noodle soup', calories_per_100g: 90, protein_g: 6, carbs_g: 13, fat_g: 2 },
+    { category: 'Hawker Dishes', name: 'Economical rice (2 veg 1 meat)', calories_per_100g: 155, protein_g: 8, carbs_g: 22, fat_g: 4 },
+    { category: 'Hawker Dishes', name: 'Prawn noodle soup', calories_per_100g: 105, protein_g: 8, carbs_g: 12, fat_g: 3 },
+    { category: 'Hawker Dishes', name: 'Satay (chicken, per stick)', calories_per_100g: 165, protein_g: 16, carbs_g: 5, fat_g: 9 },
+    { category: 'Hawker Dishes', name: 'Rojak', calories_per_100g: 110, protein_g: 3, carbs_g: 18, fat_g: 4 },
+    // Cookhouse
+    { category: 'Cookhouse', name: 'SAF chicken rice', calories_per_100g: 185, protein_g: 14, carbs_g: 23, fat_g: 5 },
+    { category: 'Cookhouse', name: 'SAF fried rice', calories_per_100g: 170, protein_g: 6, carbs_g: 28, fat_g: 4 },
+    { category: 'Cookhouse', name: 'SAF bee hoon soup', calories_per_100g: 80, protein_g: 4, carbs_g: 13, fat_g: 1.5 },
+    { category: 'Cookhouse', name: 'SAF mee rebus', calories_per_100g: 140, protein_g: 6, carbs_g: 22, fat_g: 3 },
+    { category: 'Cookhouse', name: 'SAF mixed veg rice', calories_per_100g: 145, protein_g: 7, carbs_g: 22, fat_g: 3.5 },
+    { category: 'Cookhouse', name: 'SAF oatmeal (breakfast)', calories_per_100g: 120, protein_g: 4, carbs_g: 20, fat_g: 2 },
     // Proteins
     { category: 'Proteins', name: 'Chicken breast (grilled)', calories_per_100g: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6 },
     { category: 'Proteins', name: 'Eggs (whole)', calories_per_100g: 155, protein_g: 13, carbs_g: 1.1, fat_g: 11 },
     { category: 'Proteins', name: 'Tuna (canned in water)', calories_per_100g: 116, protein_g: 26, carbs_g: 0, fat_g: 1 },
     { category: 'Proteins', name: 'Whey protein (powder)', calories_per_100g: 400, protein_g: 80, carbs_g: 8, fat_g: 4 },
     { category: 'Proteins', name: 'Greek yogurt', calories_per_100g: 97, protein_g: 9, carbs_g: 3.6, fat_g: 5 },
+    { category: 'Proteins', name: 'Tofu (firm)', calories_per_100g: 76, protein_g: 8, carbs_g: 2, fat_g: 4 },
     // Carbs
     { category: 'Carbs & Grains', name: 'White rice (cooked)', calories_per_100g: 130, protein_g: 2.7, carbs_g: 28, fat_g: 0.3 },
     { category: 'Carbs & Grains', name: 'Oats (dry)', calories_per_100g: 389, protein_g: 17, carbs_g: 66, fat_g: 7 },
     { category: 'Carbs & Grains', name: 'White bread', calories_per_100g: 265, protein_g: 9, carbs_g: 49, fat_g: 3.2 },
     { category: 'Carbs & Grains', name: 'Instant noodles (cooked)', calories_per_100g: 138, protein_g: 3.8, carbs_g: 20, fat_g: 5 },
     { category: 'Carbs & Grains', name: 'Banana', calories_per_100g: 89, protein_g: 1.1, carbs_g: 23, fat_g: 0.3 },
-    // Local favourites
-    { category: 'Local Favourites', name: 'Chicken rice', calories_per_100g: 190, protein_g: 15, carbs_g: 24, fat_g: 5 },
-    { category: 'Local Favourites', name: 'Nasi lemak', calories_per_100g: 389, protein_g: 12, carbs_g: 51, fat_g: 18 },
-    { category: 'Local Favourites', name: 'Roti prata (plain)', calories_per_100g: 301, protein_g: 8, carbs_g: 37, fat_g: 14 },
-    { category: 'Local Favourites', name: 'Mee goreng', calories_per_100g: 175, protein_g: 7, carbs_g: 26, fat_g: 5 },
-    { category: 'Local Favourites', name: 'Yong tau foo (soup)', calories_per_100g: 85, protein_g: 7, carbs_g: 8, fat_g: 3 },
     // Snacks & drinks
     { category: 'Snacks & Drinks', name: 'Peanut butter', calories_per_100g: 588, protein_g: 25, carbs_g: 20, fat_g: 50 },
     { category: 'Snacks & Drinks', name: 'Milo (powder)', calories_per_100g: 392, protein_g: 6.2, carbs_g: 72, fat_g: 8 },
     { category: 'Snacks & Drinks', name: '100 Plus', calories_per_100g: 24, protein_g: 0, carbs_g: 6, fat_g: 0 },
     { category: 'Snacks & Drinks', name: 'Protein bar (generic)', calories_per_100g: 380, protein_g: 30, carbs_g: 42, fat_g: 10 },
+    { category: 'Snacks & Drinks', name: 'Kaya toast (2 slices)', calories_per_100g: 310, protein_g: 7, carbs_g: 42, fat_g: 13 },
+    { category: 'Snacks & Drinks', name: 'Teh tarik', calories_per_100g: 55, protein_g: 1.5, carbs_g: 8, fat_g: 2 },
+    { category: 'Snacks & Drinks', name: 'Kopi O kosong', calories_per_100g: 5, protein_g: 0.2, carbs_g: 0.8, fat_g: 0 },
 ]
 
 const TEMPLATE_CATEGORIES = Array.from(new Set(TEMPLATES.map(t => t.category)))
@@ -102,7 +126,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
 
     const [stage, setStage] = useState<Stage>('pick')
     const [query, setQuery] = useState('')
-    const [results, setResults] = useState<FoodItem[]>([])
+    const [results, setResults] = useState<SearchResult[]>([])
     const [searching, setSearching] = useState(false)
     const [activeCategory, setActiveCategory] = useState(TEMPLATE_CATEGORIES[0])
 
@@ -114,7 +138,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
     const [error, setError] = useState<string | null>(null)
     const [creatingTemplate, setCreatingTemplate] = useState<string | null>(null)
 
-    const [custom, setCustom] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '' })
+    const [custom, setCustom] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '', is_cookhouse_item: false })
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -130,20 +154,21 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         setNotes('')
         setError(null)
         setCreatingTemplate(null)
-        setCustom({ name: '', calories: '', protein: '', carbs: '', fat: '' })
+        setCustom({ name: '', calories: '', protein: '', carbs: '', fat: '', is_cookhouse_item: false })
     }
 
     useEffect(() => { if (!open) reset() }, [open])
 
-    // Debounced search (only in 'pick' stage)
+    // Debounced search — queries DB (cookhouse items first)
     useEffect(() => {
         if (debounceRef.current) clearTimeout(debounceRef.current)
         if (!query.trim()) { setResults([]); setSearching(false); return }
         setSearching(true)
         debounceRef.current = setTimeout(async () => {
-            const res = await fetch(`/api/food-items?q=${encodeURIComponent(query.trim())}`)
-            const data: FoodItem[] = await res.json()
-            setResults(data)
+            const q = encodeURIComponent(query.trim())
+            const res = await fetch(`/api/food-items?q=${q}`).catch(() => null)
+            const data: FoodItem[] = res ? await res.json() : []
+            setResults((data ?? []).map(i => ({ ...i, source: 'db' as const })))
             setSearching(false)
         }, 280)
     }, [query])
@@ -169,7 +194,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         setStage('details')
     }
 
-    function selectSearchResult(item: FoodItem) {
+    function selectSearchResult(item: SearchResult) {
         setSelected(item)
         setQuery('')
         setResults([])
@@ -187,6 +212,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                 protein_g: parseFloat(custom.protein),
                 carbs_g: parseFloat(custom.carbs),
                 fat_g: parseFloat(custom.fat),
+                is_cookhouse_item: custom.is_cookhouse_item,
                 created_by: user?.id,
             }),
         })
@@ -430,6 +456,32 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                                 </div>
                             ))}
                         </div>
+                        {/* Cookhouse meal toggle */}
+                        <button
+                            type="button"
+                            onClick={() => setCustom(p => ({ ...p, is_cookhouse_item: !p.is_cookhouse_item }))}
+                            className={cn(
+                                'w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors text-left',
+                                custom.is_cookhouse_item
+                                    ? 'border-primary/50 bg-primary/8'
+                                    : 'border-border bg-muted/30 hover:border-border/80'
+                            )}
+                        >
+                            <div className={cn(
+                                'w-9 h-5 rounded-full relative transition-colors flex-shrink-0',
+                                custom.is_cookhouse_item ? 'bg-primary' : 'bg-muted-foreground/30'
+                            )}>
+                                <div className={cn(
+                                    'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform',
+                                    custom.is_cookhouse_item ? 'translate-x-4' : 'translate-x-0.5'
+                                )} />
+                            </div>
+                            <div>
+                                <div className="text-sm font-medium text-foreground">Cookhouse meal</div>
+                                <div className="text-[11px] text-muted-foreground">Visible to all users in your unit</div>
+                            </div>
+                        </button>
+
                         {error && <p className="text-sm text-destructive">{error}</p>}
                         <Button
                             className="w-full"

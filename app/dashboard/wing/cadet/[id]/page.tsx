@@ -9,18 +9,7 @@ import { cn } from '@/lib/utils'
 import { isInstructor } from '@/lib/scoring'
 import { Skeleton } from '@/components/ui/skeleton'
 
-type MealLog = {
-    id: string
-    meal_type: string
-    food_name: string
-    calories: number
-    protein_g: number
-    carbs_g: number
-    fat_g: number
-    logged_at: string
-}
-
-type DayEntry = { calories: number; protein: number; carbs: number; fat: number; meals: number }
+type DayEntry = { calories: number; protein: number; carbs: number; fat: number; calorie_target: number }
 
 type CadetData = {
     profile: {
@@ -30,13 +19,9 @@ type CadetData = {
     }
     score: number
     streak: number
-    recentLogs: MealLog[]
     dailySummary: Record<string, DayEntry>
 }
 
-const MEAL_TYPE_LABEL: Record<string, string> = {
-    breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack',
-}
 
 function StatPill({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
     return (
@@ -124,7 +109,7 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
 
     if (!data) return null
 
-    const { profile, score, streak, recentLogs, dailySummary } = data
+    const { profile, score, streak, dailySummary } = data
 
     // Last 14 days for chart
     const last14 = Array.from({ length: 14 }, (_, i) => {
@@ -135,12 +120,8 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
     })
     const maxCal = Math.max(...last14.map(d => d?.calories ?? 0), 1)
 
-    // Today's meals
     const todayKey = new Date().toISOString().slice(0, 10)
-    const todayLogs = recentLogs.filter(l => l.logged_at.slice(0, 10) === todayKey)
-    const recentByDay = Array.from(
-        new Set(recentLogs.map(l => l.logged_at.slice(0, 10)))
-    ).slice(0, 7)
+    const recentByDay = Object.keys(dailySummary).sort((a, b) => b.localeCompare(a)).slice(0, 7)
 
     const ipptDays = profile.ippt_date
         ? Math.ceil((new Date(profile.ippt_date).getTime() - Date.now()) / 86_400_000)
@@ -235,29 +216,48 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
                             </div>
                         </div>
 
-                        {/* Today's meals */}
-                        <div className="bg-card border border-border rounded-2xl overflow-hidden">
-                            <div className="px-5 py-3 border-b border-border flex items-center justify-between">
-                                <span className="text-[13px] font-semibold text-foreground">Today's meals</span>
-                                <span className="text-[12px] text-muted-foreground">{todayLogs.length} logged</span>
-                            </div>
-                            {todayLogs.length === 0 ? (
-                                <div className="px-5 py-8 text-center text-sm text-muted-foreground">Nothing logged today.</div>
-                            ) : (
-                                todayLogs.map(log => (
-                                    <div key={log.id} className="flex items-center gap-3 px-5 py-3.5 border-b border-border last:border-0">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-[13px] font-medium text-foreground truncate">{log.food_name}</div>
-                                            <div className="text-[11px] text-muted-foreground">{MEAL_TYPE_LABEL[log.meal_type] ?? log.meal_type}</div>
-                                        </div>
-                                        <div className="text-right flex-shrink-0">
-                                            <div className="text-[13px] font-semibold text-foreground">{log.calories} kcal</div>
-                                            <div className="text-[10px] text-muted-foreground">P {Math.round(log.protein_g)}g · C {Math.round(log.carbs_g)}g · F {Math.round(log.fat_g)}g</div>
-                                        </div>
+                        {/* Today's summary */}
+                        {(() => {
+                            const today = dailySummary[todayKey]
+                            return (
+                                <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                                    <div className="px-5 py-3 border-b border-border">
+                                        <span className="text-[13px] font-semibold text-foreground">Today</span>
                                     </div>
-                                ))
-                            )}
-                        </div>
+                                    {!today ? (
+                                        <div className="px-5 py-8 text-center text-sm text-muted-foreground">Nothing logged today.</div>
+                                    ) : (
+                                        <div className="px-5 py-4 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[13px] text-muted-foreground">Calories</span>
+                                                <span className="text-[15px] font-bold text-foreground">
+                                                    {Math.round(today.calories)}
+                                                    <span className="text-[11px] text-muted-foreground font-normal"> / {Math.round(today.calorie_target)} kcal</span>
+                                                </span>
+                                            </div>
+                                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full bg-primary transition-all"
+                                                    style={{ width: `${Math.min(100, (today.calories / (today.calorie_target || 2400)) * 100).toFixed(1)}%` }}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2 pt-1">
+                                                {[
+                                                    { label: 'Protein', value: today.protein, color: '#2684FF' },
+                                                    { label: 'Carbs',   value: today.carbs,   color: '#FFAB00' },
+                                                    { label: 'Fat',     value: today.fat,     color: '#FF5630' },
+                                                ].map(m => (
+                                                    <div key={m.label} className="text-center">
+                                                        <div className="text-[13px] font-bold text-foreground" style={{ color: m.color }}>{Math.round(m.value)}g</div>
+                                                        <div className="text-[10px] text-muted-foreground">{m.label}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })()}
 
                         {/* Recent days breakdown */}
                         <div className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -276,8 +276,8 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
                                                     {new Date(day).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' })}
                                                 </span>
                                                 <div className="flex items-center gap-3">
-                                                    <span className="text-[11px] text-muted-foreground">{d.meals} meal{d.meals !== 1 ? 's' : ''}</span>
-                                                    <span className="text-[13px] font-bold text-foreground">{Math.round(d.calories)} kcal</span>
+                                                    <span className="text-[11px] text-muted-foreground">{Math.round(d.calories)} / {Math.round(d.calorie_target)} kcal</span>
+                                                    <span className="text-[13px] font-bold text-foreground">{Math.round(d.calories)}</span>
                                                 </div>
                                             </div>
                                             <div className="space-y-1">
