@@ -41,6 +41,7 @@ interface FormState {
     gender: string
     activity_level: string
     goal_mode: GoalKey
+    ippt_date: string
     platoon: string
     section: string
     theme: 'light' | 'dark' | 'auto'
@@ -241,7 +242,7 @@ function FieldLabel({ label, hint, children }: { label: string; hint?: string; c
 export default function SettingsPage() {
     const { user, signOut } = useAuth()
     const router = useRouter()
-    const { setTheme } = useTheme()
+    const { setTheme, setGoalMode } = useTheme()
     const [active, setActive] = useState<TabId>('profile')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -258,7 +259,7 @@ export default function SettingsPage() {
     const defaultForm: FormState = {
         full_name: '', username: '', rank: '', wing: '',
         height_cm: '', weight_kg: '', date_of_birth: '', gender: '',
-        activity_level: 'moderate', goal_mode: 'bulk',
+        activity_level: 'moderate', goal_mode: 'bulk', ippt_date: '',
         platoon: '', section: '',
         theme: 'light', units_weight: 'kg', units_height: 'cm',
         notifs: Object.fromEntries(NOTIFS.map(n => [n.id, n.defaultOn])),
@@ -287,6 +288,7 @@ export default function SettingsPage() {
                     gender: data.gender ?? '',
                     activity_level: data.activity_level ?? 'moderate',
                     goal_mode: (data.goal_mode as GoalKey) ?? 'bulk',
+                    ippt_date: data.ippt_date ?? '',
                     platoon: data.platoon ?? '',
                     section: data.section ?? '',
                     theme: (data.theme as FormState['theme']) ?? 'light',
@@ -298,6 +300,7 @@ export default function SettingsPage() {
                 setForm(loaded)
                 setOrig(loaded)
                 setTheme(loaded.theme)
+                setGoalMode(loaded.goal_mode)
             })
             .then(() => setLoading(false))
     }, [user])
@@ -320,6 +323,7 @@ export default function SettingsPage() {
             gender: form.gender,
             activity_level: form.activity_level,
             goal_mode: form.goal_mode,
+            ippt_date: form.ippt_date || null,
             platoon: form.platoon,
             section: form.section,
             theme: form.theme,
@@ -331,6 +335,7 @@ export default function SettingsPage() {
         setSaving(false)
         if (error) { showToast('Error saving — try again'); return }
         setOrig(form)
+        setGoalMode(form.goal_mode)
         showToast('Settings saved')
     }
 
@@ -592,6 +597,26 @@ export default function SettingsPage() {
                     })}
                 </div>
             </SCard>
+            <SCard>
+                <div className="font-display text-[15px] font-bold text-foreground mb-1">Next IPPT date</div>
+                <div className="text-[13px] text-muted-foreground mb-4">Set your upcoming IPPT so the app can tailor your nutrition in the lead-up.</div>
+                <FieldLabel label="IPPT date">
+                    <DatePicker value={form.ippt_date} onChange={v => set('ippt_date', v)} className="mt-2" />
+                </FieldLabel>
+                {form.ippt_date && (() => {
+                    const days = Math.ceil((new Date(form.ippt_date).getTime() - Date.now()) / 86_400_000)
+                    if (days < 0) return (
+                        <div className="mt-3 text-[12px] text-muted-foreground">IPPT date has passed — update it when your next one is scheduled.</div>
+                    )
+                    return (
+                        <div className="mt-3 flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-warning-light text-warning-dark text-[12px] font-semibold">
+                                {days === 0 ? 'Today!' : days === 1 ? '1 day to go' : `${days} days to go`}
+                            </span>
+                        </div>
+                    )
+                })()}
+            </SCard>
         </div>
     )
 
@@ -617,6 +642,11 @@ export default function SettingsPage() {
     )
 
     const NotifsSection = (
+        <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-warning-light border border-warning/30">
+            <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-warning-dark flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span className="text-[12px] font-medium text-warning-dark">Preferences are saved but push/email delivery isn't active yet — coming soon.</span>
+        </div>
         <SCard>
             <div className="flex flex-col divide-y divide-border">
                 {NOTIFS.map(n => (
@@ -635,10 +665,15 @@ export default function SettingsPage() {
                 ))}
             </div>
         </SCard>
+        </div>
     )
 
     const PrivacySection = (
         <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-warning-light border border-warning/30">
+                <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-warning-dark flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span className="text-[12px] font-medium text-warning-dark">Leaderboard visibility and instructor data sharing are saved but not yet enforced — coming soon.</span>
+            </div>
             <SCard>
                  <div className="font-display text-[15px] font-bold text-foreground">Privacy</div>
                 <div className="text-[13px] text-muted-foreground mb-3">Manage your account's privacy preferences.</div>
@@ -682,6 +717,11 @@ export default function SettingsPage() {
     )
 
     const AppearSection = (
+        <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-warning-light border border-warning/30">
+            <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-warning-dark flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span className="text-[12px] font-medium text-warning-dark">Theme applies immediately. Weight and height unit conversion is saved but not yet applied to displays — coming soon.</span>
+        </div>
         <SCard>
             <div className="flex flex-col gap-5">
                 {([
@@ -706,6 +746,7 @@ export default function SettingsPage() {
                 ))}
             </div>
         </SCard>
+        </div>
     )
 
     const sections: Record<TabId, React.ReactNode> = {

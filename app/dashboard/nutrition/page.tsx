@@ -5,6 +5,8 @@ import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { calculateTDEE } from '@/lib/tdee'
 import { LogMealDialog, type DailyTotals, type UserTargets } from '@/components/nutrition/log-meal-dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { cn, fmt } from '@/lib/utils'
 
@@ -90,11 +92,95 @@ function ProgressBar({
     )
 }
 
+function MacroRow({ label, value, unit, pct, color }: { label: string; value: number; unit: string; pct?: number; color: string }) {
+    return (
+        <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground w-16 shrink-0">{label}</span>
+            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                {pct !== undefined && (
+                    <div className={cn('h-full rounded-full', color)} style={{ width: `${Math.min(100, pct)}%` }} />
+                )}
+            </div>
+            <span className="text-xs font-semibold text-foreground tabular-nums w-16 text-right">
+                {value}{unit}
+            </span>
+        </div>
+    )
+}
+
+function FoodItemDialog({ log, onClose }: { log: MealLog | null; onClose: () => void }) {
+    if (!log?.food_items) return null
+    const fi = log.food_items
+    const f = log.quantity_g / 100
+    const macros = {
+        calories: Math.round(fi.calories_per_100g * f),
+        protein: parseFloat((fi.protein_g * f).toFixed(1)),
+        carbs:   parseFloat((fi.carbs_g   * f).toFixed(1)),
+        fat:     parseFloat((fi.fat_g     * f).toFixed(1)),
+    }
+    const loggedAt = new Date(log.logged_at)
+    const timeStr = loggedAt.toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' })
+    const dateStr = loggedAt.toLocaleDateString('en-SG', { weekday: 'long', day: 'numeric', month: 'long' })
+
+    return (
+        <Dialog open={!!log} onOpenChange={onClose}>
+            <DialogContent className="max-w-sm">
+                <DialogHeader>
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                                <path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+                                <line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <DialogTitle className="text-base leading-tight">{fi.name}</DialogTitle>
+                            <p className="text-xs text-muted-foreground mt-0.5">{log.quantity_g}g · {MEAL_LABELS[log.meal_type]}</p>
+                        </div>
+                    </div>
+                </DialogHeader>
+
+                {/* Calorie headline */}
+                <div className="flex items-center justify-between bg-muted rounded-xl px-4 py-3 mt-1">
+                    <span className="text-sm text-muted-foreground">Total calories</span>
+                    <span className="font-display font-extrabold text-2xl text-foreground">{macros.calories} <span className="text-sm font-normal text-muted-foreground">kcal</span></span>
+                </div>
+
+                {/* Macros */}
+                <div className="flex flex-col gap-2.5 mt-1">
+                    <MacroRow label="Protein"  value={macros.protein} unit="g" pct={(macros.protein / 50) * 100}  color="bg-blue-500" />
+                    <MacroRow label="Carbs"    value={macros.carbs}   unit="g" pct={(macros.carbs   / 120) * 100} color="bg-amber-400" />
+                    <MacroRow label="Fat"      value={macros.fat}     unit="g" pct={(macros.fat     / 65)  * 100} color="bg-rose-400" />
+                </div>
+
+                {/* Per 100g footnote */}
+                <div className="border-t border-border pt-3 mt-1 flex flex-col gap-1">
+                    <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Per 100g</p>
+                    <div className="flex gap-4 text-xs text-muted-foreground">
+                        <span>{fi.calories_per_100g} kcal</span>
+                        <span>{fi.protein_g}g P</span>
+                        <span>{fi.carbs_g}g C</span>
+                        <span>{fi.fat_g}g F</span>
+                    </div>
+                </div>
+
+                {/* Timestamp */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-border pt-3">
+                    <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    Logged {dateStr} at {timeStr}
+                    {log.notes && <span className="ml-auto italic text-muted-foreground/70">{log.notes}</span>}
+                </div>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 const FALLBACK_TARGETS: UserTargets = { calories: 2400, protein: 160 }
 
 export default function NutritionPage() {
     const { user } = useAuth()
     const [dialogOpen, setDialogOpen] = useState(false)
+    const [selectedLog, setSelectedLog] = useState<MealLog | null>(null)
     const [meals, setMeals] = useState<MealLog[]>([])
     const [profile, setProfile] = useState<UserProfile | null>(null)
     const [loading, setLoading] = useState(true)
@@ -256,8 +342,30 @@ export default function NutritionPage() {
 
                 {/* ── Meal list ── */}
                 {loading ? (
-                    <div className="flex items-center justify-center py-16">
-                        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                    <div className="flex flex-col gap-6">
+                        {[0, 1].map(g => (
+                            <div key={g}>
+                                <div className="flex items-center gap-2 mb-2.5">
+                                    <Skeleton className="w-24 h-3" />
+                                    <div className="flex-1 h-px bg-border" />
+                                    <Skeleton className="w-20 h-3" />
+                                </div>
+                                <div className="space-y-2">
+                                    {[0, 1, 2].map(i => (
+                                        <div key={i} className="bg-card border border-border rounded-xl px-4 py-3.5 flex items-center gap-4">
+                                            <div className="flex-1 space-y-2">
+                                                <Skeleton className="h-3.5 w-36" />
+                                                <Skeleton className="h-2.5 w-48" />
+                                            </div>
+                                            <div className="text-right space-y-1">
+                                                <Skeleton className="h-5 w-10 ml-auto" />
+                                                <Skeleton className="h-2.5 w-8 ml-auto" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 ) : mealsByType.length === 0 ? (
                     <div
@@ -320,10 +428,11 @@ export default function NutritionPage() {
                                             return (
                                                 <div
                                                     key={log.id}
+                                                    onClick={() => setSelectedLog(log)}
                                                     className={cn(
                                                         'bg-card border border-border rounded-xl px-4 py-3.5',
                                                         'flex items-center justify-between gap-4',
-                                                        'hover:border-primary/30 hover:shadow-sm transition-all duration-150',
+                                                        'hover:border-primary/30 hover:shadow-sm transition-all duration-150 cursor-pointer',
                                                         'animate-in fade-in slide-in-from-left-2 duration-200'
                                                     )}
                                                     style={{ animationDelay: `${200 + groupIdx * 60 + i * 40}ms`, animationFillMode: 'both', boxShadow: '0 1px 3px rgba(9,30,66,0.05)' }}
@@ -371,6 +480,7 @@ export default function NutritionPage() {
                 targets={targets}
                 onLogged={fetchMeals}
             />
+            <FoodItemDialog log={selectedLog} onClose={() => setSelectedLog(null)} />
         </div>
     )
 }

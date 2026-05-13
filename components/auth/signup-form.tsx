@@ -17,7 +17,12 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/date-picker'
 
-const RANKS = ['OCT', 'ME4T', '2LT', 'LTA', 'CPT', 'MAJ', 'LTC', 'SLTC', 'COL']
+const RANKS = [
+    'OCT', 'ME4T',
+    '2LT', 'LTA', 'CPT', 'MAJ', 'LTC', 'SLTC', 'COL',
+    '3SG', 'SSG', 'MSG', '1WO', '2WO', 'MWO', 'SWO', 'CWO',
+    'ME4A', 'ME5', 'ME6', 'ME7', 'ME8', 'ME9',
+]
 
 const WINGS = [
     { value: 'Alpha', label: 'Alpha Wing' },

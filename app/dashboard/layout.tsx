@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
+import { isInstructor } from '@/lib/scoring'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 // ── Icons ─────────────────────────────────────────────────
@@ -14,28 +15,83 @@ function NutritionIcon() { return <svg viewBox="0 0 24 24" width={18} height={18
 function WorkoutsIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11M6.5 17.5h11M3 12h18M6 6.5v11M18 6.5v11" /></svg> }
 function ProgressIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg> }
 function FriendsIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg> }
+function WingIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7M17.5 14v7"/></svg> }
 function SettingsIcon() { return <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg> }
 function LogoutIcon() { return <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg> }
 function ChevronLeft() { return <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg> }
 function ChevronRight() { return <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg> }
 
-const MAIN_NAV = [
+const BASE_NAV = [
     { href: '/dashboard', label: 'Home', Icon: HomeIcon },
     { href: '/dashboard/nutrition', label: 'Nutrition', Icon: NutritionIcon },
     { href: '/dashboard/workouts', label: 'Workouts', Icon: WorkoutsIcon },
     { href: '/dashboard/progress', label: 'Progress', Icon: ProgressIcon },
-    { href: '/dashboard/friends', label: 'Friends', Icon: FriendsIcon },
+    { href: '/dashboard/friends', label: 'Leaderboard', Icon: FriendsIcon },
+]
+
+const INSTRUCTOR_NAV = [
+    { href: '/dashboard/wing', label: 'My Wing', Icon: WingIcon },
 ]
 
 const SIDEBAR_EXPANDED_W = 220
 const SIDEBAR_COLLAPSED_W = 64
 const SIDEBAR_MARGIN = 12
 
+// ── Mobile bottom nav ──────────────────────────────────────
+function MobileBottomNav({ pathname, profile }: {
+    pathname: string
+    profile: { rank?: string } | null
+}) {
+    const allNav = [
+        ...BASE_NAV,
+        ...(profile?.rank && isInstructor(profile.rank) ? INSTRUCTOR_NAV : []),
+    ]
+
+    return (
+        <nav
+            className="fixed z-50 flex md:hidden items-center"
+            style={{
+                bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
+                left: '16px',
+                right: '16px',
+                background: 'rgba(255,255,255,0.35)',
+                backdropFilter: 'blur(28px) saturate(200%)',
+                WebkitBackdropFilter: 'blur(28px) saturate(200%)',
+                borderRadius: '999px',
+                border: '1px solid rgba(255,255,255,0.45)',
+                boxShadow: '0 8px 32px rgba(9,30,66,0.14), 0 1.5px 6px rgba(9,30,66,0.08), inset 0 1px 0 rgba(255,255,255,0.6)',
+                padding: '6px',
+                gap: '2px',
+            }}
+        >
+            {allNav.slice(0, 5).map(({ href, label, Icon }) => {
+                const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+                return (
+                    <Link
+                        key={href}
+                        href={href}
+                        className={cn(
+                            'flex flex-col items-center justify-center gap-[3px] flex-1 py-2 px-1 text-[9px] font-semibold tracking-[0.04em] transition-all duration-200 rounded-[999px]',
+                            active
+                                ? 'text-primary bg-white/70 shadow-sm'
+                                : 'text-foreground/50 hover:text-foreground/80',
+                        )}
+                        style={active ? { boxShadow: '0 1px 4px rgba(9,30,66,0.10)' } : undefined}
+                    >
+                        <Icon />
+                        <span>{label}</span>
+                    </Link>
+                )
+            })}
+        </nav>
+    )
+}
+
 function Sidebar({ expanded, onToggle, pathname, profile }: {
     expanded: boolean
     onToggle: () => void
     pathname: string
-    profile: { rank?: string; full_name?: string } | null
+    profile: { rank?: string; full_name?: string; wing?: string } | null
 }) {
     const { user, signOut } = useAuth()
     const router = useRouter()
@@ -101,7 +157,13 @@ function Sidebar({ expanded, onToggle, pathname, profile }: {
 
             {/* Main nav */}
             <nav className={cn('flex flex-col gap-0.5 flex-1 overflow-y-auto', expanded ? 'px-2.5' : 'px-2')}>
-                {MAIN_NAV.map(item => <NavItem key={item.href} {...item} />)}
+                {BASE_NAV.map(item => <NavItem key={item.href} {...item} />)}
+                {profile?.rank && isInstructor(profile.rank) && (
+                    <>
+                        <div className={cn('mx-1 border-t border-sidebar-border my-1.5', !expanded && 'mx-0')} />
+                        {INSTRUCTOR_NAV.map(item => <NavItem key={item.href} {...item} />)}
+                    </>
+                )}
             </nav>
 
             {/* Divider */}
@@ -172,7 +234,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const router = useRouter()
     const pathname = usePathname()
     const [expanded, setExpanded] = useState(true)
-    const [profile, setProfile] = useState<{ rank?: string; full_name?: string } | null>(null)
+    const [profile, setProfile] = useState<{ rank?: string; full_name?: string; wing?: string } | null>(null)
 
     const isSettings = pathname.startsWith('/dashboard/settings')
 
@@ -182,7 +244,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     useEffect(() => {
         if (!user) return
-        supabase.from('users').select('rank, full_name').eq('id', user.id).single()
+        supabase.from('users').select('rank, full_name, wing').eq('id', user.id).single()
             .then(({ data }) => { if (data) setProfile(data) })
     }, [user])
 
@@ -200,28 +262,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (isSettings) {
         return (
             <div className="bg-background">
-                <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} />
-                <div
-                    className="h-screen overflow-hidden animate-in fade-in duration-200"
-                    style={{ marginLeft: contentMargin, animationFillMode: 'both' }}
-                >
+                <style>{`@media (min-width: 768px) { .dash-content { margin-left: ${contentMargin}px; } }`}</style>
+                <div className="hidden md:block">
+                    <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} />
+                </div>
+                <div className="dash-content h-screen overflow-hidden animate-in fade-in duration-200 pb-28 md:pb-0" style={{ animationFillMode: 'both' }}>
                     {children}
                 </div>
+                <MobileBottomNav pathname={pathname} profile={profile} />
             </div>
         )
     }
 
     return (
         <div className="min-h-screen bg-background">
-            <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} />
-            <main
-                className="min-h-screen transition-all duration-300 ease-in-out overflow-y-auto"
-                style={{ marginLeft: contentMargin }}
-            >
+            <style>{`@media (min-width: 768px) { .dash-content { margin-left: ${contentMargin}px; transition: margin-left 300ms ease; } }`}</style>
+            <div className="hidden md:block">
+                <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} />
+            </div>
+            <main className="dash-content min-h-screen overflow-y-auto pb-28 md:pb-0">
                 <div className="animate-in fade-in duration-200" style={{ animationFillMode: 'both' }}>
                     {children}
                 </div>
             </main>
+            <MobileBottomNav pathname={pathname} profile={profile} />
         </div>
     )
 }

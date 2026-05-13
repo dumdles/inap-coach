@@ -20,6 +20,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "INAP Coach",
   description: "Your personal fitness coach.",
+  other: {
+    'theme-color': '#F5F7FA',
+  },
 };
 
 export default function RootLayout({
@@ -32,6 +35,13 @@ export default function RootLayout({
       lang="en"
       className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", inter.variable)}
     >
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F5F7FA" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0A1428" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+      </head>
       <body className="min-h-full flex flex-col"><ThemeProvider><AuthProvider>{children}</AuthProvider></ThemeProvider></body>
     </html>
   );

@@ -250,6 +250,45 @@
   }
 }
 
+/* Safe-area utilities for mobile */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pt-safe { padding-top: env(safe-area-inset-top); }
+
+/* ── Goal-mode accent overrides ─────────────────────── */
+/* Bulk (default blue — no override needed, matches :root) */
+
+.goal-cut {
+  --primary:       #DE350B;
+  --primary-light: #FFEBE6;
+  --primary-dark:  #BF2600;
+  --primary-mid:   #FF5630;
+}
+.goal-maintain {
+  --primary:       #00875A;
+  --primary-light: #E3FCEF;
+  --primary-dark:  #006644;
+  --primary-mid:   #36B37E;
+}
+.goal-ippt {
+  --primary:       #FF991F;
+  --primary-light: #FFFAE6;
+  --primary-dark:  #974F0C;
+  --primary-mid:   #FFAB00;
+}
+
+/* Dark mode variants */
+.dark.goal-cut      { --primary: #FF5630; --primary-mid: #FF7452; }
+.dark.goal-maintain { --primary: #36B37E; --primary-mid: #57D9A3; }
+.dark.goal-ippt     { --primary: #FFAB00; --primary-mid: #FFB946; }
+
+/* Sidebar accent should track primary */
+.goal-cut     { --sidebar-primary: #DE350B; }
+.goal-maintain{ --sidebar-primary: #00875A; }
+.goal-ippt    { --sidebar-primary: #FF991F; }
+.dark.goal-cut     { --sidebar-primary: #FF5630; }
+.dark.goal-maintain{ --sidebar-primary: #36B37E; }
+.dark.goal-ippt    { --sidebar-primary: #FFAB00; }
+
 /* Apply default font */
 body {
   font-family: var(--font-body);

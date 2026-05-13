@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/app/context/auth-context'
+import { supabase } from '@/lib/supabase'
 import { LogMealDialog } from '@/components/nutrition/log-meal-dialog'
 import { cn } from '@/lib/utils'
 
@@ -107,9 +108,20 @@ function QuickAction({
 export default function DashboardPage() {
     const { user } = useAuth()
     const [logMealOpen, setLogMealOpen] = useState(false)
+    const [ipptDate, setIpptDate] = useState<string | null>(null)
     const displayName = user?.user_metadata?.full_name?.split(' ')[0] ?? 'Soldier'
     const hour = new Date().getHours()
     const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+
+    useEffect(() => {
+        if (!user) return
+        supabase.from('users').select('ippt_date').eq('id', user.id).single()
+            .then(({ data }) => { if (data?.ippt_date) setIpptDate(data.ippt_date) })
+    }, [user])
+
+    const ipptDaysLeft = ipptDate
+        ? Math.ceil((new Date(ipptDate).getTime() - Date.now()) / 86_400_000)
+        : null
 
     return (
         <div className="min-h-screen px-4 sm:px-8 pt-8 pb-12">
@@ -136,30 +148,62 @@ export default function DashboardPage() {
                 </div>
 
                 {/* ── IPPT countdown ── */}
-                <div
-                    className="rounded-2xl p-5 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-3 duration-300"
-                    style={{
-                        animationDelay: '260ms',
-                        animationFillMode: 'both',
-                        background: 'linear-gradient(135deg, var(--color-primary) 0%, #0041a8 100%)',
-                        boxShadow: '0 4px 20px rgba(0, 82, 204, 0.22)',
-                    }}
-                >
-                    <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-                        <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                            <circle cx="12" cy="12" r="10" />
-                            <polyline points="12 6 12 12 16 14" />
-                        </svg>
+                {ipptDaysLeft !== null && ipptDaysLeft >= 0 && (
+                    <div
+                        className="rounded-2xl p-5 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-3 duration-300"
+                        style={{
+                            animationDelay: '260ms',
+                            animationFillMode: 'both',
+                            background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)',
+                            boxShadow: '0 4px 20px color-mix(in srgb, var(--color-primary) 30%, transparent)',
+                        }}
+                    >
+                        <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                            <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-xs font-bold uppercase tracking-widest text-white/70 mb-0.5">IPPT Countdown</div>
+                            <div className="font-display text-2xl font-extrabold text-white">
+                                {ipptDaysLeft === 0 ? 'Today!' : `${ipptDaysLeft} day${ipptDaysLeft === 1 ? '' : 's'}`}
+                            </div>
+                            <div className="text-xs text-white/60 mt-0.5">
+                                {ipptDaysLeft === 0
+                                    ? "Good luck — you've got this"
+                                    : ipptDaysLeft <= 7
+                                        ? 'Final week — dial in your nutrition'
+                                        : ipptDaysLeft <= 30
+                                            ? 'Last stretch — stay consistent'
+                                            : 'Keep your training consistent'}
+                            </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                            <div className="font-display font-extrabold text-white/15" style={{ fontSize: ipptDaysLeft > 99 ? 28 : 36 }}>
+                                {ipptDaysLeft === 0 ? '!' : ipptDaysLeft}
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex-1">
-                        <div className="text-xs font-bold uppercase tracking-widest text-white/70 mb-0.5">IPPT Countdown</div>
-                        <div className="font-display text-2xl font-extrabold text-white">47 days</div>
-                        <div className="text-xs text-white/60 mt-0.5">Keep your training consistent</div>
+                )}
+                {ipptDaysLeft === null && (
+                    <div
+                        className="rounded-2xl p-4 flex items-center gap-3 border border-dashed border-border animate-in fade-in slide-in-from-bottom-3 duration-300 cursor-pointer hover:border-primary/40 transition-colors"
+                        style={{ animationDelay: '260ms', animationFillMode: 'both' }}
+                        onClick={() => window.location.href = '/dashboard/settings#goal'}
+                    >
+                        <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                            <svg className="w-5 h-5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                            </svg>
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-sm font-semibold text-foreground">Set your IPPT date</div>
+                            <div className="text-xs text-muted-foreground">Add it in Settings → Goal mode to see your countdown</div>
+                        </div>
+                        <svg className="w-4 h-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polyline points="9 18 15 12 9 6" /></svg>
                     </div>
-                    <div className="text-right shrink-0">
-                        <div className="text-3xl font-extrabold font-display text-white/20">47</div>
-                    </div>
-                </div>
+                )}
 
                 {/* ── Quick actions ── */}
                 <div>
