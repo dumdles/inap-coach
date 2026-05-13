@@ -8,6 +8,8 @@ import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { isInstructor } from '@/lib/scoring'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useTheme } from '@/app/context/theme-context'
+import type { GoalMode } from '@/app/context/theme-context'
 
 // ── Icons ─────────────────────────────────────────────────
 function HomeIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" /><path d="M9 21V12h6v9" /></svg> }
@@ -235,6 +237,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const pathname = usePathname()
     const [expanded, setExpanded] = useState(true)
     const [profile, setProfile] = useState<{ rank?: string; full_name?: string; wing?: string } | null>(null)
+    const { setGoalMode } = useTheme()
 
     const isSettings = pathname.startsWith('/dashboard/settings')
 
@@ -244,8 +247,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     useEffect(() => {
         if (!user) return
-        supabase.from('users').select('rank, full_name, wing').eq('id', user.id).single()
-            .then(({ data }) => { if (data) setProfile(data) })
+        supabase.from('users').select('rank, full_name, wing, goal_mode').eq('id', user.id).single()
+            .then(({ data }) => {
+                if (data) {
+                    setProfile(data)
+                    if (data.goal_mode) setGoalMode(data.goal_mode as GoalMode)
+                }
+            })
     }, [user])
 
     if (isLoading || !user) {

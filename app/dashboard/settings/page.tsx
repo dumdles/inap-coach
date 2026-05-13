@@ -261,7 +261,7 @@ export default function SettingsPage() {
         height_cm: '', weight_kg: '', date_of_birth: '', gender: '',
         activity_level: 'moderate', goal_mode: 'bulk', ippt_date: '',
         platoon: '', section: '',
-        theme: 'light', units_weight: 'kg', units_height: 'cm',
+        theme: 'auto', units_weight: 'kg', units_height: 'cm',
         notifs: Object.fromEntries(NOTIFS.map(n => [n.id, n.defaultOn])),
         privacy: Object.fromEntries(PRIVACY.map(p => [p.id, p.defaultOn])),
     }
@@ -291,7 +291,7 @@ export default function SettingsPage() {
                     ippt_date: data.ippt_date ?? '',
                     platoon: data.platoon ?? '',
                     section: data.section ?? '',
-                    theme: (data.theme as FormState['theme']) ?? 'light',
+                    theme: (data.theme as FormState['theme']) ?? 'auto',
                     units_weight: (data.units_weight as FormState['units_weight']) ?? 'kg',
                     units_height: (data.units_height as FormState['units_height']) ?? 'cm',
                     notifs: { ...Object.fromEntries(NOTIFS.map(n => [n.id, n.defaultOn])), ...(data.notif_prefs ?? {}) },
@@ -786,7 +786,7 @@ export default function SettingsPage() {
                     <div className="fixed top-6 left-1/2 -translate-x-1/2 flex items-center gap-2.5 px-4 py-2.5 rounded-[10px] text-[13px] font-medium shadow-xl z-[200] animate-in fade-in slide-in-from-top-2 duration-200 text-white"
                         style={{ background: isComingSoon ? '#344563' : '#091E42' }}>
                         <span className={cn('w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0 text-[10px]', isComingSoon ? 'bg-warning/80' : 'bg-success')}>
-                            {isComingSoon ? '✦' : <CheckIcon />}
+                            {isComingSoon ? <svg viewBox="0 0 24 24" width={10} height={10} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> : <CheckIcon />}
                         </span>
                         {msg}
                     </div>

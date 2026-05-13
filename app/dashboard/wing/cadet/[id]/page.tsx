@@ -184,7 +184,7 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
                 {/* Stats row */}
                 <div className="grid grid-cols-3 gap-3 mb-6">
                     <StatPill label="Week score" value={score.toLocaleString()} sub="pts" />
-                    <StatPill label="Streak" value={`${streak}d`} sub="🔥 consecutive" />
+                    <StatPill label="Streak" value={`${streak}d`} sub="consecutive days" />
                     <StatPill
                         label="IPPT"
                         value={ipptDays === null ? '—' : ipptDays < 0 ? 'Passed' : ipptDays === 0 ? 'Today' : `${ipptDays}d`}
@@ -193,7 +193,7 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
 
                 {/* Tabs */}
-                <div className="flex items-center bg-muted rounded-full p-0.5 gap-0.5 w-fit mb-6">
+                <div className="flex items-center bg-muted dark:bg-[#091E42] rounded-full p-0.5 gap-0.5 w-fit mb-6">
                     {(['nutrition', 'profile'] as const).map(t => (
                         <button
                             key={t}
@@ -201,7 +201,7 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
                             className={cn(
                                 'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all capitalize',
                                 activeTab === t
-                                    ? 'bg-background text-foreground shadow-sm'
+                                    ? 'bg-card dark:bg-[#1F3460] text-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground',
                             )}
                         >
