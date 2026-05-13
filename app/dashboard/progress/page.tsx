@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
@@ -49,10 +49,6 @@ function daysUntilTarget(currentWeight: number, targetWeight: number, weeklyRate
     return Math.round((diff / weeklyRateKg) * 7)
 }
 
-const GOAL_COLOR: Record<string, string> = {
-    bulk: 'var(--primary)', cut: 'var(--danger)', maintain: 'var(--success)', ippt: 'var(--warning)',
-}
-
 // ── Sub-components ────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
     return (
@@ -67,22 +63,26 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string;
     )
 }
 
-function LogWeightModal({ currentWeight, currentBodyFat, onLog, onClose }: {
+function LogWeightModal({ currentWeight, currentBodyFat, logId, onLog, onClose }: {
     currentWeight: number | null
     currentBodyFat: number | null
+    logId?: string
     onLog: (w: number, bf: number | null) => Promise<void>
     onClose: () => void
 }) {
     const [weight, setWeight] = useState(currentWeight?.toString() ?? '')
     const [bodyFat, setBodyFat] = useState(currentBodyFat?.toString() ?? '')
     const [saving, setSaving] = useState(false)
+    const isEdit = !!logId
 
     const inputCls = 'h-11 rounded-xl border border-border bg-background px-4 text-[15px] font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 w-full'
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
-            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
-                <div className="font-display text-[18px] font-bold text-foreground mb-1">Log today's check-in</div>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-sm shadow-xl mx-0 sm:mx-4 mb-[88px] sm:mb-0" onClick={e => e.stopPropagation()}>
+                <div className="font-display text-[18px] font-bold text-foreground mb-1">
+                    {isEdit ? 'Edit check-in' : "Log today's check-in"}
+                </div>
                 <div className="text-[13px] text-muted-foreground mb-5">Body fat % is optional — log it if you have a reading.</div>
                 <div className="space-y-3">
                     <div>
@@ -116,7 +116,7 @@ function LogWeightModal({ currentWeight, currentBodyFat, onLog, onClose }: {
                         disabled={saving || !parseFloat(weight)}
                         className="flex-1 h-10 rounded-xl bg-primary text-white text-[13px] font-semibold disabled:opacity-50 transition-colors"
                     >
-                        {saving ? 'Saving…' : 'Save check-in'}
+                        {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Save check-in'}
                     </button>
                 </div>
             </div>
@@ -206,6 +206,8 @@ export default function ProgressPage() {
     const [weightLogs, setWeightLogs] = useState<WeightLog[]>([])
     const [loading, setLoading] = useState(true)
     const [showLogModal, setShowLogModal] = useState(false)
+    const [editLog, setEditLog] = useState<WeightLog | null>(null)
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
     const [range, setRange] = useState<30 | 60 | 90>(90)
 
     const fetchData = useCallback(async () => {
@@ -227,9 +229,24 @@ export default function ProgressPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: user?.id, weight_kg, body_fat_pct }),
         })
-        // Keep users.weight_kg in sync for Settings display
         await supabase.from('users').update({ weight_kg }).eq('id', user!.id)
         fetchData()
+    }
+
+    const editWeight = async (weight_kg: number, body_fat_pct: number | null) => {
+        if (!editLog) return
+        await fetch(`/api/weight-logs?id=${editLog.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ weight_kg, body_fat_pct }),
+        })
+        fetchData()
+    }
+
+    const deleteWeight = async (id: string) => {
+        await fetch(`/api/weight-logs?id=${id}`, { method: 'DELETE' })
+        setWeightLogs(prev => prev.filter(l => l.id !== id))
+        setDeleteConfirmId(null)
     }
 
     const hasGoal = profile?.target_weight_kg != null
@@ -280,7 +297,7 @@ export default function ProgressPage() {
     }
 
     if (loading) return (
-        <div className="px-4 sm:px-8 pt-8 pb-12 max-w-2xl mx-auto space-y-6">
+        <div className="px-4 sm:px-8 pt-16 sm:pt-8 pb-12 max-w-2xl mx-auto space-y-6">
             <Skeleton className="h-8 w-36" />
             <div className="grid grid-cols-2 gap-3">
                 {[0,1,2,3].map(i => <Skeleton key={i} className="h-20 rounded-2xl" />)}
@@ -292,7 +309,7 @@ export default function ProgressPage() {
 
     // No goal set → prompt
     if (!hasGoal) return (
-        <div className="px-4 sm:px-8 pt-8 pb-12 max-w-2xl mx-auto">
+        <div className="px-4 sm:px-8 pt-16 sm:pt-8 pb-12 max-w-2xl mx-auto">
             <h1 className="font-display text-3xl font-extrabold text-foreground mb-1">Progress</h1>
             <p className="text-sm text-muted-foreground mb-8">Track your weight and body composition over time.</p>
             <div className="bg-card border border-dashed border-border rounded-2xl p-10 flex flex-col items-center gap-4 text-center">
@@ -316,7 +333,7 @@ export default function ProgressPage() {
     )
 
     return (
-        <div className="px-4 sm:px-8 pt-8 pb-12 max-w-2xl mx-auto space-y-6">
+        <div className="px-4 sm:px-8 pt-16 sm:pt-16 sm:pt-8 pb-12 max-w-2xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex items-start justify-between">
                 <div>
@@ -467,37 +484,64 @@ export default function ProgressPage() {
                     <div className="px-5 py-3 border-b border-border">
                         <span className="text-[13px] font-semibold text-foreground">Recent check-ins</span>
                     </div>
-                    {[...weightLogs].reverse().slice(0, 10).map((log, ri, arr) => {
+                    {[...weightLogs].reverse().slice(0, 10).map((log) => {
                         const origIdx = weightLogs.indexOf(log)
                         const prev = weightLogs[origIdx - 1]
                         const delta = prev ? log.weight_kg - prev.weight_kg : null
+                        const isConfirmingDelete = deleteConfirmId === log.id
                         return (
                             <div key={log.id} className="px-5 py-3 border-b border-border last:border-0">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[13px] text-muted-foreground">
-                                        {new Date(log.logged_at).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' })}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        {delta != null && (
-                                            <span className={cn('text-[11px] font-medium', delta < 0 ? 'text-success' : delta > 0 ? 'text-danger' : 'text-muted-foreground')}>
-                                                {delta > 0 ? '+' : ''}{delta.toFixed(1)} kg
+                                {isConfirmingDelete ? (
+                                    <div className="flex items-center justify-between gap-3">
+                                        <span className="text-[12px] text-muted-foreground">Delete {log.weight_kg} kg on {new Date(log.logged_at).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })}?</span>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            <button onClick={() => setDeleteConfirmId(null)} className="text-[12px] text-muted-foreground hover:text-foreground transition-colors px-2 py-1">Cancel</button>
+                                            <button onClick={() => deleteWeight(log.id)} className="text-[12px] font-semibold text-white bg-danger rounded-lg px-3 py-1 hover:bg-danger/90 transition-colors">Delete</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[13px] text-muted-foreground">
+                                                {new Date(log.logged_at).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' })}
                                             </span>
+                                            <div className="flex items-center gap-2">
+                                                {delta != null && (
+                                                    <span className={cn('text-[11px] font-medium', delta < 0 ? 'text-success' : delta > 0 ? 'text-danger' : 'text-muted-foreground')}>
+                                                        {delta > 0 ? '+' : ''}{delta.toFixed(1)} kg
+                                                    </span>
+                                                )}
+                                                <span className="text-[13px] font-bold text-foreground tabular-nums">{log.weight_kg} kg</span>
+                                                <button
+                                                    onClick={() => setEditLog(log)}
+                                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                                                    title="Edit"
+                                                >
+                                                    <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                </button>
+                                                <button
+                                                    onClick={() => setDeleteConfirmId(log.id)}
+                                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors"
+                                                    title="Delete"
+                                                >
+                                                    <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {(log.body_fat_pct != null || log.polar_steps != null || log.polar_calories_burned != null) && (
+                                            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                                                {log.body_fat_pct != null && (
+                                                    <span className="text-[11px] text-muted-foreground">{log.body_fat_pct}% body fat</span>
+                                                )}
+                                                {log.polar_steps != null && (
+                                                    <span className="text-[11px] text-muted-foreground">{log.polar_steps.toLocaleString()} steps</span>
+                                                )}
+                                                {log.polar_calories_burned != null && (
+                                                    <span className="text-[11px] text-muted-foreground">{Math.round(log.polar_calories_burned)} kcal burned</span>
+                                                )}
+                                            </div>
                                         )}
-                                        <span className="text-[13px] font-bold text-foreground tabular-nums">{log.weight_kg} kg</span>
-                                    </div>
-                                </div>
-                                {(log.body_fat_pct != null || log.polar_steps != null || log.polar_calories_burned != null) && (
-                                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                                        {log.body_fat_pct != null && (
-                                            <span className="text-[11px] text-muted-foreground">{log.body_fat_pct}% body fat</span>
-                                        )}
-                                        {log.polar_steps != null && (
-                                            <span className="text-[11px] text-muted-foreground">{log.polar_steps.toLocaleString()} steps</span>
-                                        )}
-                                        {log.polar_calories_burned != null && (
-                                            <span className="text-[11px] text-muted-foreground">{Math.round(log.polar_calories_burned)} kcal burned</span>
-                                        )}
-                                    </div>
+                                    </>
                                 )}
                             </div>
                         )
@@ -511,6 +555,16 @@ export default function ProgressPage() {
                     currentBodyFat={latestBodyFat}
                     onLog={logWeight}
                     onClose={() => setShowLogModal(false)}
+                />
+            )}
+
+            {editLog && (
+                <LogWeightModal
+                    logId={editLog.id}
+                    currentWeight={editLog.weight_kg}
+                    currentBodyFat={editLog.body_fat_pct}
+                    onLog={editWeight}
+                    onClose={() => setEditLog(null)}
                 />
             )}
         </div>

@@ -54,3 +54,24 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true })
 }
+
+// DELETE /api/weight-logs?id=<uuid>
+export async function DELETE(req: NextRequest) {
+    const id = req.nextUrl.searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+    const { error } = await supabaseAdmin.from('weight_logs').delete().eq('id', id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+}
+
+// PATCH /api/weight-logs?id=<uuid>  — edit a specific log entry
+export async function PATCH(req: NextRequest) {
+    const id = req.nextUrl.searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+    const { weight_kg, body_fat_pct } = await req.json()
+    if (!weight_kg) return NextResponse.json({ error: 'weight_kg required' }, { status: 400 })
+    const payload: Record<string, unknown> = { weight_kg, body_fat_pct: body_fat_pct ?? null }
+    const { error } = await supabaseAdmin.from('weight_logs').update(payload).eq('id', id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+}

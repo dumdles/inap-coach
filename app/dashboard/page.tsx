@@ -124,7 +124,7 @@ export default function DashboardPage() {
         : null
 
     return (
-        <div className="min-h-screen px-4 sm:px-8 pt-8 pb-12">
+        <div className="min-h-screen px-4 sm:px-8 pt-16 sm:pt-8 pb-12">
             <div className="w-full max-w-2xl mx-auto space-y-8">
 
                 {/* ── Header ── */}

@@ -108,19 +108,61 @@ function MacroRow({ label, value, unit, pct, color }: { label: string; value: nu
     )
 }
 
-function FoodItemDialog({ log, onClose }: { log: MealLog | null; onClose: () => void }) {
+function FoodItemDialog({ log, onClose, onDeleted, onEdited }: {
+    log: MealLog | null
+    onClose: () => void
+    onDeleted: (id: string) => void
+    onEdited: (id: string, qty: number, mealType: MealType) => void
+}) {
+    const [mode, setMode] = useState<'view' | 'edit' | 'confirm-delete'>('view')
+    const [editQty, setEditQty] = useState('')
+    const [editMealType, setEditMealType] = useState<MealType>('lunch')
+    const [saving, setSaving] = useState(false)
+
+    // Reset mode when log changes
+    useEffect(() => {
+        setMode('view')
+        if (log) {
+            setEditQty(log.quantity_g.toString())
+            setEditMealType(log.meal_type)
+        }
+    }, [log])
+
     if (!log?.food_items) return null
-    const fi = log.food_items
-    const f = log.quantity_g / 100
+    const currentLog = log!
+    const fi = currentLog.food_items!
+    const previewQty = parseFloat(editQty) || currentLog.quantity_g
+    const f = previewQty / 100
     const macros = {
         calories: Math.round(fi.calories_per_100g * f),
         protein: parseFloat((fi.protein_g * f).toFixed(1)),
         carbs:   parseFloat((fi.carbs_g   * f).toFixed(1)),
         fat:     parseFloat((fi.fat_g     * f).toFixed(1)),
     }
-    const loggedAt = new Date(log.logged_at)
+    const loggedAt = new Date(currentLog.logged_at)
     const timeStr = loggedAt.toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' })
     const dateStr = loggedAt.toLocaleDateString('en-SG', { weekday: 'long', day: 'numeric', month: 'long' })
+
+    async function handleSave() {
+        const qty = parseFloat(editQty)
+        if (!qty || qty <= 0) return
+        setSaving(true)
+        await supabase.from('meal_logs').update({ quantity_g: qty, meal_type: editMealType }).eq('id', currentLog.id)
+        setSaving(false)
+        onEdited(currentLog.id, qty, editMealType)
+        onClose()
+    }
+
+    async function handleDelete() {
+        setSaving(true)
+        await supabase.from('meal_logs').delete().eq('id', currentLog.id)
+        setSaving(false)
+        onDeleted(currentLog.id)
+        onClose()
+    }
+
+    const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
+    const inputCls = 'h-10 rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 w-full'
 
     return (
         <Dialog open={!!log} onOpenChange={onClose}>
@@ -133,43 +175,132 @@ function FoodItemDialog({ log, onClose }: { log: MealLog | null; onClose: () => 
                                 <line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
                             </svg>
                         </div>
-                        <div>
+                        <div className="flex-1 min-w-0">
                             <DialogTitle className="text-base leading-tight">{fi.name}</DialogTitle>
-                            <p className="text-xs text-muted-foreground mt-0.5">{log.quantity_g}g · {MEAL_LABELS[log.meal_type]}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{currentLog.quantity_g}g · {MEAL_LABELS[currentLog.meal_type]}</p>
                         </div>
                     </div>
                 </DialogHeader>
 
-                {/* Calorie headline */}
-                <div className="flex items-center justify-between bg-muted rounded-xl px-4 py-3 mt-1">
-                    <span className="text-sm text-muted-foreground">Total calories</span>
-                    <span className="font-display font-extrabold text-2xl text-foreground">{macros.calories} <span className="text-sm font-normal text-muted-foreground">kcal</span></span>
-                </div>
+                {mode === 'view' && (
+                    <>
+                        {/* Edit / Delete actions */}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setMode('edit')}
+                                className="flex-1 flex items-center justify-center gap-2 h-9 rounded-xl border border-border text-[13px] font-medium text-foreground hover:bg-accent transition-colors"
+                            >
+                                <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                Edit
+                            </button>
+                            <button
+                                onClick={() => setMode('confirm-delete')}
+                                className="flex-1 flex items-center justify-center gap-2 h-9 rounded-xl border border-danger/30 text-[13px] font-medium text-danger hover:bg-danger/10 transition-colors"
+                            >
+                                <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                                Delete
+                            </button>
+                        </div>
 
-                {/* Macros */}
-                <div className="flex flex-col gap-2.5 mt-1">
-                    <MacroRow label="Protein"  value={macros.protein} unit="g" pct={(macros.protein / 50) * 100}  color="bg-blue-500" />
-                    <MacroRow label="Carbs"    value={macros.carbs}   unit="g" pct={(macros.carbs   / 120) * 100} color="bg-amber-400" />
-                    <MacroRow label="Fat"      value={macros.fat}     unit="g" pct={(macros.fat     / 65)  * 100} color="bg-rose-400" />
-                </div>
+                        {/* Calorie headline */}
+                        <div className="flex items-center justify-between bg-muted rounded-xl px-4 py-3 mt-1">
+                            <span className="text-sm text-muted-foreground">Total calories</span>
+                            <span className="font-display font-extrabold text-2xl text-foreground">{macros.calories} <span className="text-sm font-normal text-muted-foreground">kcal</span></span>
+                        </div>
 
-                {/* Per 100g footnote */}
-                <div className="border-t border-border pt-3 mt-1 flex flex-col gap-1">
-                    <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Per 100g</p>
-                    <div className="flex gap-4 text-xs text-muted-foreground">
-                        <span>{fi.calories_per_100g} kcal</span>
-                        <span>{fi.protein_g}g P</span>
-                        <span>{fi.carbs_g}g C</span>
-                        <span>{fi.fat_g}g F</span>
+                        {/* Macros */}
+                        <div className="flex flex-col gap-2.5 mt-1">
+                            <MacroRow label="Protein"  value={macros.protein} unit="g" pct={(macros.protein / 50) * 100}  color="bg-blue-500" />
+                            <MacroRow label="Carbs"    value={macros.carbs}   unit="g" pct={(macros.carbs   / 120) * 100} color="bg-amber-400" />
+                            <MacroRow label="Fat"      value={macros.fat}     unit="g" pct={(macros.fat     / 65)  * 100} color="bg-rose-400" />
+                        </div>
+
+                        {/* Per 100g footnote */}
+                        <div className="border-t border-border pt-3 mt-1 flex flex-col gap-1">
+                            <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Per 100g</p>
+                            <div className="flex gap-4 text-xs text-muted-foreground">
+                                <span>{fi.calories_per_100g} kcal</span>
+                                <span>{fi.protein_g}g P</span>
+                                <span>{fi.carbs_g}g C</span>
+                                <span>{fi.fat_g}g F</span>
+                            </div>
+                        </div>
+
+                        {/* Timestamp */}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-border pt-3">
+                            <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            Logged {dateStr} at {timeStr}
+                            {currentLog.notes && <span className="italic text-muted-foreground/70 truncate ml-1">{currentLog.notes}</span>}
+                        </div>
+                    </>
+                )}
+
+                {mode === 'edit' && (
+                    <div className="space-y-4 mt-1">
+                        <div>
+                            <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Quantity (g)</label>
+                            <input
+                                type="number"
+                                className={inputCls}
+                                value={editQty}
+                                onChange={e => setEditQty(e.target.value)}
+                                autoFocus
+                                min={1}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Meal type</label>
+                            <div className="grid grid-cols-4 gap-1.5">
+                                {MEAL_TYPES.map(t => (
+                                    <button
+                                        key={t}
+                                        onClick={() => setEditMealType(t)}
+                                        className={cn(
+                                            'py-2 rounded-xl text-xs font-medium border transition-colors capitalize',
+                                            editMealType === t
+                                                ? 'bg-primary text-white border-primary'
+                                                : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                                        )}
+                                    >
+                                        {t}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        {/* Live macro preview */}
+                        <div className="bg-muted/50 rounded-xl px-4 py-3 flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">{previewQty}g</span>
+                            <span className="text-sm font-bold text-foreground">{macros.calories} kcal · {macros.protein}g P</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant="outline" className="flex-1" onClick={() => setMode('view')} disabled={saving}>Cancel</Button>
+                            <Button className="flex-1" onClick={handleSave} disabled={saving || !parseFloat(editQty)}>
+                                {saving ? 'Saving…' : 'Save'}
+                            </Button>
+                        </div>
                     </div>
-                </div>
+                )}
 
-                {/* Timestamp */}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-border pt-3">
-                    <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    Logged {dateStr} at {timeStr}
-                    {log.notes && <span className="ml-auto italic text-muted-foreground/70">{log.notes}</span>}
-                </div>
+                {mode === 'confirm-delete' && (
+                    <div className="space-y-4 mt-2">
+                        <div className="bg-danger/10 border border-danger/20 rounded-xl px-4 py-3">
+                            <p className="text-sm font-medium text-foreground">Delete this entry?</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {fi.name} — {currentLog.quantity_g}g logged at {timeStr}
+                            </p>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant="outline" className="flex-1" onClick={() => setMode('view')} disabled={saving}>Cancel</Button>
+                            <Button
+                                className="flex-1 bg-danger hover:bg-danger/90 text-white"
+                                onClick={handleDelete}
+                                disabled={saving}
+                            >
+                                {saving ? 'Deleting…' : 'Delete'}
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </DialogContent>
         </Dialog>
     )
@@ -250,7 +381,7 @@ export default function NutritionPage() {
     })).filter(g => g.logs.length > 0)
 
     return (
-        <div className="min-h-screen px-4 sm:px-8 pt-8 pb-12">
+        <div className="min-h-screen px-4 sm:px-8 pt-16 sm:pt-8 pb-12">
             <div className="w-full max-w-2xl mx-auto space-y-7">
 
                 {/* ── Header ── */}
@@ -480,7 +611,14 @@ export default function NutritionPage() {
                 targets={targets}
                 onLogged={fetchMeals}
             />
-            <FoodItemDialog log={selectedLog} onClose={() => setSelectedLog(null)} />
+            <FoodItemDialog
+                log={selectedLog}
+                onClose={() => setSelectedLog(null)}
+                onDeleted={id => setMeals(prev => prev.filter(m => m.id !== id))}
+                onEdited={(id, qty, mealType) => setMeals(prev => prev.map(m =>
+                    m.id === id ? { ...m, quantity_g: qty, meal_type: mealType } : m
+                ))}
+            />
         </div>
     )
 }

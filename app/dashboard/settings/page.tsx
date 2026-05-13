@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
+import { calculateTDEE } from '@/lib/tdee'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/app/context/theme-context'
 import { Button } from '@/components/ui/button'
@@ -318,6 +319,23 @@ export default function SettingsPage() {
     const save = async () => {
         if (!user) return
         setSaving(true)
+
+        // Compute calorie_target so the DB trigger can use it when writing daily_summaries
+        let calorie_target: number | null = null
+        if (form.gender && form.weight_kg && form.height_cm && form.date_of_birth && form.activity_level && form.goal_mode) {
+            try {
+                const { calories } = calculateTDEE({
+                    gender: form.gender as Parameters<typeof calculateTDEE>[0]['gender'],
+                    weight_kg: parseFloat(form.weight_kg),
+                    height_cm: parseFloat(form.height_cm),
+                    date_of_birth: form.date_of_birth,
+                    activity_level: form.activity_level as Parameters<typeof calculateTDEE>[0]['activity_level'],
+                    goal_mode: form.goal_mode as Parameters<typeof calculateTDEE>[0]['goal_mode'],
+                })
+                calorie_target = calories
+            } catch { /* incomplete profile — leave null */ }
+        }
+
         const { error } = await supabase.from('users').update({
             full_name: form.full_name,
             username: form.username,
@@ -338,6 +356,7 @@ export default function SettingsPage() {
             units_height: form.units_height,
             notif_prefs: form.notifs,
             privacy_prefs: form.privacy,
+            calorie_target,
         }).eq('id', user.id)
         setSaving(false)
         if (error) { showToast('Error saving — try again'); return }
