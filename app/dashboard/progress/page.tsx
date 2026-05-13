@@ -1,17 +1,458 @@
-export default function ProgressPage() {
+'use client'
+
+import React, { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/app/context/auth-context'
+import { supabase } from '@/lib/supabase'
+import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
+
+type WeightLog = { id: string; weight_kg: number; logged_at: string }
+type UserProfile = {
+    weight_kg: number | null
+    target_weight_kg: number | null
+    weight_goal_date: string | null
+    goal_mode: string | null
+    height_cm: number | null
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function bmi(weight: number, height: number) {
+    const h = height / 100
+    return weight / (h * h)
+}
+
+function trendLine(logs: WeightLog[]): { slope: number; intercept: number } | null {
+    if (logs.length < 2) return null
+    const n = logs.length
+    const xs = logs.map((_, i) => i)
+    const ys = logs.map(l => l.weight_kg)
+    const sumX = xs.reduce((a, b) => a + b, 0)
+    const sumY = ys.reduce((a, b) => a + b, 0)
+    const sumXY = xs.reduce((acc, x, i) => acc + x * ys[i], 0)
+    const sumX2 = xs.reduce((acc, x) => acc + x * x, 0)
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+    const intercept = (sumY - slope * sumX) / n
+    return { slope, intercept }
+}
+
+function daysUntilTarget(currentWeight: number, targetWeight: number, weeklyRateKg: number): number | null {
+    if (weeklyRateKg === 0) return null
+    const diff = Math.abs(targetWeight - currentWeight)
+    return Math.round((diff / weeklyRateKg) * 7)
+}
+
+const GOAL_COLOR: Record<string, string> = {
+    bulk: 'var(--primary)', cut: 'var(--danger)', maintain: 'var(--success)', ippt: 'var(--warning)',
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+function StatCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
     return (
-        <div className="max-w-2xl px-8 pt-10 pb-10">
+        <div className={cn(
+            'rounded-2xl p-4 flex flex-col gap-1 border',
+            accent ? 'bg-primary/10 border-primary/20' : 'bg-card border-border',
+        )}>
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</div>
+            <div className={cn('font-display text-2xl font-extrabold', accent ? 'text-primary' : 'text-foreground')}>{value}</div>
+            {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
+        </div>
+    )
+}
+
+function LogWeightModal({ currentWeight, onLog, onClose }: {
+    currentWeight: number | null
+    onLog: (w: number) => Promise<void>
+    onClose: () => void
+}) {
+    const [val, setVal] = useState(currentWeight?.toString() ?? '')
+    const [saving, setSaving] = useState(false)
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
+                <div className="font-display text-[18px] font-bold text-foreground mb-1">Log today's weight</div>
+                <div className="text-[13px] text-muted-foreground mb-5">Enter your weight in kg to track your progress.</div>
+                <div className="flex items-center gap-3">
+                    <input
+                        autoFocus
+                        type="number"
+                        step="0.1"
+                        value={val}
+                        onChange={e => setVal(e.target.value)}
+                        placeholder="e.g. 72.5"
+                        className="flex-1 h-11 rounded-xl border border-border bg-background px-4 text-[15px] font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    />
+                    <span className="text-[14px] text-muted-foreground font-medium">kg</span>
+                </div>
+                <div className="flex gap-2 mt-4">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 h-10 rounded-xl border border-border text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={async () => {
+                            const w = parseFloat(val)
+                            if (!w || w <= 0) return
+                            setSaving(true)
+                            await onLog(w)
+                            setSaving(false)
+                            onClose()
+                        }}
+                        disabled={saving || !parseFloat(val)}
+                        className="flex-1 h-10 rounded-xl bg-primary text-white text-[13px] font-semibold disabled:opacity-50 transition-colors"
+                    >
+                        {saving ? 'Saving…' : 'Log weight'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ── Sparkline chart ────────────────────────────────────────────────────────────
+function WeightChart({ logs, targetWeight }: { logs: WeightLog[]; targetWeight: number | null }) {
+    if (logs.length === 0) return null
+    const W = 600; const H = 160; const PAD = { t: 16, r: 16, b: 32, l: 48 }
+    const weights = logs.map(l => l.weight_kg)
+    const allWeights = targetWeight ? [...weights, targetWeight] : weights
+    const minW = Math.min(...allWeights) - 1
+    const maxW = Math.max(...allWeights) + 1
+    const toX = (i: number) => PAD.l + (i / Math.max(logs.length - 1, 1)) * (W - PAD.l - PAD.r)
+    const toY = (w: number) => PAD.t + (1 - (w - minW) / (maxW - minW)) * (H - PAD.t - PAD.b)
+
+    const points = logs.map((l, i) => `${toX(i)},${toY(l.weight_kg)}`).join(' ')
+    const area = `M ${toX(0)},${toY(logs[0].weight_kg)} ` +
+        logs.map((l, i) => `L ${toX(i)},${toY(l.weight_kg)}`).join(' ') +
+        ` L ${toX(logs.length - 1)},${H - PAD.b} L ${toX(0)},${H - PAD.b} Z`
+
+    const trend = trendLine(logs)
+    const trendPoints = trend
+        ? `${toX(0)},${toY(trend.intercept)} ${toX(logs.length - 1)},${toY(trend.slope * (logs.length - 1) + trend.intercept)}`
+        : null
+
+    // Y axis labels
+    const yLabels = [minW + 1, (minW + maxW) / 2, maxW - 1].map(w => ({ w: w.toFixed(1), y: toY(w) }))
+    // X axis: first and last date
+    const fmtDate = (s: string) => new Date(s).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })
+
+    return (
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 160 }}>
+            <defs>
+                <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.18" />
+                    <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+                </linearGradient>
+            </defs>
+            {/* Y grid lines */}
+            {yLabels.map(({ w, y }) => (
+                <g key={w}>
+                    <line x1={PAD.l} y1={y} x2={W - PAD.r} y2={y} stroke="var(--border)" strokeWidth="1" strokeDasharray="4 4" />
+                    <text x={PAD.l - 6} y={y + 4} textAnchor="end" fontSize="10" fill="var(--muted-foreground)">{w}</text>
+                </g>
+            ))}
+            {/* Area fill */}
+            <path d={area} fill="url(#wg)" />
+            {/* Line */}
+            <polyline points={points} fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            {/* Trend line */}
+            {trendPoints && (
+                <polyline points={trendPoints} fill="none" stroke="var(--primary)" strokeWidth="1.5" strokeDasharray="6 4" opacity="0.5" />
+            )}
+            {/* Target line */}
+            {targetWeight && (
+                <>
+                    <line x1={PAD.l} y1={toY(targetWeight)} x2={W - PAD.r} y2={toY(targetWeight)}
+                        stroke="var(--success)" strokeWidth="1.5" strokeDasharray="5 3" />
+                    <text x={W - PAD.r + 4} y={toY(targetWeight) + 4} fontSize="10" fill="var(--success)">Target</text>
+                </>
+            )}
+            {/* Data points */}
+            {logs.map((l, i) => (
+                <circle key={l.id} cx={toX(i)} cy={toY(l.weight_kg)} r="3.5" fill="var(--primary)" />
+            ))}
+            {/* X axis labels */}
+            <text x={toX(0)} y={H - PAD.b + 14} textAnchor="middle" fontSize="10" fill="var(--muted-foreground)">
+                {fmtDate(logs[0].logged_at)}
+            </text>
+            {logs.length > 1 && (
+                <text x={toX(logs.length - 1)} y={H - PAD.b + 14} textAnchor="middle" fontSize="10" fill="var(--muted-foreground)">
+                    {fmtDate(logs[logs.length - 1].logged_at)}
+                </text>
+            )}
+        </svg>
+    )
+}
+
+// ── Main page ──────────────────────────────────────────────────────────────────
+export default function ProgressPage() {
+    const { user } = useAuth()
+    const router = useRouter()
+    const [profile, setProfile] = useState<UserProfile | null>(null)
+    const [weightLogs, setWeightLogs] = useState<WeightLog[]>([])
+    const [loading, setLoading] = useState(true)
+    const [showLogModal, setShowLogModal] = useState(false)
+    const [range, setRange] = useState<30 | 60 | 90>(90)
+
+    const fetchData = useCallback(async () => {
+        if (!user) return
+        const [{ data: prof }, logsRes] = await Promise.all([
+            supabase.from('users').select('weight_kg, target_weight_kg, weight_goal_date, goal_mode, height_cm').eq('id', user.id).single(),
+            fetch(`/api/weight-logs?userId=${user.id}&days=${range}`).then(r => r.json()),
+        ])
+        setProfile(prof)
+        setWeightLogs(Array.isArray(logsRes) ? logsRes : [])
+        setLoading(false)
+    }, [user, range])
+
+    useEffect(() => { fetchData() }, [fetchData])
+
+    const logWeight = async (weight_kg: number) => {
+        await fetch('/api/weight-logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user?.id, weight_kg }),
+        })
+        // Also update users.weight_kg so it's reflected in settings
+        await supabase.from('users').update({ weight_kg }).eq('id', user!.id)
+        fetchData()
+    }
+
+    const hasGoal = profile?.target_weight_kg != null
+    const currentWeight = weightLogs.length > 0
+        ? weightLogs[weightLogs.length - 1].weight_kg
+        : profile?.weight_kg ?? null
+
+    // Computed stats
+    const startWeight = weightLogs.length > 0 ? weightLogs[0].weight_kg : null
+    const totalChange = currentWeight != null && startWeight != null ? currentWeight - startWeight : null
+
+    // Weekly rate from trend
+    const trend = weightLogs.length >= 2 ? trendLine(weightLogs) : null
+    // slope is kg per index; indices are daily logs so this is per-log not per-day
+    // compute actual days per log
+    const avgDaysBetweenLogs = weightLogs.length >= 2
+        ? (new Date(weightLogs[weightLogs.length - 1].logged_at).getTime() - new Date(weightLogs[0].logged_at).getTime())
+          / (1000 * 60 * 60 * 24 * (weightLogs.length - 1))
+        : 1
+    const weeklyRateKg = trend ? Math.abs(trend.slope / avgDaysBetweenLogs * 7) : 0
+
+    const projectedDays = hasGoal && currentWeight && weeklyRateKg > 0
+        ? daysUntilTarget(currentWeight, profile!.target_weight_kg!, weeklyRateKg)
+        : null
+
+    const bmiVal = currentWeight && profile?.height_cm ? bmi(currentWeight, profile.height_cm) : null
+    const bmiLabel = bmiVal == null ? '—' : bmiVal < 18.5 ? 'Underweight' : bmiVal < 25 ? 'Healthy' : bmiVal < 30 ? 'Overweight' : 'Obese'
+
+    // Personalised tip
+    function getTip(): string {
+        if (!hasGoal || !currentWeight) return 'Set a body target in Settings → Goal to get personalised feedback.'
+        const diff = profile!.target_weight_kg! - currentWeight
+        const mode = profile?.goal_mode ?? 'bulk'
+        if (Math.abs(diff) < 0.5) return "You're essentially at your target — focus on maintaining consistency."
+        if (diff < 0) {
+            // Losing weight
+            if (weeklyRateKg > 1) return "You're losing weight faster than 1 kg/week — make sure you're eating enough protein to preserve muscle."
+            if (weeklyRateKg < 0.2) return 'Progress is slow. Try tightening your calorie target by 100–200 kcal/day.'
+            return 'Solid rate of loss. Keep protein high to retain muscle while in a deficit.'
+        } else {
+            // Gaining
+            if (weeklyRateKg > 0.8) return "Gaining quickly — some may be fat. Consider slowing to 0.25–0.5 kg/week for a cleaner bulk."
+            if (weeklyRateKg < 0.1) return `Not gaining much. If you're on ${mode === 'bulk' ? 'a bulk' : 'a gain phase'}, try adding 200 kcal/day.`
+            return 'Good rate of gain. Hit your protein target daily to maximise muscle growth.'
+        }
+    }
+
+    if (loading) return (
+        <div className="px-4 sm:px-8 pt-8 pb-12 max-w-2xl mx-auto space-y-6">
+            <Skeleton className="h-8 w-36" />
+            <div className="grid grid-cols-2 gap-3">
+                {[0,1,2,3].map(i => <Skeleton key={i} className="h-20 rounded-2xl" />)}
+            </div>
+            <Skeleton className="h-48 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
+        </div>
+    )
+
+    // No goal set → prompt
+    if (!hasGoal) return (
+        <div className="px-4 sm:px-8 pt-8 pb-12 max-w-2xl mx-auto">
             <h1 className="font-display text-3xl font-extrabold text-foreground mb-1">Progress</h1>
-            <p className="text-sm text-muted-foreground mb-8">Charts and trends over time.</p>
-            <div className="bg-card border border-border rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-3">
+            <p className="text-sm text-muted-foreground mb-8">Track your weight and body composition over time.</p>
+            <div className="bg-card border border-dashed border-border rounded-2xl p-10 flex flex-col items-center gap-4 text-center">
                 <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                     <svg className="w-7 h-7 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
                     </svg>
                 </div>
-                <p className="font-semibold text-foreground">Progress charts coming soon</p>
-                <p className="text-xs text-muted-foreground max-w-xs">View your weight, body composition, and fitness trends over time.</p>
+                <div>
+                    <div className="font-semibold text-foreground mb-1">No body target set</div>
+                    <p className="text-sm text-muted-foreground max-w-xs">Set a target weight in Settings to start tracking your progress here.</p>
+                </div>
+                <button
+                    onClick={() => router.push('/dashboard/settings')}
+                    className="mt-2 px-5 py-2 rounded-full bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors"
+                >
+                    Set body target
+                </button>
             </div>
+        </div>
+    )
+
+    return (
+        <div className="px-4 sm:px-8 pt-8 pb-12 max-w-2xl mx-auto space-y-6">
+            {/* Header */}
+            <div className="flex items-start justify-between">
+                <div>
+                    <h1 className="font-display text-3xl font-extrabold text-foreground mb-0.5">Progress</h1>
+                    <p className="text-sm text-muted-foreground">Weight tracking and body composition.</p>
+                </div>
+                <button
+                    onClick={() => setShowLogModal(true)}
+                    className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+                >
+                    <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Log weight
+                </button>
+            </div>
+
+            {/* Stat cards */}
+            <div className="grid grid-cols-2 gap-3">
+                <StatCard
+                    label="Current weight"
+                    value={currentWeight ? `${currentWeight} kg` : '—'}
+                    sub={bmiVal ? `BMI ${bmiVal.toFixed(1)} · ${bmiLabel}` : undefined}
+                    accent
+                />
+                <StatCard
+                    label="Target weight"
+                    value={`${profile!.target_weight_kg} kg`}
+                    sub={profile!.weight_goal_date
+                        ? `by ${new Date(profile!.weight_goal_date).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                        : 'No deadline set'}
+                />
+                <StatCard
+                    label={totalChange != null && totalChange < 0 ? 'Lost so far' : 'Gained so far'}
+                    value={totalChange != null ? `${Math.abs(totalChange).toFixed(1)} kg` : '—'}
+                    sub={weightLogs.length > 0 ? `over ${weightLogs.length} check-ins` : 'No logs yet'}
+                />
+                <StatCard
+                    label="Projected arrival"
+                    value={projectedDays != null ? `${projectedDays}d` : '—'}
+                    sub={projectedDays != null
+                        ? `~${(weeklyRateKg).toFixed(2)} kg/week`
+                        : weightLogs.length < 2 ? 'Log 2+ entries' : 'On target'}
+                />
+            </div>
+
+            {/* Chart */}
+            <div className="bg-card border border-border rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="text-[13px] font-semibold text-foreground">Weight over time</div>
+                    <div className="flex items-center bg-muted dark:bg-[#091E42] rounded-full p-0.5 gap-0.5">
+                        {([30, 60, 90] as const).map(r => (
+                            <button
+                                key={r}
+                                onClick={() => setRange(r)}
+                                className={cn(
+                                    'px-3 py-1 rounded-full text-[12px] font-medium transition-all',
+                                    range === r
+                                        ? 'bg-card dark:bg-[#1F3460] text-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground',
+                                )}
+                            >
+                                {r}d
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                {weightLogs.length === 0 ? (
+                    <div className="h-36 flex flex-col items-center justify-center gap-2 text-center">
+                        <p className="text-sm text-muted-foreground">No weight logs in this period.</p>
+                        <button onClick={() => setShowLogModal(true)} className="text-sm text-primary font-medium">Log your first entry</button>
+                    </div>
+                ) : (
+                    <WeightChart logs={weightLogs} targetWeight={profile!.target_weight_kg} />
+                )}
+            </div>
+
+            {/* Progress toward target */}
+            {currentWeight && profile!.target_weight_kg && (() => {
+                const start = startWeight ?? profile!.weight_kg ?? currentWeight
+                const target = profile!.target_weight_kg!
+                const totalNeeded = Math.abs(target - start)
+                const done = Math.abs(currentWeight - start)
+                const pct = totalNeeded > 0 ? Math.min(100, (done / totalNeeded) * 100) : 100
+                const losing = target < start
+                return (
+                    <div className="bg-card border border-border rounded-2xl p-5">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="text-[13px] font-semibold text-foreground">Goal progress</div>
+                            <span className="text-[12px] font-semibold text-primary">{pct.toFixed(0)}%</span>
+                        </div>
+                        <div className="h-2.5 bg-muted rounded-full overflow-hidden mb-2">
+                            <div
+                                className="h-full rounded-full transition-all duration-700"
+                                style={{ width: `${pct}%`, background: losing ? 'var(--danger)' : 'var(--primary)' }}
+                            />
+                        </div>
+                        <div className="flex justify-between text-[11px] text-muted-foreground">
+                            <span>Start: {start.toFixed(1)} kg</span>
+                            <span>Target: {target.toFixed(1)} kg</span>
+                        </div>
+                    </div>
+                )
+            })()}
+
+            {/* Personalised tip */}
+            <div className="rounded-2xl p-5 flex gap-4" style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}>
+                <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+                    <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                </div>
+                <div>
+                    <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Personalised tip</div>
+                    <div className="text-[13px] text-white leading-relaxed">{getTip()}</div>
+                </div>
+            </div>
+
+            {/* Recent log */}
+            {weightLogs.length > 0 && (
+                <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                    <div className="px-5 py-3 border-b border-border">
+                        <span className="text-[13px] font-semibold text-foreground">Recent check-ins</span>
+                    </div>
+                    {[...weightLogs].reverse().slice(0, 10).map(log => {
+                        const prev = weightLogs[weightLogs.indexOf(log) - 1]
+                        const delta = prev ? log.weight_kg - prev.weight_kg : null
+                        return (
+                            <div key={log.id} className="flex items-center justify-between px-5 py-3 border-b border-border last:border-0">
+                                <span className="text-[13px] text-muted-foreground">
+                                    {new Date(log.logged_at).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    {delta != null && (
+                                        <span className={cn('text-[11px] font-medium', delta < 0 ? 'text-success' : delta > 0 ? 'text-danger' : 'text-muted-foreground')}>
+                                            {delta > 0 ? '+' : ''}{delta.toFixed(1)} kg
+                                        </span>
+                                    )}
+                                    <span className="text-[13px] font-bold text-foreground tabular-nums">{log.weight_kg} kg</span>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {showLogModal && (
+                <LogWeightModal
+                    currentWeight={currentWeight}
+                    onLog={logWeight}
+                    onClose={() => setShowLogModal(false)}
+                />
+            )}
         </div>
     )
 }
