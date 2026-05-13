@@ -14,7 +14,7 @@ import type { GoalMode } from '@/app/context/theme-context'
 // ── Icons ─────────────────────────────────────────────────
 function HomeIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" /><path d="M9 21V12h6v9" /></svg> }
 function NutritionIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1" /><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" /><line x1="6" y1="1" x2="6" y2="4" /><line x1="10" y1="1" x2="10" y2="4" /><line x1="14" y1="1" x2="14" y2="4" /></svg> }
-function WorkoutsIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11M6.5 17.5h11M3 12h18M6 6.5v11M18 6.5v11" /></svg> }
+function WorkoutsIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M6 4v16M18 4v16M2 8h4M18 8h4M2 16h4M18 16h4M6 12h12" /></svg> }
 function ProgressIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg> }
 function FriendsIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg> }
 function WingIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7M17.5 14v7"/></svg> }
@@ -146,7 +146,9 @@ function Sidebar({ expanded, onToggle, pathname, profile }: {
         >
             {/* Logo */}
             <div className={cn('flex items-center gap-2.5 px-4 py-5 flex-shrink-0', !expanded && 'justify-center px-0')}>
-                <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center font-display text-[13px] font-extrabold text-white flex-shrink-0">I</div>
+                <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center text-white flex-shrink-0">
+                    <svg viewBox="0 0 24 24" width={15} height={15} fill="currentColor"><circle cx="12" cy="4" r="1.8"/><path d="M9.5 8.5c-.4.1-.8.4-1 .8L7 12.5c-.2.5 0 1.1.5 1.3.5.2 1.1 0 1.3-.5l.9-2.1 1 .9-1.5 4.5c-.2.5.1 1.1.6 1.3.5.2 1.1-.1 1.3-.6l1-3 1 1.2V20c0 .6.4 1 1 1s1-.4 1-1v-4.5c0-.3-.1-.5-.3-.7l-1.4-1.7 .6-1.8 .7 .7c.2.2.4.3.7.3H17c.6 0 1-.4 1-1s-.4-1-1-1h-1.7l-1.5-1.5c-.5-.5-1.2-.7-1.9-.5l-2.4.7z"/></svg>
+                </div>
                 {expanded && (
                     <span className="font-display text-[15px] font-extrabold tracking-tight text-sidebar-foreground whitespace-nowrap">
                         INAP<span className="text-primary">·</span>Coach
