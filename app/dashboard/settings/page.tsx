@@ -51,6 +51,8 @@ interface FormState {
     units_weight: 'kg' | 'lb'
     units_height: 'cm' | 'in'
     notifs: Record<string, boolean>
+    weekly_recap_day: string
+    weekly_recap_time: string
     privacy: Record<string, boolean>
 }
 
@@ -85,7 +87,7 @@ const GOALS: { key: GoalKey; label: string; color: string; desc: string; target:
 const NOTIFS = [
     { id: 'meal_reminders', label: 'Meal log reminders', desc: "Nudges if you haven't logged by 1100 / 1500 / 1900", defaultOn: true, channels: ['push'] },
     { id: 'macro_alerts', label: 'Macro target alerts', desc: "Heads-up when you're falling behind on protein", defaultOn: true, channels: ['push'] },
-    { id: 'weekly_summary', label: 'Weekly performance recap', desc: 'Sundays 1800 — your week vs your wing', defaultOn: true, channels: ['email', 'push'] },
+    { id: 'weekly_summary', label: 'Weekly performance recap', desc: 'Your week vs your wing — set your preferred day and time below', defaultOn: true, channels: ['push'] },
     { id: 'ippt_reminders', label: 'IPPT prep reminders', desc: 'Nutritional cues 7 / 3 / 1 days out', defaultOn: true, channels: ['push'] },
     { id: 'leaderboard', label: 'Leaderboard movement', desc: 'When you move up or down 3+ ranks', defaultOn: false, channels: ['push'] },
     { id: 'tips', label: 'Daily nutrition tips', desc: 'One short tip every morning at 0700', defaultOn: false, channels: ['push'] },
@@ -267,6 +269,8 @@ export default function SettingsPage() {
         platoon: '', section: '',
         theme: 'auto', units_weight: 'kg', units_height: 'cm',
         notifs: Object.fromEntries(NOTIFS.map(n => [n.id, n.defaultOn])),
+        weekly_recap_day: '0',
+        weekly_recap_time: '18:00',
         privacy: Object.fromEntries(PRIVACY.map(p => [p.id, p.defaultOn])),
     }
 
@@ -301,6 +305,8 @@ export default function SettingsPage() {
                     units_weight: (data.units_weight as FormState['units_weight']) ?? 'kg',
                     units_height: (data.units_height as FormState['units_height']) ?? 'cm',
                     notifs: { ...Object.fromEntries(NOTIFS.map(n => [n.id, n.defaultOn])), ...(data.notif_prefs ?? {}) },
+                    weekly_recap_day: String(data.notif_prefs?.weekly_recap_day ?? '0'),
+                    weekly_recap_time: data.notif_prefs?.weekly_recap_time ?? '18:00',
                     privacy: { ...Object.fromEntries(PRIVACY.map(p => [p.id, p.defaultOn])), ...(data.privacy_prefs ?? {}) },
                 }
                 setForm(loaded)
@@ -354,7 +360,11 @@ export default function SettingsPage() {
             theme: form.theme,
             units_weight: form.units_weight,
             units_height: form.units_height,
-            notif_prefs: form.notifs,
+            notif_prefs: {
+                ...form.notifs,
+                weekly_recap_day: parseInt(form.weekly_recap_day, 10),
+                weekly_recap_time: form.weekly_recap_time,
+            },
             privacy_prefs: form.privacy,
             calorie_target,
         }).eq('id', user.id)
@@ -701,26 +711,56 @@ export default function SettingsPage() {
         </div>
     )
 
+    const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+    const HOURS = Array.from({ length: 24 }, (_, i) => {
+        const h = i.toString().padStart(2, '0')
+        return { value: `${h}:00`, label: `${h}00` }
+    })
+
     const NotifsSection = (
         <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-warning-light border border-warning/30">
-            <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-warning-dark flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            <span className="text-[12px] font-medium text-warning-dark">Preferences are saved but push/email delivery isn't active yet — coming soon.</span>
-        </div>
         <SCard>
             <div className="flex flex-col divide-y divide-border">
                 {NOTIFS.map(n => (
-                    <div key={n.id} className="flex items-center gap-4 py-3.5">
-                        <div className="flex-1">
-                            <div className="text-[14px] font-semibold text-foreground">{n.label}</div>
-                            <div className="text-[12px] text-muted-foreground mt-0.5">{n.desc}</div>
+                    <div key={n.id} className="flex flex-col gap-2 py-3.5">
+                        <div className="flex items-center gap-4">
+                            <div className="flex-1">
+                                <div className="text-[14px] font-semibold text-foreground">{n.label}</div>
+                                <div className="text-[12px] text-muted-foreground mt-0.5">{n.desc}</div>
+                            </div>
+                            <div className="flex gap-1.5">
+                                {n.channels.map(c => (
+                                    <span key={c} className="px-2 py-0.5 bg-muted border border-border rounded-full text-[10px] font-semibold tracking-wide uppercase text-muted-foreground">{c}</span>
+                                ))}
+                            </div>
+                            <Toggle value={form.notifs[n.id]} onChange={v => setForm(f => ({ ...f, notifs: { ...f.notifs, [n.id]: v } }))} />
                         </div>
-                        <div className="flex gap-1.5">
-                            {n.channels.map(c => (
-                                <span key={c} className="px-2 py-0.5 bg-muted border border-border rounded-full text-[10px] font-semibold tracking-wide uppercase text-muted-foreground">{c}</span>
-                            ))}
-                        </div>
-                        <Toggle value={form.notifs[n.id]} onChange={v => setForm(f => ({ ...f, notifs: { ...f.notifs, [n.id]: v } }))} />
+                        {n.id === 'weekly_summary' && form.notifs['weekly_summary'] && (
+                            <div className="flex items-center gap-2 ml-0 mt-1">
+                                <span className="text-[12px] text-muted-foreground">Send on</span>
+                                <Select value={form.weekly_recap_day} onValueChange={v => set('weekly_recap_day', v)}>
+                                    <SelectTrigger className="h-8 w-32 text-[12px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {DAYS.map((d, i) => (
+                                            <SelectItem key={i} value={String(i)} className="text-[12px]">{d}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <span className="text-[12px] text-muted-foreground">at</span>
+                                <Select value={form.weekly_recap_time} onValueChange={v => set('weekly_recap_time', v)}>
+                                    <SelectTrigger className="h-8 w-24 text-[12px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {HOURS.map(h => (
+                                            <SelectItem key={h.value} value={h.value} className="text-[12px]">{h.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>
