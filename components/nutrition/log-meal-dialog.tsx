@@ -29,59 +29,9 @@ type SearchResult = FoodItem & { source?: 'db' }
 export type DailyTotals = { calories: number; protein: number; carbs: number; fat: number }
 export type UserTargets = { calories: number; protein: number }
 
-// ─── Food templates ───────────────────────────────────────────────────────────
+// ─── Food templates (fetched from DB) ────────────────────────────────────────
 
-type Template = Omit<FoodItem, 'id' | 'is_cookhouse_item'> & { category: string }
-
-const TEMPLATES: Template[] = [
-    // Hawker & local dishes
-    { category: 'Hawker Dishes', name: 'Chicken rice', calories_per_100g: 190, protein_g: 15, carbs_g: 24, fat_g: 5 },
-    { category: 'Hawker Dishes', name: 'Char kway teow', calories_per_100g: 175, protein_g: 7, carbs_g: 23, fat_g: 7 },
-    { category: 'Hawker Dishes', name: 'Hokkien mee', calories_per_100g: 160, protein_g: 9, carbs_g: 20, fat_g: 6 },
-    { category: 'Hawker Dishes', name: 'Bak chor mee (dry)', calories_per_100g: 172, protein_g: 10, carbs_g: 22, fat_g: 6 },
-    { category: 'Hawker Dishes', name: 'Wanton mee (dry)', calories_per_100g: 165, protein_g: 9, carbs_g: 22, fat_g: 5 },
-    { category: 'Hawker Dishes', name: 'Nasi lemak', calories_per_100g: 235, protein_g: 8, carbs_g: 30, fat_g: 10 },
-    { category: 'Hawker Dishes', name: 'Mee goreng', calories_per_100g: 175, protein_g: 7, carbs_g: 26, fat_g: 5 },
-    { category: 'Hawker Dishes', name: 'Roti prata (plain)', calories_per_100g: 301, protein_g: 8, carbs_g: 37, fat_g: 14 },
-    { category: 'Hawker Dishes', name: 'Yong tau foo (soup)', calories_per_100g: 85, protein_g: 7, carbs_g: 8, fat_g: 3 },
-    { category: 'Hawker Dishes', name: 'Laksa', calories_per_100g: 120, protein_g: 6, carbs_g: 14, fat_g: 5 },
-    { category: 'Hawker Dishes', name: 'Bak kut teh', calories_per_100g: 95, protein_g: 12, carbs_g: 3, fat_g: 4 },
-    { category: 'Hawker Dishes', name: 'Fishball noodle soup', calories_per_100g: 90, protein_g: 6, carbs_g: 13, fat_g: 2 },
-    { category: 'Hawker Dishes', name: 'Economical rice (2 veg 1 meat)', calories_per_100g: 155, protein_g: 8, carbs_g: 22, fat_g: 4 },
-    { category: 'Hawker Dishes', name: 'Prawn noodle soup', calories_per_100g: 105, protein_g: 8, carbs_g: 12, fat_g: 3 },
-    { category: 'Hawker Dishes', name: 'Satay (chicken, per stick)', calories_per_100g: 165, protein_g: 16, carbs_g: 5, fat_g: 9 },
-    { category: 'Hawker Dishes', name: 'Rojak', calories_per_100g: 110, protein_g: 3, carbs_g: 18, fat_g: 4 },
-    // Cookhouse
-    { category: 'Cookhouse', name: 'SAF chicken rice', calories_per_100g: 185, protein_g: 14, carbs_g: 23, fat_g: 5 },
-    { category: 'Cookhouse', name: 'SAF fried rice', calories_per_100g: 170, protein_g: 6, carbs_g: 28, fat_g: 4 },
-    { category: 'Cookhouse', name: 'SAF bee hoon soup', calories_per_100g: 80, protein_g: 4, carbs_g: 13, fat_g: 1.5 },
-    { category: 'Cookhouse', name: 'SAF mee rebus', calories_per_100g: 140, protein_g: 6, carbs_g: 22, fat_g: 3 },
-    { category: 'Cookhouse', name: 'SAF mixed veg rice', calories_per_100g: 145, protein_g: 7, carbs_g: 22, fat_g: 3.5 },
-    { category: 'Cookhouse', name: 'SAF oatmeal (breakfast)', calories_per_100g: 120, protein_g: 4, carbs_g: 20, fat_g: 2 },
-    // Proteins
-    { category: 'Proteins', name: 'Chicken breast (grilled)', calories_per_100g: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6 },
-    { category: 'Proteins', name: 'Eggs (whole)', calories_per_100g: 155, protein_g: 13, carbs_g: 1.1, fat_g: 11 },
-    { category: 'Proteins', name: 'Tuna (canned in water)', calories_per_100g: 116, protein_g: 26, carbs_g: 0, fat_g: 1 },
-    { category: 'Proteins', name: 'Whey protein (powder)', calories_per_100g: 400, protein_g: 80, carbs_g: 8, fat_g: 4 },
-    { category: 'Proteins', name: 'Greek yogurt', calories_per_100g: 97, protein_g: 9, carbs_g: 3.6, fat_g: 5 },
-    { category: 'Proteins', name: 'Tofu (firm)', calories_per_100g: 76, protein_g: 8, carbs_g: 2, fat_g: 4 },
-    // Carbs
-    { category: 'Carbs & Grains', name: 'White rice (cooked)', calories_per_100g: 130, protein_g: 2.7, carbs_g: 28, fat_g: 0.3 },
-    { category: 'Carbs & Grains', name: 'Oats (dry)', calories_per_100g: 389, protein_g: 17, carbs_g: 66, fat_g: 7 },
-    { category: 'Carbs & Grains', name: 'White bread', calories_per_100g: 265, protein_g: 9, carbs_g: 49, fat_g: 3.2 },
-    { category: 'Carbs & Grains', name: 'Instant noodles (cooked)', calories_per_100g: 138, protein_g: 3.8, carbs_g: 20, fat_g: 5 },
-    { category: 'Carbs & Grains', name: 'Banana', calories_per_100g: 89, protein_g: 1.1, carbs_g: 23, fat_g: 0.3 },
-    // Snacks & drinks
-    { category: 'Snacks & Drinks', name: 'Peanut butter', calories_per_100g: 588, protein_g: 25, carbs_g: 20, fat_g: 50 },
-    { category: 'Snacks & Drinks', name: 'Milo (powder)', calories_per_100g: 392, protein_g: 6.2, carbs_g: 72, fat_g: 8 },
-    { category: 'Snacks & Drinks', name: '100 Plus', calories_per_100g: 24, protein_g: 0, carbs_g: 6, fat_g: 0 },
-    { category: 'Snacks & Drinks', name: 'Protein bar (generic)', calories_per_100g: 380, protein_g: 30, carbs_g: 42, fat_g: 10 },
-    { category: 'Snacks & Drinks', name: 'Kaya toast (2 slices)', calories_per_100g: 310, protein_g: 7, carbs_g: 42, fat_g: 13 },
-    { category: 'Snacks & Drinks', name: 'Teh tarik', calories_per_100g: 55, protein_g: 1.5, carbs_g: 8, fat_g: 2 },
-    { category: 'Snacks & Drinks', name: 'Kopi O kosong', calories_per_100g: 5, protein_g: 0.2, carbs_g: 0.8, fat_g: 0 },
-]
-
-const TEMPLATE_CATEGORIES = Array.from(new Set(TEMPLATES.map(t => t.category)))
+type Template = FoodItem & { category: string }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -128,32 +78,44 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
     const [query, setQuery] = useState('')
     const [results, setResults] = useState<SearchResult[]>([])
     const [searching, setSearching] = useState(false)
-    const [activeCategory, setActiveCategory] = useState(TEMPLATE_CATEGORIES[0])
+    const [templates, setTemplates] = useState<Template[]>([])
+    const [activeCategory, setActiveCategory] = useState<string>('')
 
-    const [selected, setSelected] = useState<FoodItem | null>(null)
+    const [selected, setSelected] = useState<FoodItem | Omit<FoodItem, 'id'> | null>(null)
     const [quantity, setQuantity] = useState('100')
     const [mealType, setMealType] = useState<MealType>(detectMealType())
     const [notes, setNotes] = useState('')
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [creatingTemplate, setCreatingTemplate] = useState<string | null>(null)
 
     const [custom, setCustom] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '', is_cookhouse_item: false })
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    // Fetch templates from DB once on first open
+    useEffect(() => {
+        if (!open || templates.length > 0) return
+        fetch('/api/food-templates')
+            .then(r => r.json())
+            .then((data: Template[]) => {
+                if (Array.isArray(data) && data.length > 0) {
+                    setTemplates(data)
+                    setActiveCategory(data[0].category)
+                }
+            })
+            .catch(() => {})
+    }, [open, templates.length])
 
     function reset() {
         setStage('pick')
         setQuery('')
         setResults([])
         setSearching(false)
-        setActiveCategory(TEMPLATE_CATEGORIES[0])
         setSelected(null)
         setQuantity('100')
         setMealType(detectMealType())
         setNotes('')
         setError(null)
-        setCreatingTemplate(null)
         setCustom({ name: '', calories: '', protein: '', carbs: '', fat: '', is_cookhouse_item: false })
     }
 
@@ -173,24 +135,10 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         }, 280)
     }, [query])
 
-    async function selectTemplate(t: Template) {
-        setCreatingTemplate(t.name)
-        const res = await fetch('/api/food-items', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: t.name,
-                calories_per_100g: t.calories_per_100g,
-                protein_g: t.protein_g,
-                carbs_g: t.carbs_g,
-                fat_g: t.fat_g,
-                created_by: user?.id,
-            }),
-        })
-        setCreatingTemplate(null)
-        if (!res.ok) { setError('Failed to load food item'); return }
-        const item: FoodItem = await res.json()
-        setSelected(item)
+    function selectTemplate(t: Template) {
+        // Navigate to details immediately using template data.
+        // The food item will be created/looked up in the DB during submit.
+        setSelected({ name: t.name, calories_per_100g: t.calories_per_100g, protein_g: t.protein_g, carbs_g: t.carbs_g, fat_g: t.fat_g, is_cookhouse_item: false })
         setStage('details')
     }
 
@@ -227,9 +175,23 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         if (!user || !selected || parseFloat(quantity) <= 0) return
         setSubmitting(true)
         setError(null)
+
+        // Resolve food item ID — template selections don't have one yet
+        let foodItemId = 'id' in selected ? selected.id : null
+        if (!foodItemId) {
+            const res = await fetch('/api/food-items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: selected.name, calories_per_100g: selected.calories_per_100g, protein_g: selected.protein_g, carbs_g: selected.carbs_g, fat_g: selected.fat_g, created_by: user.id }),
+            })
+            if (!res.ok) { setError('Failed to save food item'); setSubmitting(false); return }
+            const item: FoodItem = await res.json()
+            foodItemId = item.id
+        }
+
         const { error: insertError } = await supabase.from('meal_logs').insert({
             user_id: user.id,
-            food_item_id: selected.id,
+            food_item_id: foodItemId,
             quantity_g: parseFloat(quantity),
             meal_type: mealType,
             notes: notes.trim() || null,
@@ -267,7 +229,8 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         { value: 'snack', label: 'Snack' },
     ]
 
-    const visibleTemplates = TEMPLATES.filter(t => t.category === activeCategory)
+    const templateCategories = Array.from(new Set(templates.map(t => t.category)))
+    const visibleTemplates = templates.filter(t => t.category === activeCategory)
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -356,10 +319,10 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                             </div>
                         ) : (
                             /* Template browser */
-                            <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                            <div className="flex flex-col flex-1 min-h-0 overflow-hidden scrollbar-hide">
                                 {/* Category pills */}
                                 <div className="px-5 pb-2 flex gap-2 overflow-x-auto scrollbar-none flex-shrink-0">
-                                    {TEMPLATE_CATEGORIES.map(cat => (
+                                    {templateCategories.map(cat => (
                                         <button
                                             key={cat}
                                             onClick={() => setActiveCategory(cat)}
@@ -381,12 +344,11 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                                         {visibleTemplates.map(t => (
                                             <button
                                                 key={t.name}
-                                                disabled={creatingTemplate === t.name}
                                                 onClick={() => selectTemplate(t)}
                                                 className={cn(
                                                     'relative flex flex-col gap-1 p-3 rounded-xl border border-border bg-card text-left',
                                                     'hover:border-primary/50 hover:bg-accent/50 transition-colors',
-                                                    'active:scale-[0.97] disabled:opacity-60 disabled:cursor-wait'
+                                                    'active:scale-[0.97]'
                                                 )}
                                             >
                                                 <span className="text-[12px] font-semibold text-foreground leading-tight line-clamp-2">
@@ -399,11 +361,6 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                                                     {t.protein_g}g P · {t.carbs_g}g C · {t.fat_g}g F
                                                 </span>
                                                 <span className="text-[9px] text-muted-foreground/60">per 100g</span>
-                                                {creatingTemplate === t.name && (
-                                                    <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-background/60">
-                                                        <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                                                    </div>
-                                                )}
                                             </button>
                                         ))}
                                     </div>

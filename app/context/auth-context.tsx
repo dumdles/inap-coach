@@ -50,13 +50,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((event, session) => {
+            // On token refresh, only update session — avoid changing user object
+            // reference which would re-trigger every useEffect([user]) on tab focus.
+            if (event === 'TOKEN_REFRESHED') {
+                setSession(session)
+                return
+            }
             setSession(session)
             setUser(session?.user ?? null)
-
-            // Handle token refresh
-            if (event === 'TOKEN_REFRESHED') {
-                console.log('Token refreshed')
-            }
         })
 
         return () => {

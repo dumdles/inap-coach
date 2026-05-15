@@ -37,6 +37,15 @@ export async function GET(req: NextRequest) {
             .eq('wing', wing)
         if (error) return NextResponse.json({ error: error.message }, { status: 500 })
         users = data ?? []
+    } else if (scope === 'section') {
+        const { data: me } = await supabaseAdmin.from('users').select('section').eq('id', userId).single()
+        if (me?.section) {
+            const { data } = await supabaseAdmin
+                .from('users')
+                .select('id, full_name, rank, wing')
+                .eq('section', me.section)
+            users = data ?? []
+        }
     } else if (scope === 'friends') {
         const { data: rows } = await supabaseAdmin
             .from('friendships')

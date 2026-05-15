@@ -4,9 +4,7 @@ import React, { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/app/context/auth-context'
-import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import { isInstructor } from '@/lib/scoring'
 import { Skeleton } from '@/components/ui/skeleton'
 
 type DayEntry = { calories: number; protein: number; carbs: number; fat: number; calorie_target: number }
@@ -32,6 +30,7 @@ type CadetData = {
     score: number
     streak: number
     dailySummary: Record<string, DayEntry>
+    accessLevel: 'instructor' | 'friend'
 }
 
 
@@ -81,9 +80,8 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
         if (!user) return
         async function load() {
             try {
-                const { data: profile } = await supabase.from('users').select('rank').eq('id', user!.id).single()
-                if (!profile || !isInstructor(profile.rank)) { router.replace('/dashboard'); return }
                 const res = await fetch(`/api/cadet?cadetId=${cadetId}&requesterId=${user!.id}`)
+                if (res.status === 403) { router.replace('/dashboard'); return }
                 const json = await res.json()
                 if (json?.error) { setError(json.error) } else { setData(json) }
             } catch {
@@ -133,7 +131,8 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
 
     if (!data) return null
 
-    const { profile, score, streak, dailySummary } = data
+    const { profile, score, streak, dailySummary, accessLevel } = data
+    const isFriendView = accessLevel === 'friend'
 
     // Last 14 days for chart
     const last14 = Array.from({ length: 14 }, (_, i) => {
@@ -156,11 +155,11 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
             <div className="max-w-3xl mx-auto">
                 {/* Back */}
                 <Link
-                    href="/dashboard/wing"
+                    href={isFriendView ? '/dashboard/friends' : '/dashboard/wing'}
                     className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors mb-5"
                 >
                     <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-                    Back to wing
+                    {isFriendView ? 'Back to leaderboard' : 'Back to wing'}
                 </Link>
 
                 {/* Header */}
@@ -176,7 +175,7 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
                             {[profile.wing && `${profile.wing} Wing`, profile.platoon && `Plt ${profile.platoon}`, profile.section && `Sec ${profile.section}`].filter(Boolean).join(' · ')}
                         </div>
                     </div>
-                    {profile.goal_mode && (
+                    {!isFriendView && profile.goal_mode && (
                         <span
                             className="text-[11px] font-bold uppercase tracking-wide px-3 py-1 rounded-full text-white flex-shrink-0"
                             style={{ background: GOAL_COLOR[profile.goal_mode] ?? '#0052CC' }}
@@ -197,23 +196,25 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
                     />
                 </div>
 
-                {/* Tabs */}
-                <div className="flex items-center bg-muted dark:bg-[#091E42] rounded-full p-0.5 gap-0.5 w-fit mb-6">
-                    {([['nutrition', 'Nutrition'], ['workouts', 'Workouts'], ['profile', 'Profile']] as const).map(([key, label]) => (
-                        <button
-                            key={key}
-                            onClick={() => setActiveTab(key)}
-                            className={cn(
-                                'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all',
-                                activeTab === key
-                                    ? 'bg-card dark:bg-[#1F3460] text-foreground shadow-sm'
-                                    : 'text-muted-foreground hover:text-foreground',
-                            )}
-                        >
-                            {label}
-                        </button>
-                    ))}
-                </div>
+                {/* Tabs — profile tab hidden for friend view */}
+                {!isFriendView && (
+                    <div className="flex items-center bg-muted dark:bg-[#091E42] rounded-full p-0.5 gap-0.5 w-fit mb-6">
+                        {(['nutrition', 'profile'] as const).map(t => (
+                            <button
+                                key={t}
+                                onClick={() => setActiveTab(t)}
+                                className={cn(
+                                    'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all capitalize',
+                                    activeTab === t
+                                        ? 'bg-card dark:bg-[#1F3460] text-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground',
+                                )}
+                            >
+                                {t === 'nutrition' ? 'Nutrition' : 'Profile'}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 {activeTab === 'nutrition' && (
                     <div className="space-y-6">
