@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { computeScore, computeStreak } from '@/lib/scoring'
+import { computeScore, computeStreak, isInstructor } from '@/lib/scoring'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,7 +21,20 @@ export async function GET(req: NextRequest) {
         supabaseAdmin.from('users').select('*').eq('id', cadetId).single(),
     ])
     if (!requester || !cadet) return NextResponse.json({ error: 'not found' }, { status: 404 })
-    if (requester.wing !== cadet.wing) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+
+    const isInstructorInSameWing = isInstructor(requester.rank) && requester.wing === cadet.wing
+    if (!isInstructorInSameWing) {
+        const { data: friendship } = await supabaseAdmin
+            .from('friendships')
+            .select('id')
+            .or(
+                `and(requester_id.eq.${requesterId},addressee_id.eq.${cadetId}),` +
+                `and(requester_id.eq.${cadetId},addressee_id.eq.${requesterId})`
+            )
+            .eq('status', 'accepted')
+            .maybeSingle()
+        if (!friendship) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    }
 
     const yearAgo = new Date()
     yearAgo.setFullYear(yearAgo.getFullYear() - 1)
@@ -65,22 +78,25 @@ export async function GET(req: NextRequest) {
         }
     }
 
+    const profile = isInstructorInSameWing
+        ? {
+            id: cadet.id, full_name: cadet.full_name, rank: cadet.rank, wing: cadet.wing,
+            platoon: cadet.platoon, section: cadet.section,
+            height_cm: cadet.height_cm, weight_kg: cadet.weight_kg,
+            gender: cadet.gender, goal_mode: cadet.goal_mode, ippt_date: cadet.ippt_date,
+        }
+        : {
+            // Friend view — omit biometric/sensitive fields
+            id: cadet.id, full_name: cadet.full_name, rank: cadet.rank, wing: cadet.wing,
+            platoon: cadet.platoon, section: cadet.section,
+            goal_mode: cadet.goal_mode, ippt_date: cadet.ippt_date,
+        }
+
     return NextResponse.json({
-        profile: {
-            id: cadet.id,
-            full_name: cadet.full_name,
-            rank: cadet.rank,
-            wing: cadet.wing,
-            platoon: cadet.platoon,
-            section: cadet.section,
-            height_cm: cadet.height_cm,
-            weight_kg: cadet.weight_kg,
-            gender: cadet.gender,
-            goal_mode: cadet.goal_mode,
-            ippt_date: cadet.ippt_date,
-        },
+        profile,
         score,
         streak,
         dailySummary,
+        accessLevel: isInstructorInSameWing ? 'instructor' : 'friend',
     })
 }

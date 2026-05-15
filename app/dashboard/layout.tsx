@@ -139,13 +139,21 @@ function NotificationPanel({ userId, anchorRef, onClose }: {
                             )}
                             <div className={cn('flex-1 min-w-0', n.read && 'pl-4')}>
                                 <div className="text-[13px] font-medium text-foreground leading-snug">{n.title}</div>
-                                {n.body && <div className="text-[12px] text-muted-foreground mt-0.5 leading-snug">{n.body}</div>}
+                                {n.body && <div className="text-[12px] text-muted-foreground mt-0.5 leading-snug line-clamp-2">{n.body}</div>}
                                 <div className="text-[11px] text-muted-foreground/60 mt-1">{timeAgo(n.created_at)}</div>
                             </div>
                         </div>
                     </div>
                 ))}
             </div>
+            <a
+                href="/dashboard/notifications"
+                onClick={onClose}
+                className="flex items-center justify-center gap-1.5 py-2.5 border-t border-border text-[12px] font-medium text-primary hover:bg-primary/5 transition-colors flex-shrink-0"
+            >
+                View all notifications
+                <svg viewBox="0 0 24 24" width={12} height={12} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
         </div>
     )
 
@@ -153,24 +161,29 @@ function NotificationPanel({ userId, anchorRef, onClose }: {
     return createPortal(panel, document.body)
 }
 
-// ── Bell button with unread badge ──────────────────────────
-function NotificationBell({ userId, expanded }: { userId: string; expanded: boolean }) {
-    const [open, setOpen] = useState(false)
+// ── Shared unread count (one fetch, visibility-aware, 5 min poll) ──
+function useUnreadCount(userId: string) {
     const [unread, setUnread] = useState(0)
-    const buttonRef = useRef<HTMLButtonElement>(null)
-
-    const fetchUnread = useCallback(() => {
+    const fetch$ = useCallback(() => {
+        if (!userId || document.hidden) return
         fetch(`/api/notifications?userId=${userId}`)
             .then(r => r.json())
             .then((data: Notification[]) => setUnread((data ?? []).filter(n => !n.read).length))
             .catch(() => {})
     }, [userId])
-
     useEffect(() => {
-        fetchUnread()
-        const id = setInterval(fetchUnread, 60_000)
-        return () => clearInterval(id)
-    }, [fetchUnread])
+        fetch$()
+        const id = setInterval(fetch$, 5 * 60_000)
+        document.addEventListener('visibilitychange', fetch$)
+        return () => { clearInterval(id); document.removeEventListener('visibilitychange', fetch$) }
+    }, [fetch$])
+    return [unread, setUnread] as const
+}
+
+// ── Bell button with unread badge ──────────────────────────
+function NotificationBell({ userId, expanded, unread, setUnread }: { userId: string; expanded: boolean; unread: number; setUnread: (n: number | ((prev: number) => number)) => void }) {
+    const [open, setOpen] = useState(false)
+    const buttonRef = useRef<HTMLButtonElement>(null)
 
     function handleOpen() {
         setOpen(o => !o)
@@ -227,23 +240,9 @@ const SIDEBAR_COLLAPSED_W = 64
 const SIDEBAR_MARGIN = 12
 
 // ── Mobile bell (floating top-right) ──────────────────────
-function MobileBell({ userId }: { userId: string }) {
+function MobileBell({ userId, unread, setUnread }: { userId: string; unread: number; setUnread: (n: number | ((prev: number) => number)) => void }) {
     const [open, setOpen] = useState(false)
-    const [unread, setUnread] = useState(0)
     const buttonRef = useRef<HTMLButtonElement>(null)
-
-    const fetchUnread = useCallback(() => {
-        fetch(`/api/notifications?userId=${userId}`)
-            .then(r => r.json())
-            .then((data: Notification[]) => setUnread((data ?? []).filter(n => !n.read).length))
-            .catch(() => {})
-    }, [userId])
-
-    useEffect(() => {
-        fetchUnread()
-        const id = setInterval(fetchUnread, 60_000)
-        return () => clearInterval(id)
-    }, [fetchUnread])
 
     return (
         <div className="fixed top-4 right-4 z-50 md:hidden">
@@ -316,12 +315,14 @@ function MobileBottomNav({ pathname, profile }: {
     )
 }
 
-function Sidebar({ expanded, onToggle, pathname, profile, userId }: {
+function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnread }: {
     expanded: boolean
     onToggle: () => void
     pathname: string
     profile: { rank?: string; full_name?: string; wing?: string } | null
     userId: string
+    unread: number
+    setUnread: (n: number | ((prev: number) => number)) => void
 }) {
     const { user, signOut } = useAuth()
     const router = useRouter()
@@ -388,7 +389,7 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId }: {
             <div className="mx-3 border-t border-sidebar-border mb-3" />
 
             {/* Main nav */}
-            <nav className={cn('flex flex-col gap-0.5 flex-1 overflow-y-auto', expanded ? 'px-2.5' : 'px-2')}>
+            <nav className={cn('flex flex-col gap-0.5 flex-1 overflow-y-auto overflow-x-hidden', expanded ? 'px-2.5' : 'px-2')}>
                 {BASE_NAV.map(item => <NavItem key={item.href} {...item} />)}
                 {profile?.rank && isInstructor(profile.rank) && (
                     <>
@@ -397,7 +398,7 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId }: {
                     </>
                 )}
                 <div className={cn('mx-1 border-t border-sidebar-border my-1.5', !expanded && 'mx-0')} />
-                <NotificationBell userId={userId} expanded={expanded} />
+                <NotificationBell userId={userId} expanded={expanded} unread={unread} setUnread={setUnread} />
             </nav>
 
             {/* Divider */}
@@ -470,6 +471,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [expanded, setExpanded] = useState(true)
     const [profile, setProfile] = useState<{ rank?: string; full_name?: string; wing?: string } | null>(null)
     const { setGoalMode } = useTheme()
+    const [unread, setUnread] = useUnreadCount(user?.id ?? '')
 
     const isSettings = pathname.startsWith('/dashboard/settings')
 
@@ -504,12 +506,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="bg-background">
                 <style>{`@media (min-width: 768px) { .dash-content { margin-left: ${contentMargin}px; } }`}</style>
                 <div className="hidden md:block">
-                    <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} />
+                    <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} unread={unread} setUnread={setUnread} />
                 </div>
                 <div className="dash-content h-screen overflow-hidden animate-in fade-in duration-200 pb-28 md:pb-0" style={{ animationFillMode: 'both' }}>
                     {children}
                 </div>
-                <MobileBell userId={user.id} />
+                <MobileBell userId={user.id} unread={unread} setUnread={setUnread} />
                 <MobileBottomNav pathname={pathname} profile={profile} />
             </div>
         )
@@ -519,14 +521,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="min-h-screen bg-background">
             <style>{`@media (min-width: 768px) { .dash-content { margin-left: ${contentMargin}px; transition: margin-left 300ms ease; } }`}</style>
             <div className="hidden md:block">
-                <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} />
+                <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} unread={unread} setUnread={setUnread} />
             </div>
             <main className="dash-content min-h-screen overflow-y-auto pb-28 md:pb-0">
                 <div className="animate-in fade-in duration-200" style={{ animationFillMode: 'both' }}>
                     {children}
                 </div>
             </main>
-            <MobileBell userId={user.id} />
+            <MobileBell userId={user.id} unread={unread} setUnread={setUnread} />
             <MobileBottomNav pathname={pathname} profile={profile} />
         </div>
     )
