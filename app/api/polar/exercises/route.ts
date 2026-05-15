@@ -1,0 +1,26 @@
+import { NextRequest, NextResponse } from "next/server";
+import { fetchPolar } from "@/lib/polar";
+
+export async function GET(request: NextRequest) {
+    try {
+        const searchParams = new URL(request.url).searchParams;
+        const userId = searchParams.get("userId");
+        const endpoint = searchParams.get("endpoint") || "/users/exercises";
+
+        if (!userId) {
+            return NextResponse.json(
+                { error: "Missing userId parameter" },
+                { status: 400 }
+            );
+        }
+
+        const data = await fetchPolar(userId, endpoint);
+        return NextResponse.json(data);
+    } catch (error) {
+        console.error("Polar API error:", error);
+        return NextResponse.json(
+            { error: error instanceof Error ? error.message : "Unknown error" },
+            { status: 500 }
+        );
+    }
+}
