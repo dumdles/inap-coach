@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
+import { calculateTDEE } from '@/lib/tdee'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/app/context/theme-context'
 import { Button } from '@/components/ui/button'
@@ -42,12 +43,16 @@ interface FormState {
     activity_level: string
     goal_mode: GoalKey
     ippt_date: string
+    target_weight_kg: string
+    weight_goal_date: string
     platoon: string
     section: string
     theme: 'light' | 'dark' | 'auto'
     units_weight: 'kg' | 'lb'
     units_height: 'cm' | 'in'
     notifs: Record<string, boolean>
+    weekly_recap_day: string
+    weekly_recap_time: string
     privacy: Record<string, boolean>
 }
 
@@ -82,7 +87,7 @@ const GOALS: { key: GoalKey; label: string; color: string; desc: string; target:
 const NOTIFS = [
     { id: 'meal_reminders', label: 'Meal log reminders', desc: "Nudges if you haven't logged by 1100 / 1500 / 1900", defaultOn: true, channels: ['push'] },
     { id: 'macro_alerts', label: 'Macro target alerts', desc: "Heads-up when you're falling behind on protein", defaultOn: true, channels: ['push'] },
-    { id: 'weekly_summary', label: 'Weekly performance recap', desc: 'Sundays 1800 — your week vs your wing', defaultOn: true, channels: ['email', 'push'] },
+    { id: 'weekly_summary', label: 'Weekly performance recap', desc: 'Your week vs your wing — set your preferred day and time below', defaultOn: true, channels: ['push'] },
     { id: 'ippt_reminders', label: 'IPPT prep reminders', desc: 'Nutritional cues 7 / 3 / 1 days out', defaultOn: true, channels: ['push'] },
     { id: 'leaderboard', label: 'Leaderboard movement', desc: 'When you move up or down 3+ ranks', defaultOn: false, channels: ['push'] },
     { id: 'tips', label: 'Daily nutrition tips', desc: 'One short tip every morning at 0700', defaultOn: false, channels: ['push'] },
@@ -260,9 +265,12 @@ export default function SettingsPage() {
         full_name: '', username: '', rank: '', wing: '',
         height_cm: '', weight_kg: '', date_of_birth: '', gender: '',
         activity_level: 'moderate', goal_mode: 'bulk', ippt_date: '',
+        target_weight_kg: '', weight_goal_date: '',
         platoon: '', section: '',
-        theme: 'light', units_weight: 'kg', units_height: 'cm',
+        theme: 'auto', units_weight: 'kg', units_height: 'cm',
         notifs: Object.fromEntries(NOTIFS.map(n => [n.id, n.defaultOn])),
+        weekly_recap_day: '0',
+        weekly_recap_time: '18:00',
         privacy: Object.fromEntries(PRIVACY.map(p => [p.id, p.defaultOn])),
     }
 
@@ -289,12 +297,16 @@ export default function SettingsPage() {
                     activity_level: data.activity_level ?? 'moderate',
                     goal_mode: (data.goal_mode as GoalKey) ?? 'bulk',
                     ippt_date: data.ippt_date ?? '',
+                    target_weight_kg: data.target_weight_kg?.toString() ?? '',
+                    weight_goal_date: data.weight_goal_date ?? '',
                     platoon: data.platoon ?? '',
                     section: data.section ?? '',
-                    theme: (data.theme as FormState['theme']) ?? 'light',
+                    theme: (data.theme as FormState['theme']) ?? 'auto',
                     units_weight: (data.units_weight as FormState['units_weight']) ?? 'kg',
                     units_height: (data.units_height as FormState['units_height']) ?? 'cm',
                     notifs: { ...Object.fromEntries(NOTIFS.map(n => [n.id, n.defaultOn])), ...(data.notif_prefs ?? {}) },
+                    weekly_recap_day: String(data.notif_prefs?.weekly_recap_day ?? '0'),
+                    weekly_recap_time: data.notif_prefs?.weekly_recap_time ?? '18:00',
                     privacy: { ...Object.fromEntries(PRIVACY.map(p => [p.id, p.defaultOn])), ...(data.privacy_prefs ?? {}) },
                 }
                 setForm(loaded)
@@ -313,6 +325,23 @@ export default function SettingsPage() {
     const save = async () => {
         if (!user) return
         setSaving(true)
+
+        // Compute calorie_target so the DB trigger can use it when writing daily_summaries
+        let calorie_target: number | null = null
+        if (form.gender && form.weight_kg && form.height_cm && form.date_of_birth && form.activity_level && form.goal_mode) {
+            try {
+                const { calories } = calculateTDEE({
+                    gender: form.gender as Parameters<typeof calculateTDEE>[0]['gender'],
+                    weight_kg: parseFloat(form.weight_kg),
+                    height_cm: parseFloat(form.height_cm),
+                    date_of_birth: form.date_of_birth,
+                    activity_level: form.activity_level as Parameters<typeof calculateTDEE>[0]['activity_level'],
+                    goal_mode: form.goal_mode as Parameters<typeof calculateTDEE>[0]['goal_mode'],
+                })
+                calorie_target = calories
+            } catch { /* incomplete profile — leave null */ }
+        }
+
         const { error } = await supabase.from('users').update({
             full_name: form.full_name,
             username: form.username,
@@ -324,13 +353,20 @@ export default function SettingsPage() {
             activity_level: form.activity_level,
             goal_mode: form.goal_mode,
             ippt_date: form.ippt_date || null,
+            target_weight_kg: parseFloat(form.target_weight_kg) || null,
+            weight_goal_date: form.weight_goal_date || null,
             platoon: form.platoon,
             section: form.section,
             theme: form.theme,
             units_weight: form.units_weight,
             units_height: form.units_height,
-            notif_prefs: form.notifs,
+            notif_prefs: {
+                ...form.notifs,
+                weekly_recap_day: parseInt(form.weekly_recap_day, 10),
+                weekly_recap_time: form.weekly_recap_time,
+            },
             privacy_prefs: form.privacy,
+            calorie_target,
         }).eq('id', user.id)
         setSaving(false)
         if (error) { showToast('Error saving — try again'); return }
@@ -617,6 +653,40 @@ export default function SettingsPage() {
                     )
                 })()}
             </SCard>
+            <SCard>
+                <div className="font-display text-[15px] font-bold text-foreground mb-1">Body target</div>
+                <div className="text-[13px] text-muted-foreground mb-4">Set a target weight and optional deadline. The Progress page will track your trajectory.</div>
+                <div className="grid grid-cols-2 gap-3.5">
+                    <InputField
+                        label="Target weight"
+                        hint="kg"
+                        type="number"
+                        value={form.target_weight_kg}
+                        onChange={e => set('target_weight_kg', e.target.value)}
+                        suffix="kg"
+                        placeholder={form.weight_kg || '70'}
+                    />
+                    <FieldLabel label="Target date">
+                        <DatePicker value={form.weight_goal_date} onChange={v => set('weight_goal_date', v)} className="mt-2" />
+                    </FieldLabel>
+                </div>
+                {form.target_weight_kg && form.weight_kg && (() => {
+                    const diff = parseFloat(form.target_weight_kg) - parseFloat(form.weight_kg)
+                    if (Math.abs(diff) < 0.1) return null
+                    const direction = diff < 0 ? 'lose' : 'gain'
+                    return (
+                        <div className="mt-3 text-[12px] text-muted-foreground">
+                            Target: {direction} <span className="font-semibold text-foreground">{Math.abs(diff).toFixed(1)} kg</span>
+                            {form.weight_goal_date && (() => {
+                                const days = Math.ceil((new Date(form.weight_goal_date).getTime() - Date.now()) / 86_400_000)
+                                if (days <= 0) return null
+                                const weeklyRate = (Math.abs(diff) / (days / 7)).toFixed(2)
+                                return <> over {days} days <span className="text-foreground font-medium">({weeklyRate} kg/week)</span></>
+                            })()}
+                        </div>
+                    )
+                })()}
+            </SCard>
         </div>
     )
 
@@ -641,26 +711,56 @@ export default function SettingsPage() {
         </div>
     )
 
+    const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+    const HOURS = Array.from({ length: 24 }, (_, i) => {
+        const h = i.toString().padStart(2, '0')
+        return { value: `${h}:00`, label: `${h}00` }
+    })
+
     const NotifsSection = (
         <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-warning-light border border-warning/30">
-            <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-warning-dark flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            <span className="text-[12px] font-medium text-warning-dark">Preferences are saved but push/email delivery isn't active yet — coming soon.</span>
-        </div>
         <SCard>
             <div className="flex flex-col divide-y divide-border">
                 {NOTIFS.map(n => (
-                    <div key={n.id} className="flex items-center gap-4 py-3.5">
-                        <div className="flex-1">
-                            <div className="text-[14px] font-semibold text-foreground">{n.label}</div>
-                            <div className="text-[12px] text-muted-foreground mt-0.5">{n.desc}</div>
+                    <div key={n.id} className="flex flex-col gap-2 py-3.5">
+                        <div className="flex items-center gap-4">
+                            <div className="flex-1">
+                                <div className="text-[14px] font-semibold text-foreground">{n.label}</div>
+                                <div className="text-[12px] text-muted-foreground mt-0.5">{n.desc}</div>
+                            </div>
+                            <div className="flex gap-1.5">
+                                {n.channels.map(c => (
+                                    <span key={c} className="px-2 py-0.5 bg-muted border border-border rounded-full text-[10px] font-semibold tracking-wide uppercase text-muted-foreground">{c}</span>
+                                ))}
+                            </div>
+                            <Toggle value={form.notifs[n.id]} onChange={v => setForm(f => ({ ...f, notifs: { ...f.notifs, [n.id]: v } }))} />
                         </div>
-                        <div className="flex gap-1.5">
-                            {n.channels.map(c => (
-                                <span key={c} className="px-2 py-0.5 bg-muted border border-border rounded-full text-[10px] font-semibold tracking-wide uppercase text-muted-foreground">{c}</span>
-                            ))}
-                        </div>
-                        <Toggle value={form.notifs[n.id]} onChange={v => setForm(f => ({ ...f, notifs: { ...f.notifs, [n.id]: v } }))} />
+                        {n.id === 'weekly_summary' && form.notifs['weekly_summary'] && (
+                            <div className="flex items-center gap-2 ml-0 mt-1">
+                                <span className="text-[12px] text-muted-foreground">Send on</span>
+                                <Select value={form.weekly_recap_day} onValueChange={v => set('weekly_recap_day', v)}>
+                                    <SelectTrigger className="h-8 w-32 text-[12px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {DAYS.map((d, i) => (
+                                            <SelectItem key={i} value={String(i)} className="text-[12px]">{d}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <span className="text-[12px] text-muted-foreground">at</span>
+                                <Select value={form.weekly_recap_time} onValueChange={v => set('weekly_recap_time', v)}>
+                                    <SelectTrigger className="h-8 w-24 text-[12px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {HOURS.map(h => (
+                                            <SelectItem key={h.value} value={h.value} className="text-[12px]">{h.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>
@@ -786,7 +886,7 @@ export default function SettingsPage() {
                     <div className="fixed top-6 left-1/2 -translate-x-1/2 flex items-center gap-2.5 px-4 py-2.5 rounded-[10px] text-[13px] font-medium shadow-xl z-[200] animate-in fade-in slide-in-from-top-2 duration-200 text-white"
                         style={{ background: isComingSoon ? '#344563' : '#091E42' }}>
                         <span className={cn('w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0 text-[10px]', isComingSoon ? 'bg-warning/80' : 'bg-success')}>
-                            {isComingSoon ? '✦' : <CheckIcon />}
+                            {isComingSoon ? <svg viewBox="0 0 24 24" width={10} height={10} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> : <CheckIcon />}
                         </span>
                         {msg}
                     </div>

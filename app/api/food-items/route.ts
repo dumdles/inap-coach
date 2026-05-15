@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
 // POST: create a custom food item (or return existing match by name)
 export async function POST(req: NextRequest) {
-    const { name, calories_per_100g, protein_g, carbs_g, fat_g, created_by } = await req.json()
+    const { name, calories_per_100g, protein_g, carbs_g, fat_g, is_cookhouse_item, created_by } = await req.json()
 
     // Return existing if a food with this exact name already exists
     const { data: existing } = await supabaseAdmin
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
             protein_g,
             carbs_g,
             fat_g,
-            is_cookhouse_item: false,
+            is_cookhouse_item: is_cookhouse_item ?? false,
             created_by,
         })
         .select('id, name, calories_per_100g, protein_g, carbs_g, fat_g, is_cookhouse_item')

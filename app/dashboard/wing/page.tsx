@@ -136,7 +136,7 @@ export default function WingPage() {
                         Nutrition overview for your cadets
                     </p>
                 </div>
-                <div className="flex items-center bg-muted rounded-full p-0.5 gap-0.5 mt-1">
+                <div className="flex items-center bg-muted dark:bg-[#091E42] rounded-full p-0.5 gap-0.5 mt-1">
                     {(['week', 'month'] as const).map(p => (
                         <button
                             key={p}
@@ -144,7 +144,7 @@ export default function WingPage() {
                             className={cn(
                                 'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all',
                                 period === p
-                                    ? 'bg-background text-foreground shadow-sm'
+                                    ? 'bg-card dark:bg-[#1F3460] text-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground',
                             )}
                         >
@@ -196,7 +196,7 @@ export default function WingPage() {
                     <div className="text-xs text-muted-foreground mb-2">Top streak</div>
                     <div className="flex items-end gap-1.5">
                         <div className="font-display font-extrabold text-3xl text-foreground">{topStreak}</div>
-                        <div className="text-base text-muted-foreground mb-0.5">days 🔥</div>
+                        <div className="text-base text-muted-foreground mb-0.5 flex items-center gap-1">days <svg viewBox="0 0 24 24" width={14} height={14} fill="currentColor" className="text-warning"><path d="M12 2C10 5.5 8 7 8.5 10.5 7 9.5 7 7 7 7 5.5 9 6 12 6 12 6 15.5 8.2 18.5 11 18.5s5-3 5-6.5c0-2.5-1.5-4-1.5-4s0 2-1 2.5C14 8 12 2 12 2Z"/></svg></div>
                     </div>
                     {topStreaker && (
                         <div className="text-xs text-muted-foreground mt-1 truncate">

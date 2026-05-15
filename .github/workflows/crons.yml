@@ -1,0 +1,79 @@
+name: Cron Jobs
+on:
+  schedule:
+    - cron: '0 3 * * *'    # meal reminder: 1100 SGT
+    - cron: '0 7 * * *'    # meal reminder: 1500 SGT
+    - cron: '0 11 * * *'   # meal reminder: 1900 SGT
+    - cron: '0 13 * * *'   # macro alerts: 2100 SGT
+    - cron: '0 * * * *'    # weekly recap check: every hour
+    - cron: '0 23 * * *'   # ippt reminders + nutrition tips: 0700 SGT
+    - cron: '0 0 * * *'    # leaderboard movement: 0800 SGT
+  workflow_dispatch:        # allow manual trigger from GitHub UI
+
+jobs:
+  meal-reminders:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.schedule == '0 3 * * *' ||
+      github.event.schedule == '0 7 * * *' ||
+      github.event.schedule == '0 11 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger meal reminders
+        run: |
+          curl -sf \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/meal-reminders"
+
+  macro-alerts:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.schedule == '0 13 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger macro alerts
+        run: |
+          curl -sf \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/macro-alerts"
+
+  weekly-recap:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.schedule == '0 * * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger weekly recap
+        run: |
+          curl -sf \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/weekly-recap"
+
+  ippt-and-tips:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.schedule == '0 23 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger IPPT reminders
+        run: |
+          curl -sf \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/ippt-reminders"
+      - name: Trigger nutrition tips
+        run: |
+          curl -sf \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/nutrition-tips"
+
+  leaderboard-movement:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.schedule == '0 0 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger leaderboard movement
+        run: |
+          curl -sf \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/leaderboard-movement"

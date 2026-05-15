@@ -72,7 +72,7 @@ function Avatar({ name, size = 'md', className }: { name: string; size?: 'sm' | 
 // ── Sub-components ────────────────────────────────────────────────────────────
 function PeriodToggle({ value, onChange }: { value: 'week' | 'month'; onChange: (v: 'week' | 'month') => void }) {
     return (
-        <div className="flex items-center bg-muted rounded-full p-0.5 gap-0.5">
+        <div className="flex items-center bg-muted dark:bg-[#091E42] rounded-full p-0.5 gap-0.5">
             {(['week', 'month'] as const).map(p => (
                 <button
                     key={p}
@@ -80,7 +80,7 @@ function PeriodToggle({ value, onChange }: { value: 'week' | 'month'; onChange: 
                     className={cn(
                         'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all',
                         value === p
-                            ? 'bg-background text-foreground shadow-sm'
+                            ? 'bg-card dark:bg-[#1F3460] text-foreground shadow-sm'
                             : 'text-muted-foreground hover:text-foreground',
                     )}
                 >
@@ -117,8 +117,9 @@ function RankingCard({
                         {user.wing} Wing
                     </span>
                     {user.streak > 0 && (
-                        <span className="ml-auto bg-emerald-500/20 text-emerald-400 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-                            🔥 {user.streak}-day streak
+                        <span className="ml-auto bg-emerald-500/20 text-emerald-400 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
+                            <svg viewBox="0 0 24 24" width={11} height={11} fill="currentColor"><path d="M12 2C10 5.5 8 7 8.5 10.5 7 9.5 7 7 7 7 5.5 9 6 12 6 12 6 15.5 8.2 18.5 11 18.5s5-3 5-6.5c0-2.5-1.5-4-1.5-4s0 2-1 2.5C14 8 12 2 12 2Z"/></svg>
+                            {user.streak}-day streak
                         </span>
                     )}
                 </div>
@@ -206,7 +207,12 @@ function LeaderboardList({ users, currentUserId }: { users: RankedUser[]; curren
                         </div>
                         <div className="text-xs text-muted-foreground">{u.rank} · {u.wing} Wing</div>
                     </div>
-                    {u.streak > 1 && <span className="text-xs text-muted-foreground">🔥{u.streak}</span>}
+                    {u.streak > 1 && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                            <svg viewBox="0 0 24 24" width={10} height={10} fill="currentColor" className="text-warning"><path d="M12 2C10 5.5 8 7 8.5 10.5 7 9.5 7 7 7 7 5.5 9 6 12 6 12 6 15.5 8.2 18.5 11 18.5s5-3 5-6.5c0-2.5-1.5-4-1.5-4s0 2-1 2.5C14 8 12 2 12 2Z"/></svg>
+                            {u.streak}
+                        </span>
+                    )}
                     <span className="text-sm font-bold text-foreground tabular-nums">{u.score.toLocaleString()}</span>
                 </div>
             ))}
@@ -293,6 +299,7 @@ function AddFriendDialog({
     onClose,
     currentUserId,
     existingIds,
+    pendingSentIds,
     pendingReceived,
     onSent,
     onAccept,
@@ -302,6 +309,7 @@ function AddFriendDialog({
     onClose: () => void
     currentUserId: string
     existingIds: Set<string>
+    pendingSentIds: Set<string>
     pendingReceived: FriendUser[]
     onSent: () => void
     onAccept: (id: string) => void
@@ -446,8 +454,8 @@ function AddFriendDialog({
                                         </p>
                                     )}
                                     {displayList.map(u => {
-                                        const already = existingIds.has(u.id)
-                                        const wasSent = sent.has(u.id)
+                                        const isFriend = existingIds.has(u.id)
+                                        const isPending = pendingSentIds.has(u.id) || sent.has(u.id)
                                         const subtitle = u.sameSection
                                             ? 'Same section'
                                             : `${u.wing} Wing`
@@ -460,10 +468,10 @@ function AddFriendDialog({
                                                     </div>
                                                     <div className="text-xs text-primary">{subtitle}</div>
                                                 </div>
-                                                {already ? (
+                                                {isFriend ? (
                                                     <span className="text-xs text-muted-foreground px-3">Friends</span>
-                                                ) : wasSent ? (
-                                                    <span className="text-xs text-emerald-500 font-semibold px-3">Sent!</span>
+                                                ) : isPending ? (
+                                                    <span className="text-xs text-muted-foreground font-medium px-3">Pending</span>
                                                 ) : (
                                                     <Button size="sm" onClick={() => sendRequest(u.id)}>Add</Button>
                                                 )}
@@ -496,6 +504,7 @@ export default function FriendsPage() {
     const [addOpen, setAddOpen] = useState(false)
     const [loadingBoard, setLoadingBoard] = useState(true)
     const [existingFriendIds, setExistingFriendIds] = useState<Set<string>>(new Set())
+    const [pendingSentIds, setPendingSentIds] = useState<Set<string>>(new Set())
 
     useEffect(() => {
         if (!user) return
@@ -507,12 +516,12 @@ export default function FriendsPage() {
         if (!user) return
         const res = await fetch(`/api/friendships?userId=${user.id}`)
         const data = await res.json()
-        const ids = new Set<string>([
+        // Only accepted friends go into existingFriendIds — pending sent tracked separately
+        setExistingFriendIds(new Set<string>([
             ...(data.friends ?? []).map((f: FriendUser) => f.id),
-            ...(data.pendingSent ?? []).map((f: FriendUser) => f.id),
             ...(data.pendingReceived ?? []).map((f: FriendUser) => f.id),
-        ])
-        setExistingFriendIds(ids)
+        ]))
+        setPendingSentIds(new Set<string>((data.pendingSent ?? []).map((f: FriendUser) => f.id)))
         setPendingReceived(data.pendingReceived ?? [])
     }, [user])
 
@@ -715,6 +724,7 @@ export default function FriendsPage() {
                 onClose={() => setAddOpen(false)}
                 currentUserId={user?.id ?? ''}
                 existingIds={existingFriendIds}
+                pendingSentIds={pendingSentIds}
                 pendingReceived={pendingReceived}
                 onSent={() => { fetchFriends(); fetchLeaderboard() }}
                 onAccept={handleAccept}
