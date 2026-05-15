@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
@@ -147,7 +149,7 @@ function RankingCard({
     )
 }
 
-function Podium({ top3 }: { top3: RankedUser[] }) {
+function Podium({ top3, currentUserId, clickableIds }: { top3: RankedUser[]; currentUserId: string; clickableIds?: Set<string> }) {
     if (top3.length === 0) return null
     const [first, second, third] = top3
     const order = [second, first, third].filter(Boolean)
@@ -158,8 +160,9 @@ function Podium({ top3 }: { top3: RankedUser[] }) {
             <div className="flex items-end justify-center gap-4">
                 {order.map(u => {
                     const isFirst = u.position === 1
-                    return (
-                        <div key={u.id} className="flex flex-col items-center gap-2 flex-1">
+                    const isClickable = u.id !== currentUserId && clickableIds?.has(u.id)
+                    const inner = (
+                        <>
                             <Avatar name={u.full_name} size="lg" className={isFirst ? 'ring-2 ring-primary ring-offset-2 ring-offset-card' : ''} />
                             <span className="text-xs font-medium text-foreground text-center leading-tight">
                                 {u.full_name.split(' ')[0]}
@@ -177,7 +180,13 @@ function Podium({ top3 }: { top3: RankedUser[] }) {
                                     Score
                                 </span>
                             </div>
-                        </div>
+                        </>
+                    )
+                    const colClass = cn('flex flex-col items-center gap-2 flex-1', isClickable && 'cursor-pointer')
+                    return isClickable ? (
+                        <Link key={u.id} href={`/dashboard/wing/cadet/${u.id}`} className={colClass}>{inner}</Link>
+                    ) : (
+                        <div key={u.id} className={colClass}>{inner}</div>
                     )
                 })}
             </div>
@@ -185,37 +194,44 @@ function Podium({ top3 }: { top3: RankedUser[] }) {
     )
 }
 
-function LeaderboardList({ users, currentUserId }: { users: RankedUser[]; currentUserId: string }) {
+function LeaderboardList({ users, currentUserId, clickableIds }: { users: RankedUser[]; currentUserId: string; clickableIds?: Set<string> }) {
     const rest = users.slice(3)
     if (rest.length === 0) return null
     return (
         <div className="rounded-2xl bg-card border border-border overflow-hidden">
-            {rest.map(u => (
-                <div
-                    key={u.id}
-                    className={cn(
-                        'flex items-center gap-3 px-5 py-3 border-b border-border last:border-0',
-                        u.id === currentUserId && 'bg-primary/5',
-                    )}
-                >
-                    <span className="w-6 text-center text-sm font-bold text-muted-foreground">{u.position}</span>
-                    <Avatar name={u.full_name} size="sm" />
-                    <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-foreground truncate">
-                            {u.full_name}
-                            {u.id === currentUserId && <span className="ml-1.5 text-xs text-primary font-normal">(you)</span>}
+            {rest.map(u => {
+                const isClickable = u.id !== currentUserId && clickableIds?.has(u.id)
+                const inner = (
+                    <>
+                        <span className="w-6 text-center text-sm font-bold text-muted-foreground">{u.position}</span>
+                        <Avatar name={u.full_name} size="sm" />
+                        <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-foreground truncate">
+                                {u.full_name}
+                                {u.id === currentUserId && <span className="ml-1.5 text-xs text-primary font-normal">(you)</span>}
+                            </div>
+                            <div className="text-xs text-muted-foreground">{u.rank} · {u.wing} Wing</div>
                         </div>
-                        <div className="text-xs text-muted-foreground">{u.rank} · {u.wing} Wing</div>
-                    </div>
-                    {u.streak > 1 && (
-                        <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                            <svg viewBox="0 0 24 24" width={10} height={10} fill="currentColor" className="text-warning"><path d="M12 2C10 5.5 8 7 8.5 10.5 7 9.5 7 7 7 7 5.5 9 6 12 6 12 6 15.5 8.2 18.5 11 18.5s5-3 5-6.5c0-2.5-1.5-4-1.5-4s0 2-1 2.5C14 8 12 2 12 2Z"/></svg>
-                            {u.streak}
-                        </span>
-                    )}
-                    <span className="text-sm font-bold text-foreground tabular-nums">{u.score.toLocaleString()}</span>
-                </div>
-            ))}
+                        {u.streak > 0 && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                                <svg viewBox="0 0 24 24" width={10} height={10} fill="currentColor" className="text-warning"><path d="M12 2C10 5.5 8 7 8.5 10.5 7 9.5 7 7 7 7 5.5 9 6 12 6 12 6 15.5 8.2 18.5 11 18.5s5-3 5-6.5c0-2.5-1.5-4-1.5-4s0 2-1 2.5C14 8 12 2 12 2Z"/></svg>
+                                {u.streak}
+                            </span>
+                        )}
+                        <span className="text-sm font-bold text-foreground tabular-nums">{u.score.toLocaleString()}</span>
+                    </>
+                )
+                const rowClass = cn(
+                    'flex items-center gap-3 px-5 py-3 border-b border-border last:border-0',
+                    u.id === currentUserId && 'bg-primary/5',
+                    isClickable && 'hover:bg-accent/50 cursor-pointer',
+                )
+                return isClickable ? (
+                    <Link key={u.id} href={`/dashboard/wing/cadet/${u.id}`} className={rowClass}>{inner}</Link>
+                ) : (
+                    <div key={u.id} className={rowClass}>{inner}</div>
+                )
+            })}
         </div>
     )
 }
@@ -493,10 +509,23 @@ function AddFriendDialog({
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
+type LeaderTab = 'wing' | 'section' | 'friends'
+const VALID_LEADER_TABS = new Set<LeaderTab>(['wing', 'section', 'friends'])
+
 export default function FriendsPage() {
     const { user } = useAuth()
-    const [profile, setProfile] = useState<{ rank: string; wing: string } | null>(null)
-    const [tab, setTab] = useState<'wing' | 'friends'>('wing')
+    const router = useRouter()
+    const searchParams = useSearchParams()
+    const [profile, setProfile] = useState<{ rank: string; wing: string; section?: string } | null>(null)
+    const initialTab = (searchParams.get('tab') ?? '') as LeaderTab
+    const [tab, setTab] = useState<LeaderTab>(VALID_LEADER_TABS.has(initialTab) ? initialTab : 'wing')
+
+    function changeTab(t: LeaderTab) {
+        setTab(t)
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('tab', t)
+        router.replace(`?${params.toString()}`, { scroll: false })
+    }
     const [period, setPeriod] = useState<'week' | 'month'>('week')
     const [leaderboard, setLeaderboard] = useState<RankedUser[]>([])
     const [wingStandings, setWingStandings] = useState<WingStanding[]>([])
@@ -508,7 +537,7 @@ export default function FriendsPage() {
 
     useEffect(() => {
         if (!user) return
-        supabase.from('users').select('rank, wing').eq('id', user.id).single()
+        supabase.from('users').select('rank, wing, section').eq('id', user.id).single()
             .then(({ data }) => { if (data) setProfile(data) })
     }, [user])
 
@@ -530,8 +559,8 @@ export default function FriendsPage() {
     const fetchLeaderboard = useCallback(async () => {
         if (!user || !profile) return
         setLoadingBoard(true)
-        const scope = tab === 'wing' ? 'wing' : 'friends'
-        const wingParam = profile.wing ? `&wing=${encodeURIComponent(profile.wing)}` : ''
+        const scope = tab === 'wing' ? 'wing' : tab === 'section' ? 'section' : 'friends'
+        const wingParam = tab === 'wing' && profile.wing ? `&wing=${encodeURIComponent(profile.wing)}` : ''
         const res = await fetch(
             `/api/leaderboard?scope=${scope}&period=${period}&userId=${user.id}${wingParam}`,
         )
@@ -595,11 +624,11 @@ export default function FriendsPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-2 mb-6">
-                {(['wing', 'friends'] as const).map(t => (
+            <div className="flex items-center gap-2 mb-6 flex-wrap">
+                {(['wing', 'section', 'friends'] as const).map(t => (
                     <button
                         key={t}
-                        onClick={() => setTab(t)}
+                        onClick={() => changeTab(t)}
                         className={cn(
                             'flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium border transition-all',
                             tab === t
@@ -609,10 +638,12 @@ export default function FriendsPage() {
                     >
                         {t === 'wing' ? (
                             <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                        ) : t === 'section' ? (
+                            <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
                         ) : (
                             <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
                         )}
-                        {t === 'wing' ? `${profile?.wing ?? ''} Wing` : 'Friends'}
+                        {t === 'wing' ? `${profile?.wing ?? ''} Wing` : t === 'section' ? (profile?.section ? `Section ${profile.section}` : 'My Section') : 'Friends'}
                     </button>
                 ))}
             </div>
@@ -690,8 +721,8 @@ export default function FriendsPage() {
                     {/* Left */}
                     <div className="flex flex-col gap-5">
                         <RankingCard user={me} total={leaderboard.length} period={period} />
-                        <Podium top3={top3} />
-                        <LeaderboardList users={leaderboard} currentUserId={user?.id ?? ''} />
+                        <Podium top3={top3} currentUserId={user?.id ?? ''} clickableIds={tab === 'friends' ? existingFriendIds : undefined} />
+                        <LeaderboardList users={leaderboard} currentUserId={user?.id ?? ''} clickableIds={tab === 'friends' ? existingFriendIds : undefined} />
                     </div>
 
                     {/* Right */}

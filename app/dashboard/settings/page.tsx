@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { calculateTDEE } from '@/lib/tdee'
@@ -247,8 +247,19 @@ function FieldLabel({ label, hint, children }: { label: string; hint?: string; c
 export default function SettingsPage() {
     const { user, signOut } = useAuth()
     const router = useRouter()
+    const searchParams = useSearchParams()
     const { setTheme, setGoalMode } = useTheme()
-    const [active, setActive] = useState<TabId>('profile')
+
+    const VALID_TABS = new Set<TabId>(['profile', 'physical', 'goal', 'wing', 'notifs', 'privacy', 'appear'])
+    const initialTab = (searchParams.get('tab') ?? '') as TabId
+    const [active, setActive] = useState<TabId>(VALID_TABS.has(initialTab) ? initialTab : 'profile')
+
+    function changeTab(id: TabId) {
+        setActive(id)
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('tab', id)
+        router.replace(`?${params.toString()}`, { scroll: false })
+    }
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [toast, setToast] = useState<string | null>(null)
@@ -448,7 +459,7 @@ export default function SettingsPage() {
                             return (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setActive(tab.id)}
+                                    onClick={() => changeTab(tab.id)}
                                     className={cn(
                                         'relative flex items-center gap-2.5 w-full text-left px-2.5 py-2 rounded-lg text-[13px] transition-all duration-150 border-none cursor-pointer',
                                         isActive

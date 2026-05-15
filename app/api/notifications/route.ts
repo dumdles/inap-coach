@@ -12,12 +12,14 @@ export async function GET(req: NextRequest) {
     const userId = req.nextUrl.searchParams.get('userId')
     if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
 
+    const limit = Math.min(parseInt(req.nextUrl.searchParams.get('limit') ?? '30', 10), 200)
+
     const { data, error } = await supabaseAdmin
         .from('notifications')
         .select('id, type, title, body, read, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(30)
+        .limit(limit)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json(data ?? [])
