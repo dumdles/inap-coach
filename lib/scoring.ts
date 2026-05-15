@@ -11,21 +11,36 @@ export const INSTRUCTOR_RANKS = [
 export const PTS_PER_MEAL = 40
 export const MAX_MEALS_PER_DAY = 3
 export const STREAK_BONUS_PER_DAY = 5
+export const PTS_PER_10_KCAL = 1
+export const MAX_WORKOUT_KCAL_PER_DAY = 1000   // cap at 100 pts to prevent outliers
+export const CONSISTENCY_MULTIPLIER = 1.5       // applied to a day's total when both meal + workout logged
 
 export function isInstructor(rank: string): boolean {
     return INSTRUCTOR_RANKS.includes(rank)
 }
 
-/** Score from meal logs in a period + all-time streak */
+/**
+ * Score from meal logs, workout logs, and all-time streak.
+ * Days with both a meal and workout logged get a 1.5× consistency multiplier.
+ */
 export function computeScore(
     mealsByDay: Record<string, number>,
     streakDays: number,
+    workoutKcalByDay: Record<string, number> = {},
 ): number {
-    const mealPts = Object.values(mealsByDay).reduce(
-        (sum, count) => sum + Math.min(count, MAX_MEALS_PER_DAY) * PTS_PER_MEAL,
-        0,
-    )
-    return mealPts + streakDays * STREAK_BONUS_PER_DAY
+    const allDays = new Set([...Object.keys(mealsByDay), ...Object.keys(workoutKcalByDay)])
+
+    const dayPts = [...allDays].reduce((sum, day) => {
+        const meals = mealsByDay[day] ?? 0
+        const kcal = workoutKcalByDay[day] ?? 0
+        const mealPts = Math.min(meals, MAX_MEALS_PER_DAY) * PTS_PER_MEAL
+        const workoutPts = Math.floor(Math.min(kcal, MAX_WORKOUT_KCAL_PER_DAY) / 10) * PTS_PER_10_KCAL
+        const dayTotal = mealPts + workoutPts
+        const hasConsistency = meals > 0 && kcal > 0
+        return sum + (hasConsistency ? Math.round(dayTotal * CONSISTENCY_MULTIPLIER) : dayTotal)
+    }, 0)
+
+    return dayPts + streakDays * STREAK_BONUS_PER_DAY
 }
 
 export function computeStreak(daysWithMeals: Set<string>): number {

@@ -6,6 +6,8 @@ import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 
 type WeightLog = {
     id: string
@@ -63,7 +65,8 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string;
     )
 }
 
-function LogWeightModal({ currentWeight, currentBodyFat, logId, onLog, onClose }: {
+function LogWeightModal({ open, currentWeight, currentBodyFat, logId, onLog, onClose }: {
+    open: boolean
     currentWeight: number | null
     currentBodyFat: number | null
     logId?: string
@@ -78,12 +81,12 @@ function LogWeightModal({ currentWeight, currentBodyFat, logId, onLog, onClose }
     const inputCls = 'h-11 rounded-xl border border-border bg-background px-4 text-[15px] font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 w-full'
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
-            <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-sm shadow-xl mx-0 sm:mx-4 mb-[88px] sm:mb-0" onClick={e => e.stopPropagation()}>
-                <div className="font-display text-[18px] font-bold text-foreground mb-1">
-                    {isEdit ? 'Edit check-in' : "Log today's check-in"}
-                </div>
-                <div className="text-[13px] text-muted-foreground mb-5">Body fat % is optional — log it if you have a reading.</div>
+        <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
+            <DialogContent className="sm:max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>{isEdit ? 'Edit check-in' : "Log today's check-in"}</DialogTitle>
+                </DialogHeader>
+                <p className="text-[13px] text-muted-foreground -mt-2">Body fat % is optional — log it if you have a reading.</p>
                 <div className="space-y-3">
                     <div>
                         <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Weight</label>
@@ -100,11 +103,9 @@ function LogWeightModal({ currentWeight, currentBodyFat, logId, onLog, onClose }
                         </div>
                     </div>
                 </div>
-                <div className="flex gap-2 mt-5">
-                    <button onClick={onClose} className="flex-1 h-10 rounded-xl border border-border text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors">
-                        Cancel
-                    </button>
-                    <button
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose}>Cancel</Button>
+                    <Button
                         onClick={async () => {
                             const w = parseFloat(weight)
                             if (!w || w <= 0) return
@@ -114,13 +115,12 @@ function LogWeightModal({ currentWeight, currentBodyFat, logId, onLog, onClose }
                             onClose()
                         }}
                         disabled={saving || !parseFloat(weight)}
-                        className="flex-1 h-10 rounded-xl bg-primary text-white text-[13px] font-semibold disabled:opacity-50 transition-colors"
                     >
                         {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Save check-in'}
-                    </button>
-                </div>
-            </div>
-        </div>
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     )
 }
 
@@ -549,24 +549,22 @@ export default function ProgressPage() {
                 </div>
             )}
 
-            {showLogModal && (
-                <LogWeightModal
-                    currentWeight={currentWeight}
-                    currentBodyFat={latestBodyFat}
-                    onLog={logWeight}
-                    onClose={() => setShowLogModal(false)}
-                />
-            )}
+            <LogWeightModal
+                open={showLogModal}
+                currentWeight={currentWeight}
+                currentBodyFat={latestBodyFat}
+                onLog={logWeight}
+                onClose={() => setShowLogModal(false)}
+            />
 
-            {editLog && (
-                <LogWeightModal
-                    logId={editLog.id}
-                    currentWeight={editLog.weight_kg}
-                    currentBodyFat={editLog.body_fat_pct}
-                    onLog={editWeight}
-                    onClose={() => setEditLog(null)}
-                />
-            )}
+            <LogWeightModal
+                open={!!editLog}
+                logId={editLog?.id}
+                currentWeight={editLog?.weight_kg ?? null}
+                currentBodyFat={editLog?.body_fat_pct ?? null}
+                onLog={editWeight}
+                onClose={() => setEditLog(null)}
+            />
         </div>
     )
 }

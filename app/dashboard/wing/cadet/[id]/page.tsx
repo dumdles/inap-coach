@@ -11,6 +11,18 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 type DayEntry = { calories: number; protein: number; carbs: number; fat: number; calorie_target: number }
 
+type WorkoutLogRow = {
+    id: string
+    name: string
+    source: string
+    duration_min: number | null
+    calories: number | null
+    distance_km: number | null
+    heart_rate_avg: number | null
+    logged_at: string
+    exercise_templates: { category: string } | null
+}
+
 type CadetData = {
     profile: {
         id: string; full_name: string; rank: string; wing: string
@@ -61,7 +73,9 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
     const [data, setData] = useState<CadetData | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const [activeTab, setActiveTab] = useState<'nutrition' | 'profile'>('nutrition')
+    const [activeTab, setActiveTab] = useState<'nutrition' | 'workouts' | 'profile'>('nutrition')
+    const [workoutLogs, setWorkoutLogs] = useState<WorkoutLogRow[]>([])
+    const [workoutsLoading, setWorkoutsLoading] = useState(false)
 
     useEffect(() => {
         if (!user) return
@@ -80,6 +94,16 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
         }
         load()
     }, [user, cadetId, router])
+
+    // Fetch workout logs lazily when tab is first opened
+    useEffect(() => {
+        if (activeTab !== 'workouts' || workoutLogs.length > 0) return
+        setWorkoutsLoading(true)
+        fetch(`/api/workout-logs?userId=${cadetId}`)
+            .then(r => r.json())
+            .then(d => setWorkoutLogs(Array.isArray(d) ? d : []))
+            .finally(() => setWorkoutsLoading(false))
+    }, [activeTab, cadetId, workoutLogs.length])
 
     if (loading) return (
         <div className="px-4 md:px-8 py-8 max-w-3xl mx-auto space-y-6">
@@ -175,18 +199,18 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
 
                 {/* Tabs */}
                 <div className="flex items-center bg-muted dark:bg-[#091E42] rounded-full p-0.5 gap-0.5 w-fit mb-6">
-                    {(['nutrition', 'profile'] as const).map(t => (
+                    {([['nutrition', 'Nutrition'], ['workouts', 'Workouts'], ['profile', 'Profile']] as const).map(([key, label]) => (
                         <button
-                            key={t}
-                            onClick={() => setActiveTab(t)}
+                            key={key}
+                            onClick={() => setActiveTab(key)}
                             className={cn(
-                                'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all capitalize',
-                                activeTab === t
+                                'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all',
+                                activeTab === key
                                     ? 'bg-card dark:bg-[#1F3460] text-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground',
                             )}
                         >
-                            {t === 'nutrition' ? 'Nutrition' : 'Profile'}
+                            {label}
                         </button>
                     ))}
                 </div>
@@ -290,6 +314,57 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
                                 })
                             )}
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'workouts' && (
+                    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                        <div className="px-5 py-3 border-b border-border">
+                            <span className="text-[13px] font-semibold text-foreground">Workout history</span>
+                        </div>
+                        {workoutsLoading ? (
+                            <div className="px-5 py-6 space-y-3">
+                                {[0,1,2].map(i => <div key={i} className="h-12 rounded-xl bg-muted animate-pulse" />)}
+                            </div>
+                        ) : workoutLogs.length === 0 ? (
+                            <div className="px-5 py-10 text-center text-sm text-muted-foreground">No workouts logged yet.</div>
+                        ) : (
+                            workoutLogs.map(log => {
+                                const catColorMap: Record<string, string> = {
+                                    strength: 'bg-primary/10 text-primary',
+                                    cardio:   'bg-success-light text-success-dark',
+                                    hiit:     'bg-warning-light text-warning-dark',
+                                    other:    'bg-muted text-muted-foreground',
+                                }
+                                const cat = log.exercise_templates?.category ?? 'other'
+                                return (
+                                    <div key={log.id} className="px-5 py-3.5 border-b border-border last:border-0">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-[13px] font-semibold text-foreground">{log.name}</span>
+                                                    <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize', catColorMap[cat])}>
+                                                        {cat}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-3 mt-1 flex-wrap text-[11px] text-muted-foreground">
+                                                    <span>{new Date(log.logged_at).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                                                    {log.duration_min != null && log.duration_min > 0 && <span>{log.duration_min} min</span>}
+                                                    {log.distance_km != null && <span>{log.distance_km} km</span>}
+                                                    {log.heart_rate_avg != null && <span>{log.heart_rate_avg} bpm avg</span>}
+                                                </div>
+                                            </div>
+                                            {log.calories != null && log.calories > 0 && (
+                                                <div className="text-right flex-shrink-0">
+                                                    <span className="text-[14px] font-bold text-foreground tabular-nums">{log.calories}</span>
+                                                    <span className="text-[11px] text-muted-foreground ml-1">kcal</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })
+                        )}
                     </div>
                 )}
 

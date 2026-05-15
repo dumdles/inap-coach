@@ -14,7 +14,16 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        const data = await fetchPolar(userId, endpoint);
+        let data: unknown;
+        try {
+            data = await fetchPolar(userId, endpoint);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "";
+            if (msg.includes("status 404")) {
+                return NextResponse.json({ exercises: [] });
+            }
+            throw err;
+        }
         return NextResponse.json(data);
     } catch (error) {
         console.error("Polar API error:", error);
