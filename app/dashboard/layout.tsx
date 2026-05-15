@@ -25,6 +25,7 @@ function ChevronLeft() { return <svg viewBox="0 0 24 24" width={14} height={14} 
 function ChevronRight() { return <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg> }
 function BellIcon({ size = 16 }: { size?: number }) { return <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg> }
 function CheckIcon() { return <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> }
+function InsightsIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 7 7c0 2.5-1.3 4.7-3.3 6L12 18l-3.7-3C6.3 13.7 5 11.5 5 9a7 7 0 0 1 7-7z"/></svg> }
 
 // ── Notification types ─────────────────────────────────────
 type Notification = {
@@ -229,6 +230,7 @@ const BASE_NAV = [
     { href: '/dashboard/workouts', label: 'Workouts', Icon: WorkoutsIcon },
     { href: '/dashboard/progress', label: 'Progress', Icon: ProgressIcon },
     { href: '/dashboard/friends', label: 'Leaderboard', Icon: FriendsIcon },
+    { href: '/dashboard/insights', label: 'Insights', Icon: InsightsIcon },
 ]
 
 const INSTRUCTOR_NAV = [
