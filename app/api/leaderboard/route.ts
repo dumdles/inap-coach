@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
     const userIds = users.map(u => u.id)
     const start = windowStart(period)
 
-    const [{ data: periodLogs }, { data: allLogs }] = await Promise.all([
+    const [{ data: periodLogs }, { data: allLogs }, { data: workoutLogs }] = await Promise.all([
         supabaseAdmin
             .from('meal_logs')
             .select('user_id, logged_at')
@@ -79,14 +79,21 @@ export async function GET(req: NextRequest) {
             .select('user_id, logged_at')
             .in('user_id', userIds)
             .gte('logged_at', new Date(Date.now() - 365 * 86400_000).toISOString()),
+        supabaseAdmin
+            .from('workout_logs')
+            .select('user_id, calories, logged_at')
+            .in('user_id', userIds)
+            .gte('logged_at', start.toISOString()),
     ])
 
-    // Aggregate meals by user+day
+    // Aggregate meals and workout kcal by user+day
     const mealsByUserDay: Record<string, Record<string, number>> = {}
     const allDaysByUser: Record<string, Set<string>> = {}
+    const workoutKcalByUserDay: Record<string, Record<string, number>> = {}
     for (const u of users) {
         mealsByUserDay[u.id] = {}
         allDaysByUser[u.id] = new Set()
+        workoutKcalByUserDay[u.id] = {}
     }
     for (const log of periodLogs ?? []) {
         const day = log.logged_at.slice(0, 10)
@@ -95,11 +102,16 @@ export async function GET(req: NextRequest) {
     for (const log of allLogs ?? []) {
         allDaysByUser[log.user_id]?.add(log.logged_at.slice(0, 10))
     }
+    for (const log of workoutLogs ?? []) {
+        if (!log.calories) continue
+        const day = log.logged_at.slice(0, 10)
+        workoutKcalByUserDay[log.user_id][day] = (workoutKcalByUserDay[log.user_id][day] ?? 0) + log.calories
+    }
 
     const ranked = users
         .map(u => {
             const streak = computeStreak(allDaysByUser[u.id])
-            const score = computeScore(mealsByUserDay[u.id], streak)
+            const score = computeScore(mealsByUserDay[u.id], streak, workoutKcalByUserDay[u.id])
             const mealsToday = mealsByUserDay[u.id][new Date().toISOString().slice(0, 10)] ?? 0
             return { ...u, score, streak, mealsToday }
         })
