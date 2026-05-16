@@ -50,7 +50,11 @@ function fmtDate(isoDate: string) {
     return `${d}/${m}/${y}`
 }
 
-function buildUserMessage(user: Record<string, unknown>, dailySummaries: Record<string, unknown>[], weightLogs: Record<string, unknown>[], leaderboardScores: Record<string, unknown>[]) {
+const ANS_LABEL_INSIGHTS: Record<number, string> = {
+    1: 'much below usual', 2: 'below usual', 3: 'usual', 4: 'above usual', 5: 'much above usual',
+}
+
+function buildUserMessage(user: Record<string, unknown>, dailySummaries: Record<string, unknown>[], weightLogs: Record<string, unknown>[], leaderboardScores: Record<string, unknown>[], sleepLogs: Record<string, unknown>[]) {
     const dob = user.date_of_birth as string | null
     const age = dob ? Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 3600 * 1000)) : 'unknown'
 
@@ -76,6 +80,18 @@ function buildUserMessage(user: Record<string, unknown>, dailySummaries: Record<
         ? leaderboardScores.map(s => `Week of ${fmtDate(s.week_start as string)}: ${s.total_score} pts`).join('\n')
         : 'No score data.'
 
+    const sleepLines = sleepLogs.length
+        ? sleepLogs.map(s => {
+            const date = fmtDate(s.night_date as string)
+            const hours = ((s.duration_min as number) / 60).toFixed(1)
+            const parts = [`${date}: ${hours}h slept`]
+            if (s.sleep_score != null) parts.push(`score ${s.sleep_score}`)
+            if (s.ans_charge_status != null) parts.push(`ANS ${ANS_LABEL_INSIGHTS[s.ans_charge_status as number]}`)
+            if (s.deep_min != null && s.rem_min != null) parts.push(`deep ${s.deep_min}m / REM ${s.rem_min}m`)
+            return parts.join(', ')
+        }).join('\n')
+        : 'No sleep data — encourage cadet to start tracking sleep for richer recovery insights.'
+
     return `Current Singapore time: ${sgtDateStr} ${sgtTimeStr}
 
 Cadet profile:
@@ -91,8 +107,16 @@ ${nutritionLines}
 Weight logs (last 14 days):
 ${weightLines}
 
+Sleep logs (last 14 nights, newest first). ANS = autonomic nervous system recharge from Polar:
+${sleepLines}
+
 Leaderboard scores (recent weeks):
-${scoreLines}`
+${scoreLines}
+
+When analysing, look for correlations between sleep and the rest of the data — e.g.
+nights with poor sleep that followed late training, or weeks where high consistency
+scores coincide with better sleep duration. Surface these as "recovery" or "performance"
+insights when supported by the data.`
 }
 
 export async function GET(req: NextRequest) {
@@ -114,11 +138,12 @@ export async function GET(req: NextRequest) {
         }
     }
 
-    const [userRes, summariesRes, weightRes, scoresRes] = await Promise.all([
+    const [userRes, summariesRes, weightRes, scoresRes, sleepRes] = await Promise.all([
         supabaseAdmin.from('users').select('goal_mode, activity_level, height_cm, weight_kg, gender, date_of_birth, ippt_date, rank, wing, calorie_target').eq('id', userId).single(),
         supabaseAdmin.from('daily_summaries').select('date, total_calories, total_protein_g, total_carbs_g, total_fat_g, calorie_target').eq('user_id', userId).order('date', { ascending: false }).limit(14),
         supabaseAdmin.from('weight_logs').select('weight_kg, body_fat_pct, polar_steps, logged_at').eq('user_id', userId).order('logged_at', { ascending: false }).limit(14),
         supabaseAdmin.from('leaderboard_scores').select('total_score, week_start').eq('user_id', userId).order('week_start', { ascending: false }).limit(4),
+        supabaseAdmin.from('sleep_logs').select('night_date, duration_min, sleep_score, ans_charge_status, deep_min, rem_min').eq('user_id', userId).order('night_date', { ascending: false }).limit(14),
     ])
 
     if (!userRes.data) return NextResponse.json({ error: 'user not found' }, { status: 404 })
@@ -128,6 +153,7 @@ export async function GET(req: NextRequest) {
         (summariesRes.data ?? []) as Record<string, unknown>[],
         (weightRes.data ?? []) as Record<string, unknown>[],
         (scoresRes.data ?? []) as Record<string, unknown>[],
+        (sleepRes.data ?? []) as Record<string, unknown>[],
     )
 
     async function callModel(model: string) {

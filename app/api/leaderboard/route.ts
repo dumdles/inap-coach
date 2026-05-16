@@ -68,7 +68,8 @@ export async function GET(req: NextRequest) {
     const userIds = users.map(u => u.id)
     const start = windowStart(period)
 
-    const [{ data: periodLogs }, { data: allLogs }, { data: workoutLogs }] = await Promise.all([
+    const startDate = start.toISOString().slice(0, 10)
+    const [{ data: periodLogs }, { data: allLogs }, { data: workoutLogs }, { data: sleepLogs }] = await Promise.all([
         supabaseAdmin
             .from('meal_logs')
             .select('user_id, logged_at')
@@ -84,16 +85,23 @@ export async function GET(req: NextRequest) {
             .select('user_id, calories, logged_at')
             .in('user_id', userIds)
             .gte('logged_at', start.toISOString()),
+        supabaseAdmin
+            .from('sleep_logs')
+            .select('user_id, night_date, duration_min, sleep_score, ans_charge_status')
+            .in('user_id', userIds)
+            .gte('night_date', startDate),
     ])
 
-    // Aggregate meals and workout kcal by user+day
+    // Aggregate meals, workout kcal, and sleep by user+day
     const mealsByUserDay: Record<string, Record<string, number>> = {}
     const allDaysByUser: Record<string, Set<string>> = {}
     const workoutKcalByUserDay: Record<string, Record<string, number>> = {}
+    const sleepByUserDay: Record<string, Record<string, { durationMin: number; sleepScore: number | null; ansStatus: number | null }>> = {}
     for (const u of users) {
         mealsByUserDay[u.id] = {}
         allDaysByUser[u.id] = new Set()
         workoutKcalByUserDay[u.id] = {}
+        sleepByUserDay[u.id] = {}
     }
     for (const log of periodLogs ?? []) {
         const day = log.logged_at.slice(0, 10)
@@ -107,11 +115,19 @@ export async function GET(req: NextRequest) {
         const day = log.logged_at.slice(0, 10)
         workoutKcalByUserDay[log.user_id][day] = (workoutKcalByUserDay[log.user_id][day] ?? 0) + log.calories
     }
+    for (const log of sleepLogs ?? []) {
+        if (!log.duration_min || !sleepByUserDay[log.user_id]) continue
+        sleepByUserDay[log.user_id][log.night_date] = {
+            durationMin: log.duration_min,
+            sleepScore: log.sleep_score ?? null,
+            ansStatus: log.ans_charge_status ?? null,
+        }
+    }
 
     const ranked = users
         .map(u => {
             const streak = computeStreak(allDaysByUser[u.id])
-            const score = computeScore(mealsByUserDay[u.id], streak, workoutKcalByUserDay[u.id])
+            const score = computeScore(mealsByUserDay[u.id], streak, workoutKcalByUserDay[u.id], sleepByUserDay[u.id])
             const mealsToday = mealsByUserDay[u.id][new Date().toISOString().slice(0, 10)] ?? 0
             return { ...u, score, streak, mealsToday }
         })
