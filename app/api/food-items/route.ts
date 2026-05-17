@@ -24,6 +24,16 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     const { name, calories_per_100g, protein_g, carbs_g, fat_g, is_cookhouse_item, created_by } = await req.json()
 
+    if (!name?.trim()) return NextResponse.json({ error: 'name required' }, { status: 400 })
+    if (calories_per_100g == null || calories_per_100g < 0 || calories_per_100g > 900)
+        return NextResponse.json({ error: 'calories_per_100g must be 0–900' }, { status: 400 })
+    if (protein_g == null || protein_g < 0 || protein_g > 100)
+        return NextResponse.json({ error: 'protein_g must be 0–100' }, { status: 400 })
+    if (carbs_g == null || carbs_g < 0 || carbs_g > 100)
+        return NextResponse.json({ error: 'carbs_g must be 0–100' }, { status: 400 })
+    if (fat_g == null || fat_g < 0 || fat_g > 100)
+        return NextResponse.json({ error: 'fat_g must be 0–100' }, { status: 400 })
+
     // Return existing if a food with this exact name already exists
     const { data: existing } = await supabaseAdmin
         .from('food_items')

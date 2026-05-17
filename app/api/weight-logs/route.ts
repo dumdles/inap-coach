@@ -32,6 +32,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     const { userId, weight_kg, body_fat_pct } = await req.json()
     if (!userId || !weight_kg) return NextResponse.json({ error: 'missing fields' }, { status: 400 })
+    if (weight_kg < 20 || weight_kg > 300)
+        return NextResponse.json({ error: 'weight_kg must be 20–300' }, { status: 400 })
+    if (body_fat_pct != null && (body_fat_pct < 1 || body_fat_pct > 60))
+        return NextResponse.json({ error: 'body_fat_pct must be 1–60' }, { status: 400 })
 
     const payload: Record<string, unknown> = { weight_kg }
     if (body_fat_pct != null) payload.body_fat_pct = body_fat_pct

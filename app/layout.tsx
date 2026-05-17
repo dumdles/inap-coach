@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { AuthProvider } from "@/app/context/auth-context"
 import { ThemeProvider } from "@/app/context/theme-context";
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -42,7 +43,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
-      <body className="min-h-full flex flex-col"><ThemeProvider><AuthProvider>{children}</AuthProvider></ThemeProvider></body>
+      <body className="min-h-full flex flex-col"><ThemeProvider><AuthProvider>{children}<Toaster /></AuthProvider></ThemeProvider></body>
     </html>
   );
 }

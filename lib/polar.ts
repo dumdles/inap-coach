@@ -57,6 +57,9 @@ export async function fetchPolar(userId: string, endpoint: string) {
     console.log(`Polar API response status: ${res.status}`);
     console.log(`Polar API response:`, responseText);
 
+    // 204 No Content means no new data — return null so callers can handle gracefully
+    if (res.status === 204) return null;
+
     if (!res.ok) {
         throw new Error(`Polar API request failed with status ${res.status}: ${responseText}`);
     }

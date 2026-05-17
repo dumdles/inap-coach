@@ -125,6 +125,7 @@ function LogModal({
     const [selected, setSelected] = React.useState<ExerciseTemplate | null>(null)
     const [saving, setSaving] = React.useState(false)
     const [taggedIds, setTaggedIds] = React.useState<string[]>([])
+    const [formErrors, setFormErrors] = React.useState<Record<string, string>>({})
     const [form, setForm] = React.useState({
         duration_min: "", calories: "", distance_km: "",
         sets: "", reps: "", rounds: "", notes: "",
@@ -153,9 +154,45 @@ function LogModal({
         }
     }, [editingLog, templates])
 
+    const FIELD_LIMITS: Record<string, { min: number; max: number; label: string }> = {
+        duration_min: { min: 0, max: 600, label: "Duration" },
+        calories:     { min: 0, max: 5000, label: "Calories" },
+        distance_km:  { min: 0, max: 200, label: "Distance" },
+        sets:         { min: 0, max: 100, label: "Sets" },
+        reps:         { min: 0, max: 1000, label: "Reps" },
+        rounds:       { min: 0, max: 100, label: "Rounds" },
+    }
+
+    function validateField(key: string, val: string): string {
+        if (!val) return ""
+        const limit = FIELD_LIMITS[key]
+        if (!limit) return ""
+        const n = parseFloat(val)
+        if (isNaN(n)) return "Invalid number"
+        if (n < limit.min) return `Min ${limit.min}`
+        if (n > limit.max) return `Max ${limit.max}`
+        return ""
+    }
+
+    function setField(key: keyof typeof form, val: string) {
+        setForm(f => ({ ...f, [key]: val }))
+        setFormErrors(prev => ({ ...prev, [key]: validateField(key, val) }))
+    }
+
+    function validateForm(): boolean {
+        const errs: Record<string, string> = {}
+        for (const key of Object.keys(FIELD_LIMITS)) {
+            const e = validateField(key, form[key as keyof typeof form])
+            if (e) errs[key] = e
+        }
+        setFormErrors(errs)
+        return Object.keys(errs).length === 0
+    }
+
     function reset() {
         setStep("pick"); setSelected(null); setTaggedIds([])
         setForm({ duration_min: "", calories: "", distance_km: "", sets: "", reps: "", rounds: "", notes: "" })
+        setFormErrors({})
     }
 
     function handleClose() { reset(); onClose() }
@@ -168,6 +205,7 @@ function LogModal({
 
     async function handleSave() {
         if (!selected && !isEdit) return
+        if (!validateForm()) return
         setSaving(true)
         const calories = form.calories
             ? parseInt(form.calories)
@@ -246,28 +284,30 @@ function LogModal({
                             <div>
                                 <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Duration (min)</label>
                                 <input
-                                    autoFocus type="number" min="0"
+                                    autoFocus type="number" min="0" max="600"
                                     value={form.duration_min}
-                                    onChange={e => setForm(f => ({ ...f, duration_min: e.target.value }))}
+                                    onChange={e => setField("duration_min", e.target.value)}
                                     placeholder="45"
-                                    className={inputCls}
+                                    className={cn(inputCls, formErrors.duration_min && "border-red-500 focus:ring-red-500/40")}
                                 />
+                                {formErrors.duration_min && <p className="text-[11px] text-red-500 mt-1">{formErrors.duration_min}</p>}
                             </div>
                             <div>
                                 <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
                                     Calories <span className="normal-case font-normal tracking-normal">{selected?.calories_per_min ? "(auto)" : ""}</span>
                                 </label>
                                 <input
-                                    type="number" min="0"
+                                    type="number" min="0" max="5000"
                                     value={form.calories}
-                                    onChange={e => setForm(f => ({ ...f, calories: e.target.value }))}
+                                    onChange={e => setField("calories", e.target.value)}
                                     placeholder={
                                         form.duration_min && selected?.calories_per_min
                                             ? String(Math.round(parseInt(form.duration_min || "0") * selected.calories_per_min))
                                             : "320"
                                     }
-                                    className={inputCls}
+                                    className={cn(inputCls, formErrors.calories && "border-red-500 focus:ring-red-500/40")}
                                 />
+                                {formErrors.calories && <p className="text-[11px] text-red-500 mt-1">{formErrors.calories}</p>}
                             </div>
                         </div>
 
@@ -275,12 +315,13 @@ function LogModal({
                             <div>
                                 <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Distance (km)</label>
                                 <input
-                                    type="number" min="0" step="0.1"
+                                    type="number" min="0" max="200" step="0.1"
                                     value={form.distance_km}
-                                    onChange={e => setForm(f => ({ ...f, distance_km: e.target.value }))}
+                                    onChange={e => setField("distance_km", e.target.value)}
                                     placeholder="5.0"
-                                    className={inputCls}
+                                    className={cn(inputCls, formErrors.distance_km && "border-red-500 focus:ring-red-500/40")}
                                 />
+                                {formErrors.distance_km && <p className="text-[11px] text-red-500 mt-1">{formErrors.distance_km}</p>}
                             </div>
                         )}
 
@@ -289,22 +330,24 @@ function LogModal({
                                 <div>
                                     <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Sets</label>
                                     <input
-                                        type="number" min="0"
+                                        type="number" min="0" max="100"
                                         value={form.sets}
-                                        onChange={e => setForm(f => ({ ...f, sets: e.target.value }))}
+                                        onChange={e => setField("sets", e.target.value)}
                                         placeholder="4"
-                                        className={inputCls}
+                                        className={cn(inputCls, formErrors.sets && "border-red-500 focus:ring-red-500/40")}
                                     />
+                                    {formErrors.sets && <p className="text-[11px] text-red-500 mt-1">{formErrors.sets}</p>}
                                 </div>
                                 <div>
                                     <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Reps</label>
                                     <input
-                                        type="number" min="0"
+                                        type="number" min="0" max="1000"
                                         value={form.reps}
-                                        onChange={e => setForm(f => ({ ...f, reps: e.target.value }))}
+                                        onChange={e => setField("reps", e.target.value)}
                                         placeholder="10"
-                                        className={inputCls}
+                                        className={cn(inputCls, formErrors.reps && "border-red-500 focus:ring-red-500/40")}
                                     />
+                                    {formErrors.reps && <p className="text-[11px] text-red-500 mt-1">{formErrors.reps}</p>}
                                 </div>
                             </div>
                         )}
@@ -313,12 +356,13 @@ function LogModal({
                             <div>
                                 <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Rounds</label>
                                 <input
-                                    type="number" min="0"
+                                    type="number" min="0" max="100"
                                     value={form.rounds}
-                                    onChange={e => setForm(f => ({ ...f, rounds: e.target.value }))}
+                                    onChange={e => setField("rounds", e.target.value)}
                                     placeholder="5"
-                                    className={inputCls}
+                                    className={cn(inputCls, formErrors.rounds && "border-red-500 focus:ring-red-500/40")}
                                 />
+                                {formErrors.rounds && <p className="text-[11px] text-red-500 mt-1">{formErrors.rounds}</p>}
                             </div>
                         )}
 

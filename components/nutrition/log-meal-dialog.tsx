@@ -83,12 +83,14 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
 
     const [selected, setSelected] = useState<FoodItem | Omit<FoodItem, 'id'> | null>(null)
     const [quantity, setQuantity] = useState('100')
+    const [quantityError, setQuantityError] = useState<string | null>(null)
     const [mealType, setMealType] = useState<MealType>(detectMealType())
     const [notes, setNotes] = useState('')
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     const [custom, setCustom] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '', is_cookhouse_item: false })
+    const [customErrors, setCustomErrors] = useState<Record<string, string>>({})
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -106,6 +108,36 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
             .catch(() => {})
     }, [open, templates.length])
 
+    function validateQuantity(val: string): string | null {
+        const n = parseFloat(val)
+        if (!val || isNaN(n)) return 'Enter a quantity'
+        if (n <= 0) return 'Must be greater than 0'
+        if (n > 5000) return 'Max 5000g per serving'
+        return null
+    }
+
+    function validateMacro(val: string, label: string, max: number): string | null {
+        const n = parseFloat(val)
+        if (val === '' || isNaN(n)) return `${label} is required`
+        if (n < 0) return 'Cannot be negative'
+        if (n > max) return `Max ${max} per 100g`
+        return null
+    }
+
+    function validateCustom() {
+        const errs: Record<string, string> = {}
+        const calErr = validateMacro(custom.calories, 'Calories', 900)
+        const proErr = validateMacro(custom.protein, 'Protein', 100)
+        const carErr = validateMacro(custom.carbs, 'Carbs', 100)
+        const fatErr = validateMacro(custom.fat, 'Fats', 100)
+        if (calErr) errs.calories = calErr
+        if (proErr) errs.protein = proErr
+        if (carErr) errs.carbs = carErr
+        if (fatErr) errs.fat = fatErr
+        setCustomErrors(errs)
+        return Object.keys(errs).length === 0
+    }
+
     function reset() {
         setStage('pick')
         setQuery('')
@@ -113,10 +145,12 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         setSearching(false)
         setSelected(null)
         setQuantity('100')
+        setQuantityError(null)
         setMealType(detectMealType())
         setNotes('')
         setError(null)
         setCustom({ name: '', calories: '', protein: '', carbs: '', fat: '', is_cookhouse_item: false })
+        setCustomErrors({})
     }
 
     useEffect(() => { if (!open) reset() }, [open])
@@ -150,6 +184,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
     }
 
     async function createCustomAndProceed() {
+        if (!validateCustom()) return
         setSubmitting(true)
         const res = await fetch('/api/food-items', {
             method: 'POST',
@@ -172,7 +207,9 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
     }
 
     async function handleSubmit() {
-        if (!user || !selected || parseFloat(quantity) <= 0) return
+        const qErr = validateQuantity(quantity)
+        if (qErr) { setQuantityError(qErr); return }
+        if (!user || !selected) return
         setSubmitting(true)
         setError(null)
 
@@ -395,11 +432,11 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                         />
                         <div className="grid grid-cols-2 gap-3">
                             {([
-                                { key: 'calories' as const, label: 'Calories', unit: 'kcal' },
-                                { key: 'protein' as const, label: 'Protein', unit: 'g' },
-                                { key: 'carbs' as const, label: 'Carbs', unit: 'g' },
-                                { key: 'fat' as const, label: 'Fats', unit: 'g' },
-                            ]).map(({ key, label, unit }) => (
+                                { key: 'calories' as const, label: 'Calories', unit: 'kcal', max: 900 },
+                                { key: 'protein' as const, label: 'Protein', unit: 'g', max: 100 },
+                                { key: 'carbs' as const, label: 'Carbs', unit: 'g', max: 100 },
+                                { key: 'fat' as const, label: 'Fats', unit: 'g', max: 100 },
+                            ]).map(({ key, label, unit, max }) => (
                                 <div key={key}>
                                     <label className="text-[11px] font-medium text-muted-foreground mb-1.5 block">
                                         {label} / 100g ({unit})
@@ -407,9 +444,17 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                                     <Input
                                         type="number"
                                         placeholder="0"
+                                        min={0}
+                                        max={max}
                                         value={custom[key]}
-                                        onChange={e => setCustom(p => ({ ...p, [key]: e.target.value }))}
+                                        onChange={e => {
+                                            setCustom(p => ({ ...p, [key]: e.target.value }))
+                                            const err = validateMacro(e.target.value, label, max)
+                                            setCustomErrors(prev => ({ ...prev, [key]: err ?? '' }))
+                                        }}
+                                        className={customErrors[key] ? 'border-destructive focus-visible:ring-destructive/30' : ''}
                                     />
+                                    {customErrors[key] && <p className="text-xs text-destructive mt-1">{customErrors[key]}</p>}
                                 </div>
                             ))}
                         </div>
@@ -472,9 +517,12 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                                 type="number"
                                 placeholder="100"
                                 value={quantity}
-                                onChange={e => setQuantity(e.target.value)}
+                                onChange={e => { setQuantity(e.target.value); setQuantityError(validateQuantity(e.target.value)) }}
                                 min={1}
+                                max={5000}
+                                className={quantityError ? 'border-destructive focus-visible:ring-destructive/30' : ''}
                             />
+                            {quantityError && <p className="text-xs text-destructive mt-1">{quantityError}</p>}
                             {/* Quick-select pills */}
                             <div className="flex gap-1.5 mt-2 flex-wrap">
                                 {QUICK_QUANTITIES.map(q => (

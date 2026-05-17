@@ -51,6 +51,19 @@ export async function POST(req: NextRequest) {
     } = body
     if (!userId || !name) return NextResponse.json({ error: 'userId and name required' }, { status: 400 })
 
+    if (duration_min != null && (duration_min < 0 || duration_min > 600))
+        return NextResponse.json({ error: 'duration_min must be 0–600' }, { status: 400 })
+    if (calories != null && (calories < 0 || calories > 5000))
+        return NextResponse.json({ error: 'calories must be 0–5000' }, { status: 400 })
+    if (distance_km != null && (distance_km < 0 || distance_km > 200))
+        return NextResponse.json({ error: 'distance_km must be 0–200' }, { status: 400 })
+    if (sets != null && (sets < 0 || sets > 100))
+        return NextResponse.json({ error: 'sets must be 0–100' }, { status: 400 })
+    if (reps != null && (reps < 0 || reps > 1000))
+        return NextResponse.json({ error: 'reps must be 0–1000' }, { status: 400 })
+    if (rounds != null && (rounds < 0 || rounds > 100))
+        return NextResponse.json({ error: 'rounds must be 0–100' }, { status: 400 })
+
     const payload: Record<string, unknown> = {
         user_id: userId,
         template_id: templateId ?? null,

@@ -4,6 +4,10 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/app/context/auth-context'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
+
+const COOLDOWN_MS = 60 * 60 * 1000 // 1 hour between manual refreshes
+const COOLDOWN_KEY = 'insights_last_refresh'
 
 type Insight = {
     id: string
@@ -98,11 +102,40 @@ export default function InsightsPage() {
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
     const [error, setError] = useState(false)
+    const [cooldownRemaining, setCooldownRemaining] = useState(0)
+
+    // Tick down the cooldown every second
+    useEffect(() => {
+        const stored = parseInt(localStorage.getItem(COOLDOWN_KEY) ?? '0')
+        const remaining = Math.max(0, stored + COOLDOWN_MS - Date.now())
+        setCooldownRemaining(remaining)
+        if (remaining <= 0) return
+        const interval = setInterval(() => {
+            const r = Math.max(0, stored + COOLDOWN_MS - Date.now())
+            setCooldownRemaining(r)
+            if (r === 0) clearInterval(interval)
+        }, 1000)
+        return () => clearInterval(interval)
+    }, [])
 
     const fetchInsights = useCallback(async (refresh = false) => {
         if (!user) return
-        if (refresh) setRefreshing(true)
-        else setLoading(true)
+
+        if (refresh) {
+            const stored = parseInt(localStorage.getItem(COOLDOWN_KEY) ?? '0')
+            const remaining = Math.max(0, stored + COOLDOWN_MS - Date.now())
+            if (remaining > 0) {
+                const mins = Math.ceil(remaining / 60_000)
+                toast.warning(`Refresh cooldown active — try again in ${mins} min${mins !== 1 ? 's' : ''}.`)
+                return
+            }
+            localStorage.setItem(COOLDOWN_KEY, Date.now().toString())
+            setCooldownRemaining(COOLDOWN_MS)
+            setRefreshing(true)
+        } else {
+            setLoading(true)
+        }
+
         setError(false)
         try {
             const url = `/api/insights?userId=${user.id}${refresh ? '&refresh=1' : ''}`
@@ -130,7 +163,13 @@ export default function InsightsPage() {
                     </div>
                     <Skeleton className="h-9 w-24 rounded-full" />
                 </div>
-                <Skeleton className="h-24 rounded-2xl" />
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 flex flex-col items-center text-center gap-3">
+                    <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                    <div>
+                        <p className="font-semibold text-foreground text-[15px]">Analysing your data…</p>
+                        <p className="text-[13px] text-muted-foreground mt-1">Your AI coach is reviewing the last 14 days of nutrition, workouts, and progress. This may take up to 30 seconds.</p>
+                    </div>
+                </div>
                 {[0, 1, 2].map(i => <Skeleton key={i} className="h-40 rounded-2xl" />)}
             </div>
         )
@@ -155,11 +194,12 @@ export default function InsightsPage() {
                     </div>
                     <button
                         onClick={() => fetchInsights(true)}
-                        disabled={refreshing}
+                        disabled={refreshing || cooldownRemaining > 0}
                         className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-40"
+                        title={cooldownRemaining > 0 ? `Available in ${Math.ceil(cooldownRemaining / 60_000)} min` : undefined}
                     >
                         <RefreshIcon spinning={refreshing} />
-                        {refreshing ? 'Retrying…' : 'Retry'}
+                        {refreshing ? 'Retrying…' : cooldownRemaining > 0 ? `Try again in ${Math.ceil(cooldownRemaining / 60_000)}m` : 'Retry'}
                     </button>
                 </div>
             </div>
@@ -176,11 +216,12 @@ export default function InsightsPage() {
                 </div>
                 <button
                     onClick={() => fetchInsights(true)}
-                    disabled={refreshing}
+                    disabled={refreshing || cooldownRemaining > 0}
                     className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-40 flex-shrink-0 mt-1"
+                    title={cooldownRemaining > 0 ? `Available in ${Math.ceil(cooldownRemaining / 60_000)} min` : undefined}
                 >
                     <RefreshIcon spinning={refreshing} />
-                    {refreshing ? 'Refreshing…' : 'Refresh'}
+                    {refreshing ? 'Refreshing…' : cooldownRemaining > 0 ? `${Math.ceil(cooldownRemaining / 60_000)}m` : 'Refresh'}
                 </button>
             </div>
 

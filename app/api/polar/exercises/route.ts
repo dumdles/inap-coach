@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
     try {
         const searchParams = new URL(request.url).searchParams;
         const userId = searchParams.get("userId");
-        const endpoint = searchParams.get("endpoint") || "/users/exercises";
+        const endpoint = searchParams.get("endpoint") || "/exercises";
 
         if (!userId) {
             return NextResponse.json(
@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
             }
             throw err;
         }
+        // null means 204 No Content (no new exercises)
+        if (data === null) return NextResponse.json({ exercises: [] });
         return NextResponse.json(data);
     } catch (error) {
         console.error("Polar API error:", error);
