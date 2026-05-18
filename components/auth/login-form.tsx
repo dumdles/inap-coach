@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
 import { Button } from '@/components/ui/button'
@@ -13,12 +13,26 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 
 export const LoginForm: React.FC = () => {
     const router = useRouter()
-    const { signIn, error, isLoading, clearError } = useAuth()
+    const { user, signIn, error, isLoading, clearError } = useAuth()
 
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
     const [succeeded, setSucceeded] = useState(false)
+
+    useEffect(() => {
+        if (user) {
+            router.replace('/dashboard')
+        }
+    }, [router, user])
+
+    if (user || isLoading) {
+        return (
+            <div className="w-full max-w-md mx-auto p-8 bg-white dark:bg-[#172B4D] rounded-2xl border border-gray-200 dark:border-[#344563] shadow-lg flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            </div>
+        )
+    }
 
     const validateForm = (): boolean => {
         const errors: Record<string, string> = {}
