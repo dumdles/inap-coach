@@ -90,15 +90,6 @@ export async function GET(request: NextRequest) {
         },
         body: JSON.stringify({ "member-id": tokens.x_user_id.toString() }),
 });
-        const exercisesResponse = await fetch('https://www.polaraccesslink.com/v3/exercises', {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${tokens.access_token}`,
-                Accept: "application/json",
-            }
-        }).then(res => res.json());
-
-        console.log(`Fetched exercises for user ${userId}:`, exercisesResponse);
 
         const dailyActivityResponse = await fetch('https://www.polaraccesslink.com/v3/users/activities', {
             method: "GET",
@@ -110,32 +101,24 @@ export async function GET(request: NextRequest) {
 
         console.log(`Fetched daily activity for user ${userId}:`, dailyActivityResponse);
 
-        const nightlyRechargeResponse = await fetch('https://www.polaraccesslink.com/v3/users/nightly-recharge', {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${tokens.access_token}`,
-                Accept: "application/json",
-            }
-        }).then(res => res.json());
+        await fetch(new URL(`/api/polar/sleep?userId=${encodeURIComponent(userId)}`, request.url));
 
-        console.log(`Fetched nightly recharge for user ${userId}:`, nightlyRechargeResponse);
+        // const cardioLoadResponse = await fetch('https://www.polaraccesslink.com/v3/users/cardio-load', {
+        //     method: "GET",
+        //     headers: {
+        //         Authorization: `Bearer ${tokens.access_token}`,
+        //         Accept: "application/json",
+        //     }
+        // }).then(res => res.json());
 
-        const cardioLoadResponse = await fetch('https://www.polaraccesslink.com/v3/users/cardio-load', {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${tokens.access_token}`,
-                Accept: "application/json",
-            }
-        }).then(res => res.json());
-
-        console.log(`Fetched cardio load for user ${userId}:`, cardioLoadResponse);
+        // console.log(`Fetched cardio load for user ${userId}:`, cardioLoadResponse);
 
 
     }
 
     console.log(`Successfully saved tokens for user ${userId}:`, tokens.access_token);
 
-    const response = NextResponse.redirect(new URL("/dashboard", request.url));
+    const response = NextResponse.redirect(new URL("/dashboard/workouts", request.url));
     response.cookies.delete("polar_oauth_user_id");
     return response;
 }
