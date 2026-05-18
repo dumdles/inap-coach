@@ -101,9 +101,23 @@ type Night = {
 }
 
 function groupIntoNights(records: RawRecord[]): Night[] {
+    // Apple Health exports BOTH a backward-compat "AsleepUnspecified" record covering
+    // the whole night AND individual detailed stage records (AsleepCore/Deep/REM).
+    // If specific stages exist for a night, skip the unspecified aggregate to avoid
+    // double-counting it into light_min.
+    const nightsWithSpecificStages = new Set<string>()
+    for (const r of records) {
+        if (r.stage === 'deep' || r.stage === 'rem' || r.stage === 'light' || r.stage === 'awake') {
+            nightsWithSpecificStages.add(nightDate(r.end))
+        }
+    }
+
     const byNight = new Map<string, Night>()
 
     for (const r of records) {
+        // Drop compatibility aggregate when granular stage records are present
+        if (r.stage === 'unspecified' && nightsWithSpecificStages.has(nightDate(r.end))) continue
+
         const date = nightDate(r.end)
         const min = (r.end.getTime() - r.start.getTime()) / 60000
 
@@ -162,9 +176,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'file required' }, { status: 400 })
     }
 
-    // Cap at 200 MB to avoid memory blowups. Most exports are 5–80 MB.
-    if (file.size > 200 * 1024 * 1024) {
-        return NextResponse.json({ error: 'File too large (max 200 MB)' }, { status: 413 })
+    // Cap at 500 MB. Apple Health exports from heavy users can exceed 200 MB.
+    if (file.size > 500 * 1024 * 1024) {
+        return NextResponse.json({ error: 'File too large (max 500 MB)' }, { status: 413 })
     }
 
     const xml = await file.text()
