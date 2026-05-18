@@ -449,6 +449,7 @@ export default function WorkoutsPage() {
     const [logsLoading, setLogsLoading] = React.useState(true)
     const [polarLoading, setPolarLoading] = React.useState(false)
     const [isPolarConnected, setIsPolarConnected] = React.useState(false)
+    const [isPolarConnectionChecked, setIsPolarConnectionChecked] = React.useState(false)
     const [loggerOpen, setLoggerOpen] = React.useState(false)
     const [editLog, setEditLog] = React.useState<WorkoutLog | null>(null)
     const [confirmDeleteId, setConfirmDeleteId] = React.useState<string | null>(null)
@@ -480,6 +481,27 @@ export default function WorkoutsPage() {
                     .in("id", ids)
                 setFriends((users as Friend[]) ?? [])
             })
+    }, [user?.id])
+
+    React.useEffect(() => {
+        if (!user?.id) return
+
+        let cancelled = false
+
+        fetch(`/api/auth/polar/status?userId=${user.id}`)
+            .then(r => r.json())
+            .then((data: { connected?: boolean }) => {
+                if (cancelled) return
+                setIsPolarConnected(Boolean(data.connected))
+                setIsPolarConnectionChecked(true)
+            })
+            .catch(() => {
+                if (cancelled) return
+                setIsPolarConnected(false)
+                setIsPolarConnectionChecked(true)
+            })
+
+        return () => { cancelled = true }
     }, [user?.id])
 
     // Load workout logs
@@ -637,7 +659,7 @@ export default function WorkoutsPage() {
             </div>
 
             {/* Polar connect banner */}
-            {!isPolarConnected && !polarLoading && (
+            {isPolarConnectionChecked && !isPolarConnected && !polarLoading && (
                 <div className="bg-card border border-dashed border-border rounded-2xl p-5 flex items-center gap-4">
                     <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <FootprintsIcon className="w-4 h-4 text-primary" />

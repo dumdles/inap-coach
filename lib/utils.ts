@@ -9,3 +9,12 @@ export function cn(...inputs: ClassValue[]) {
 export function fmt(n: number, dp = 1): string {
   return parseFloat(n.toFixed(dp)).toString()
 }
+
+export function parseDuration(duration: string): number {
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
+  if (!match) return 0;
+  const hours = parseInt(match[1] ?? "0");
+  const minutes = parseInt(match[2] ?? "0");
+  const seconds = parseFloat(match[3] ?? "0"); // parseFloat instead of parseInt
+  return hours * 3600 + minutes * 60 + seconds;
+}
