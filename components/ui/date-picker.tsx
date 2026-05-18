@@ -13,9 +13,16 @@ interface DatePickerProps {
     placeholder?: string
     disabled?: boolean
     className?: string
+    fromDate?: Date       // earliest month the calendar can navigate to (default: Jan 1940)
+    toDate?: Date         // latest month the calendar can navigate to (default: 5 years ahead)
 }
 
-export function DatePicker({ value, onChange, placeholder = "Pick a date", disabled, className }: DatePickerProps) {
+export function DatePicker({ value, onChange, placeholder = "Pick a date", disabled, className, fromDate, toDate }: DatePickerProps) {
+    const defaultToDate = React.useMemo(() => {
+        const d = new Date()
+        d.setFullYear(d.getFullYear() + 5)
+        return d
+    }, [])
     const [open, setOpen] = React.useState(false)
 
     const selected = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined
@@ -57,8 +64,8 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", disab
                     }}
                     captionLayout="dropdown"
                     defaultMonth={validSelected}
-                    startMonth={new Date(1940, 0)}
-                    endMonth={new Date()}
+                    startMonth={fromDate ?? new Date(1940, 0)}
+                    endMonth={toDate ?? defaultToDate}
                     initialFocus
                 />
             </PopoverContent>

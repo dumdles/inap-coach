@@ -323,7 +323,7 @@ export default function ProgressPage() {
                     <p className="text-sm text-muted-foreground max-w-xs">Set a target weight in Settings to start tracking your progress here.</p>
                 </div>
                 <button
-                    onClick={() => router.push('/dashboard/settings')}
+                    onClick={() => router.push('/dashboard/settings?tab=goal')}
                     className="mt-2 px-5 py-2 rounded-full bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors"
                 >
                     Set body target

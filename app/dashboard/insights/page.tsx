@@ -29,17 +29,20 @@ const PRIORITY_CARD: Record<Insight['priority'], string> = {
     medium: 'border-yellow-400/30 bg-yellow-400/5',
     low:    'border-border bg-card',
 }
-const PRIORITY_DOT: Record<Insight['priority'], string> = {
-    high:   'bg-danger',
-    medium: 'bg-yellow-400',
-    low:    'bg-muted-foreground',
+const PRIORITY_BADGE: Record<Insight['priority'], string> = {
+    high:   'bg-danger/10 text-danger border-danger/20',
+    medium: 'bg-yellow-400/10 text-yellow-600 dark:text-yellow-400 border-yellow-400/20',
+    low:    'bg-muted text-muted-foreground border-transparent',
 }
-const CATEGORY_LABEL: Record<Insight['category'], string> = {
-    nutrition:   'Nutrition',
-    weight:      'Body',
-    performance: 'Performance',
-    recovery:    'Recovery',
-    adherence:   'Adherence',
+const PRIORITY_LABEL: Record<Insight['priority'], string> = {
+    high: 'High', medium: 'Medium', low: 'Low',
+}
+const CATEGORY_META: Record<Insight['category'], { label: string; icon: React.ReactNode }> = {
+    nutrition:   { label: 'Nutrition',   icon: <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3" /> },
+    weight:      { label: 'Body',        icon: <><path d="M5 7h14l-1 13H6L5 7z"/><path d="M9 7a3 3 0 0 1 6 0"/></> },
+    performance: { label: 'Performance', icon: <><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></> },
+    recovery:    { label: 'Recovery',    icon: <><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></> },
+    adherence:   { label: 'Adherence',   icon: <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></> },
 }
 
 function relativeTime(iso: string) {
@@ -75,20 +78,32 @@ function ArrowIcon() {
 }
 
 function InsightCard({ insight }: { insight: Insight }) {
+    const cat = CATEGORY_META[insight.category]
     return (
         <div className={cn('rounded-2xl p-5 border', PRIORITY_CARD[insight.priority])}>
-            <div className="flex items-center justify-between gap-3 mb-2">
+            {/* Header row: category icon + label, priority badge */}
+            <div className="flex items-center justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2">
-                    <span className={cn('w-2 h-2 rounded-full flex-shrink-0', PRIORITY_DOT[insight.priority])} />
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                        {CATEGORY_LABEL[insight.category]}
-                    </span>
+                    <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center shrink-0">
+                        <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                            {cat.icon}
+                        </svg>
+                    </div>
+                    <span className="text-[11px] font-semibold text-muted-foreground">{cat.label}</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground capitalize">{insight.priority}</span>
+                <span className={cn(
+                    'text-[10px] font-semibold px-2 py-0.5 rounded-full border',
+                    PRIORITY_BADGE[insight.priority]
+                )}>
+                    {PRIORITY_LABEL[insight.priority]}
+                </span>
             </div>
-            <div className="font-semibold text-[15px] text-foreground mb-1.5">{insight.title}</div>
+
+            <div className="font-semibold text-[15px] text-foreground mb-1.5 leading-snug">{insight.title}</div>
             <div className="text-[13px] text-muted-foreground mb-3 leading-relaxed">{insight.observation}</div>
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/[0.06] border border-primary/[0.12]">
+
+            {/* Action box */}
+            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/10">
                 <ArrowIcon />
                 <div className="text-[13px] text-foreground leading-relaxed">{insight.action}</div>
             </div>
@@ -226,9 +241,21 @@ export default function InsightsPage() {
             </div>
 
             {/* Summary card */}
-            <div className="rounded-2xl bg-primary p-6">
-                <p className="text-[14px] text-white leading-relaxed">{data.summary}</p>
-                <p className="text-[11px] text-white/50 mt-3">Updated {relativeTime(data.generated_at)}</p>
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)' }}>
+                <div className="px-6 pt-5 pb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 2a8 8 0 0 1 8 8c0 3-1.5 5.5-4 7l-1 5H9l-1-5C5.5 15.5 4 13 4 10a8 8 0 0 1 8-8z" />
+                            <line x1="9" y1="17" x2="15" y2="17" />
+                        </svg>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-white/70">Coach Summary</span>
+                    </div>
+                    <p className="text-[14px] text-white leading-relaxed">{data.summary}</p>
+                </div>
+                <div className="px-6 py-3 bg-black/10 flex items-center justify-between">
+                    <span className="text-[11px] text-white/50">Updated {relativeTime(data.generated_at)}</span>
+                    <span className="text-[11px] text-white/50">{data.insights.length} insight{data.insights.length !== 1 ? 's' : ''}</span>
+                </div>
             </div>
 
             {/* Insight cards */}

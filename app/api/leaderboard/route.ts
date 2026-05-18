@@ -28,12 +28,13 @@ export async function GET(req: NextRequest) {
     if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
 
     // Resolve user list
-    let users: { id: string; full_name: string; rank: string; wing: string }[] = []
+    const USER_FIELDS = 'id, full_name, rank, wing, goal_mode'
+    let users: { id: string; full_name: string; rank: string; wing: string; goal_mode: string | null }[] = []
 
     if (scope === 'wing' && wing) {
         const { data, error } = await supabaseAdmin
             .from('users')
-            .select('id, full_name, rank, wing')
+            .select(USER_FIELDS)
             .eq('wing', wing)
         if (error) return NextResponse.json({ error: error.message }, { status: 500 })
         users = data ?? []
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
         if (me?.section) {
             const { data } = await supabaseAdmin
                 .from('users')
-                .select('id, full_name, rank, wing')
+                .select(USER_FIELDS)
                 .eq('section', me.section)
             users = data ?? []
         }
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
         )]
         const { data } = await supabaseAdmin
             .from('users')
-            .select('id, full_name, rank, wing')
+            .select(USER_FIELDS)
             .in('id', ids)
         users = data ?? []
     }

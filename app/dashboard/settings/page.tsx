@@ -548,7 +548,7 @@ export default function SettingsPage() {
                     <InputField label="Height" hint="cm" type="number" value={form.height_cm} onChange={e => set('height_cm', e.target.value)} suffix="cm" />
                     <InputField label="Weight" hint="kg" type="number" value={form.weight_kg} onChange={e => set('weight_kg', e.target.value)} suffix="kg" />
                     <FieldLabel label="Date of Birth">
-                        <DatePicker value={form.date_of_birth} onChange={v => set('date_of_birth', v)} className='mt-2' />
+                        <DatePicker value={form.date_of_birth} onChange={v => set('date_of_birth', v)} className='mt-2' toDate={new Date()} />
                     </FieldLabel>
                 </div>
                 <div className="grid grid-cols-3 bg-muted border border-border rounded-[10px] overflow-hidden">

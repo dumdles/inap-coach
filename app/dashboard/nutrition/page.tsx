@@ -308,6 +308,14 @@ function FoodItemDialog({ log, onClose, onDeleted, onEdited }: {
 
 const FALLBACK_TARGETS: UserTargets = { calories: 2400, protein: 160 }
 
+function deriveMacroTargets(calTarget: number, proteinTarget: number) {
+    const remaining = Math.max(0, calTarget - proteinTarget * 4)
+    return {
+        carbs: Math.round(remaining * 0.55 / 4),
+        fat:   Math.round(remaining * 0.30 / 9),
+    }
+}
+
 export default function NutritionPage() {
     const { user } = useAuth()
     const [dialogOpen, setDialogOpen] = useState(false)
@@ -372,8 +380,8 @@ export default function NutritionPage() {
         { calories: 0, protein: 0, carbs: 0, fat: 0 }
     )
 
-    const calPct  = Math.min(100, Math.round((totals.calories / targets.calories) * 100))
-    const protPct = Math.min(100, Math.round((totals.protein  / targets.protein)  * 100))
+    const macroTargets = deriveMacroTargets(targets.calories, targets.protein)
+    const calPct = Math.min(100, Math.round((totals.calories / targets.calories) * 100))
 
     const mealsByType = MEAL_ORDER.map(type => ({
         type,
@@ -441,33 +449,21 @@ export default function NutritionPage() {
                         <div className="space-y-1.5">
                             <div className="flex justify-between items-baseline">
                                 <span className="text-xs text-white/60">Carbs</span>
-                                <span className="text-xs font-medium text-white/80">{fmt(totals.carbs)}g</span>
+                                <span className="text-xs font-medium text-white/80">
+                                    {fmt(totals.carbs)}<span className="text-white/40">/{macroTargets.carbs}g</span>
+                                </span>
                             </div>
-                            <ProgressBar value={totals.carbs} max={400} colorClass="bg-yellow-300" />
+                            <ProgressBar value={totals.carbs} max={macroTargets.carbs} colorClass="bg-yellow-300" />
                         </div>
                         <div className="space-y-1.5">
                             <div className="flex justify-between items-baseline">
-                                <span className="text-xs text-white/60">Fats</span>
-                                <span className="text-xs font-medium text-white/80">{fmt(totals.fat)}g</span>
+                                <span className="text-xs text-white/60">Fat</span>
+                                <span className="text-xs font-medium text-white/80">
+                                    {fmt(totals.fat)}<span className="text-white/40">/{macroTargets.fat}g</span>
+                                </span>
                             </div>
-                            <ProgressBar value={totals.fat} max={80} colorClass="bg-orange-300" />
+                            <ProgressBar value={totals.fat} max={macroTargets.fat} colorClass="bg-orange-300" />
                         </div>
-                    </div>
-
-                    {/* Macro summary row */}
-                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-white/15">
-                        {[
-                            { label: 'Protein', value: `${fmt(totals.protein)}g`, pct: protPct },
-                            { label: 'Carbs',   value: `${fmt(totals.carbs)}g`,   pct: null },
-                            { label: 'Fats',    value: `${fmt(totals.fat)}g`,     pct: null },
-                        ].map(({ label, value, pct }) => (
-                            <div key={label} className="text-center">
-                                <div className="text-base font-bold text-white">{value}</div>
-                                <div className="text-[10px] text-white/50 uppercase tracking-wide">
-                                    {label}{pct !== null ? ` · ${pct}%` : ''}
-                                </div>
-                            </div>
-                        ))}
                     </div>
                 </div>
 

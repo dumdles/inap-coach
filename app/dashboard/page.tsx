@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils'
 import {
     PlusIcon, MoonIcon, DumbbellIcon, ChevronRightIcon, FlameIcon,
 } from 'lucide-react'
+import router from 'next/router'
+import { Button } from '@/components/ui/button'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -399,6 +401,9 @@ export default function DashboardPage() {
     const [sleepLoading, setSleepLoading]     = useState(true)
     const [workoutsLoading, setWorkoutsLoading] = useState(true)
 
+    const [aiSummary, setAiSummary]           = useState<string | null>(null)
+    const [aiLoading, setAiLoading]           = useState(true)
+
     // Fetch user profile
     useEffect(() => {
         if (!user) return
@@ -453,6 +458,15 @@ export default function DashboardPage() {
             .maybeSingle()
             .then(({ data }) => { setSleep(data as SleepSummary | null) })
             .then(() => setSleepLoading(false), () => setSleepLoading(false))
+    }, [user])
+
+    // Fetch cached AI coach summary — reuses the 24h insights cache, no extra AI cost
+    useEffect(() => {
+        if (!user) return
+        fetch(`/api/insights?userId=${user.id}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data?.summary) setAiSummary(data.summary) })
+            .finally(() => setAiLoading(false))
     }, [user])
 
     // Fetch today's workouts
@@ -566,6 +580,39 @@ export default function DashboardPage() {
                     )}
                 </div>
             </div>
+
+            {/* ── AI coach summary ─────────────────────────────────────────── */}
+            {aiLoading ? (
+                <div className="bg-card border border-border rounded-2xl p-4 flex items-start gap-3">
+                    <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+                    <div className="flex-1 space-y-2">
+                        <Skeleton className="h-3 w-24" />
+                        <Skeleton className="h-3.5 w-full" />
+                        <Skeleton className="h-3.5 w-4/5" />
+                    </div>
+                </div>
+            ) : aiSummary ? (
+                <div className="bg-card border border-border rounded-2xl p-4 flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="var(--color-primary)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 2a8 8 0 0 1 8 8c0 3-1.5 5.5-4 7l-1 5H9l-1-5C5.5 15.5 4 13 4 10a8 8 0 0 1 8-8z" />
+                            <line x1="9" y1="17" x2="15" y2="17" />
+                        </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+                            AI Coach
+                        </div>
+                        <p className="text-[13px] text-foreground leading-relaxed">{aiSummary}</p>
+                        <a
+                            href="/dashboard/insights"
+                            className="inline-flex items-center gap-1 mt-2 text-[12px] font-semibold text-primary hover:underline"
+                        >
+                            Full insights <ChevronRightIcon className="w-3 h-3" />
+                        </a>
+                    </div>
+                </div>
+            ) : null}
 
             {/* ── Main content grid ─────────────────────────────────────────── */}
             <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 items-start">
@@ -749,11 +796,11 @@ export default function DashboardPage() {
                             href="/dashboard/settings#goal"
                             className="flex items-center gap-3 bg-card border border-dashed border-border rounded-2xl p-4 hover:border-primary/40 hover:bg-muted/20 transition-colors group"
                         >
-                            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                            <Button className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0" onClick={() => router.push('/dashboard/settings?tab=goal')}>
                                 <svg className="w-4 h-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                                     <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                                 </svg>
-                            </div>
+                            </Button>
                             <div className="flex-1 min-w-0">
                                 <div className="text-[13px] font-semibold text-foreground">Set your IPPT date</div>
                                 <div className="text-[11px] text-muted-foreground mt-0.5">Enable the countdown timer</div>
