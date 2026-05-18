@@ -74,7 +74,7 @@ function Avatar({ name, size = 'md', className }: { name: string; size?: 'sm' | 
 // ── Sub-components ────────────────────────────────────────────────────────────
 function PeriodToggle({ value, onChange }: { value: 'week' | 'month'; onChange: (v: 'week' | 'month') => void }) {
     return (
-        <div className="flex items-center bg-muted dark:bg-[#091E42] rounded-full p-0.5 gap-0.5">
+        <div className="flex items-center bg-muted dark:bg-background rounded-full p-0.5 gap-0.5">
             {(['week', 'month'] as const).map(p => (
                 <button
                     key={p}
@@ -82,7 +82,7 @@ function PeriodToggle({ value, onChange }: { value: 'week' | 'month'; onChange: 
                     className={cn(
                         'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all',
                         value === p
-                            ? 'bg-card dark:bg-[#1F3460] text-foreground shadow-sm'
+                            ? 'bg-card text-foreground shadow-sm'
                             : 'text-muted-foreground hover:text-foreground',
                     )}
                 >

@@ -185,7 +185,8 @@ const HEATMAP_WEEKS = 17
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 function cellIntensity(count: number): string {
-    if (count === 0) return "bg-muted"
+    // In dark mode --muted === --card, so empty cells need a lighter token (border) to stay visible
+    if (count === 0) return "bg-muted dark:bg-border"
     if (count === 1) return "bg-primary/30"
     if (count === 2) return "bg-primary/60"
     return "bg-primary"
@@ -348,10 +349,11 @@ function WeeklyTrend({ logs }: { logs: WorkoutLog[] }) {
                             fontSize: 12,
                             color: "var(--color-foreground)",
                         }}
-                        formatter={(val: number, _: string, entry: { payload?: { sessions?: number } }) => [
-                            `${val} min · ${entry.payload?.sessions ?? 0} session${(entry.payload?.sessions ?? 0) !== 1 ? "s" : ""}`,
-                            "Activity",
-                        ]}
+                        formatter={(val, _name, entry) => {
+                            const mins = typeof val === "number" ? val : 0
+                            const sessions = (entry as { payload?: { sessions?: number } }).payload?.sessions ?? 0
+                            return [`${mins} min · ${sessions} session${sessions !== 1 ? "s" : ""}`, "Activity"]
+                        }}
                         cursor={{ fill: "var(--color-muted)", opacity: 0.4 }}
                     />
                     <Bar dataKey="min" radius={[4, 4, 0, 0]} fill="var(--color-primary)" opacity={0.85} />
@@ -1068,7 +1070,7 @@ export default function WorkoutsPage() {
             {/* Period + category filters */}
             <div className="flex flex-wrap items-center gap-2">
                 {/* Period toggle */}
-                <div className="flex items-center gap-1 bg-muted rounded-full p-1">
+                <div className="flex items-center gap-1 bg-muted dark:bg-background rounded-full p-1">
                     {PERIODS.map(p => (
                         <button
                             key={p.key}
@@ -1076,7 +1078,7 @@ export default function WorkoutsPage() {
                             className={cn(
                                 "rounded-full px-3 py-1 text-[12px] font-semibold transition-all",
                                 activePeriod === p.key
-                                    ? "bg-background text-foreground shadow-sm"
+                                    ? "bg-card text-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground"
                             )}
                         >
