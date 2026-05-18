@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { useAuth } from '@/app/context/auth-context'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ArrowLeft } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 type DayEntry = { calories: number; protein: number; carbs: number; fat: number; calorie_target: number }
 
@@ -124,7 +126,9 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
         <div className="px-4 md:px-8 py-8 max-w-3xl mx-auto">
             <div className="rounded-2xl border border-dashed border-border p-12 text-center">
                 <p className="text-sm text-muted-foreground">{error === 'forbidden' ? 'This cadet is not in your wing.' : 'Could not load cadet data.'}</p>
-                <Link href="/dashboard/wing" className="text-sm text-primary mt-2 inline-block">← Back to wing</Link>
+                <Button className="mt-4" variant="outline" onClick={() => router.back()}>
+                    <ArrowLeft /> Back to wing
+                </Button>
             </div>
         </div>
     )
