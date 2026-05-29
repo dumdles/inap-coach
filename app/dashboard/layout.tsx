@@ -11,23 +11,11 @@ import { isInstructor } from '@/lib/scoring'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useTheme } from '@/app/context/theme-context'
 import type { GoalMode } from '@/app/context/theme-context'
-
-// ── Icons ─────────────────────────────────────────────────
-function HomeIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" /><path d="M9 21V12h6v9" /></svg> }
-function NutritionIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1" /><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" /><line x1="6" y1="1" x2="6" y2="4" /><line x1="10" y1="1" x2="10" y2="4" /><line x1="14" y1="1" x2="14" y2="4" /></svg> }
-function WorkoutsIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M6 4v16M18 4v16M2 8h4M18 8h4M2 16h4M18 16h4M6 12h12" /></svg> }
-function ProgressIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg> }
-function FriendsIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg> }
-function WingIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7M17.5 14v7"/></svg> }
-function SettingsIcon() { return <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg> }
-function LogoutIcon() { return <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg> }
-function ChevronLeft() { return <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg> }
-function ChevronRight() { return <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg> }
-function BellIcon({ size = 16 }: { size?: number }) { return <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg> }
-function CheckIcon() { return <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> }
-function InsightsIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 7 7c0 2.5-1.3 4.7-3.3 6L12 18l-3.7-3C6.3 13.7 5 11.5 5 9a7 7 0 0 1 7-7z"/></svg> }
-function SleepIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> }
-function IPPTIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M6 4v16M18 4v16M2 8h4M18 8h4M2 16h4M18 16h4M6 12h12" /></svg> }
+import {
+    Home, Utensils, Dumbbell, Moon, TrendingUp,
+    Trophy, Brain, LayoutGrid, Bell, Settings, LogOut,
+    ChevronLeft, ChevronRight, Check, SportShoe, MoreHorizontal,
+} from 'lucide-react'
 
 // ── Notification types ─────────────────────────────────────
 type Notification = {
@@ -112,7 +100,7 @@ function NotificationPanel({ userId, anchorRef, onClose }: {
                         onClick={markAllRead}
                         className="flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 transition-colors"
                     >
-                        <CheckIcon /> Mark all read
+                        <Check size={13} /> Mark all read
                     </button>
                 )}
             </div>
@@ -124,7 +112,7 @@ function NotificationPanel({ userId, anchorRef, onClose }: {
                 )}
                 {!loading && items.length === 0 && (
                     <div className="py-10 flex flex-col items-center text-sm text-muted-foreground">
-                        <BellIcon size={24} />
+                        <Bell size={24} />
                         <p className="mt-2">No notifications yet</p>
                     </div>
                 )}
@@ -155,7 +143,7 @@ function NotificationPanel({ userId, anchorRef, onClose }: {
                 className="flex items-center justify-center gap-1.5 py-2.5 border-t border-border text-[12px] font-medium text-primary hover:bg-primary/5 transition-colors flex-shrink-0"
             >
                 View all notifications
-                <svg viewBox="0 0 24 24" width={12} height={12} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                <svg viewBox="0 0 24 24" width={12} height={12} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
             </a>
         </div>
     )
@@ -200,13 +188,13 @@ function NotificationBell({ userId, expanded, unread, setUnread }: { userId: str
                 onClick={handleOpen}
                 title="Notifications"
                 className={cn(
-                    'flex items-center gap-2.5 rounded-xl transition-all duration-150 relative',
+                    'flex items-center gap-2.5 rounded-xl transition-all duration-150 relative group',
                     expanded ? 'px-3 py-2.5 w-full' : 'justify-center py-2.5 w-full',
                     'text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
                 )}
             >
-                <span className="flex-shrink-0 relative">
-                    <BellIcon />
+                <span className="flex-shrink-0 relative transition-transform duration-200 group-hover:-rotate-12">
+                    <Bell size={18} />
                     {unread > 0 && (
                         <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center px-0.5">
                             {unread > 9 ? '9+' : unread}
@@ -226,20 +214,26 @@ function NotificationBell({ userId, expanded, unread, setUnread }: { userId: str
     )
 }
 
+// ── Nav items ──────────────────────────────────────────────
+// iconClassName is applied to the icon wrapper — use group-hover: classes for hover animations
 const BASE_NAV = [
-    { href: '/dashboard', label: 'Home', Icon: HomeIcon },
-    { href: '/dashboard/nutrition', label: 'Nutrition', Icon: NutritionIcon },
-    { href: '/dashboard/workouts', label: 'Workouts', Icon: WorkoutsIcon },
-    { href: '/dashboard/sleep', label: 'Sleep', Icon: SleepIcon },
-    { href: '/dashboard/progress', label: 'Progress', Icon: ProgressIcon },
-    { href: '/dashboard/ippt',     label: 'IPPT',      Icon: IPPTIcon     },
-    { href: '/dashboard/friends', label: 'Leaderboard', Icon: FriendsIcon },
-    { href: '/dashboard/insights', label: 'Insights', Icon: InsightsIcon },
+    { href: '/dashboard',           label: 'Home',        Icon: () => <Home size={18} />,       iconClassName: 'group-hover:-translate-y-0.5' },
+    { href: '/dashboard/nutrition', label: 'Nutrition',   Icon: () => <Utensils size={18} />,   iconClassName: 'group-hover:rotate-12' },
+    { href: '/dashboard/workouts',  label: 'Workouts',    Icon: () => <Dumbbell size={18} />,   iconClassName: 'group-hover:-rotate-12' },
+    { href: '/dashboard/sleep',     label: 'Sleep',       Icon: () => <Moon size={18} />,       iconClassName: 'group-hover:-rotate-12' },
+    { href: '/dashboard/progress',  label: 'Progress',    Icon: () => <TrendingUp size={18} />, iconClassName: 'group-hover:-translate-y-0.5' },
+    { href: '/dashboard/ippt',      label: 'IPPT',        Icon: () => <SportShoe size={18} />,  iconClassName: 'group-hover:-translate-y-1' },
+    { href: '/dashboard/friends',   label: 'Leaderboard', Icon: () => <Trophy size={18} />,     iconClassName: 'group-hover:scale-110' },
+    { href: '/dashboard/insights',  label: 'Insights',    Icon: () => <Brain size={18} />,      iconClassName: 'group-hover:scale-110' },
 ]
 
 const INSTRUCTOR_NAV = [
-    { href: '/dashboard/wing', label: 'My Wing', Icon: WingIcon },
+    { href: '/dashboard/wing', label: 'My Wing', Icon: () => <LayoutGrid size={18} />, iconClassName: 'group-hover:scale-110' },
 ]
+
+// First 4 tabs appear in the mobile bottom bar; the rest go in the "More" sheet
+const PRIMARY_NAV = BASE_NAV.slice(0, 4)
+const OVERFLOW_NAV = BASE_NAV.slice(4)
 
 const SIDEBAR_EXPANDED_W = 220
 const SIDEBAR_COLLAPSED_W = 64
@@ -257,7 +251,7 @@ function MobileBell({ userId, unread, setUnread }: { userId: string; unread: num
                 onClick={() => { setOpen(o => !o); setTimeout(() => setUnread(0), 2000) }}
                 className="w-10 h-10 rounded-full bg-card border border-border shadow-md flex items-center justify-center relative text-foreground hover:bg-accent transition-colors"
             >
-                <BellIcon size={18} />
+                <Bell size={18} />
                 {unread > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center px-1">
                         {unread > 9 ? '9+' : unread}
@@ -271,53 +265,186 @@ function MobileBell({ userId, unread, setUnread }: { userId: string; unread: num
     )
 }
 
+// ── More sheet (overflow nav for mobile) ──────────────────
+function MobileMoreSheet({ open, onClose, pathname, profile }: {
+    open: boolean
+    onClose: () => void
+    pathname: string
+    profile: { rank?: string; full_name?: string; wing?: string } | null
+}) {
+    const { user, signOut } = useAuth()
+    const router = useRouter()
+    // Keep the sheet mounted during the close animation, then unmount
+    const [rendered, setRendered] = useState(false)
+    useEffect(() => { if (open) setRendered(true) }, [open])
+
+    const overflowNav = [
+        ...OVERFLOW_NAV,
+        ...(profile?.rank && isInstructor(profile.rank) ? INSTRUCTOR_NAV : []),
+    ]
+
+    if (!rendered || typeof document === 'undefined') return null
+
+    return createPortal(
+        <div
+            className="fixed inset-0 z-[60] md:hidden"
+            onTransitionEnd={() => { if (!open) setRendered(false) }}
+        >
+            {/* Backdrop */}
+            <div
+                className={cn(
+                    'absolute inset-0 bg-black/50 transition-opacity duration-300',
+                    open ? 'opacity-100' : 'opacity-0'
+                )}
+                onClick={onClose}
+            />
+
+            {/* Sheet */}
+            <div
+                className={cn(
+                    'absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl shadow-2xl transition-transform duration-300 ease-out',
+                    open ? 'translate-y-0' : 'translate-y-full'
+                )}
+            >
+                {/* Drag handle */}
+                <div className="flex justify-center pt-3 pb-1">
+                    <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
+                </div>
+
+                <div className="px-2 pt-2 pb-3">
+                    {/* Overflow nav grid */}
+                    <div className="grid grid-cols-4 gap-1">
+                        {overflowNav.map(({ href, label, Icon }) => {
+                            const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+                            return (
+                                <Link
+                                    key={href}
+                                    href={href}
+                                    onClick={onClose}
+                                    className={cn(
+                                        'flex flex-col items-center gap-1.5 py-3.5 rounded-2xl text-[11px] font-semibold tracking-[0.02em] transition-colors duration-150',
+                                        active
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'text-foreground/60 hover:bg-muted hover:text-foreground'
+                                    )}
+                                >
+                                    <Icon />
+                                    <span>{label}</span>
+                                </Link>
+                            )
+                        })}
+                    </div>
+
+                    <div className="mx-2 my-3 border-t border-border" />
+
+                    {/* Settings & sign out */}
+                    <Link
+                        href="/dashboard/settings"
+                        onClick={onClose}
+                        className={cn(
+                            'flex items-center gap-3 px-4 py-3 rounded-2xl text-[14px] font-medium transition-colors duration-150',
+                            pathname.startsWith('/dashboard/settings')
+                                ? 'bg-primary/10 text-primary'
+                                : 'text-foreground hover:bg-muted'
+                        )}
+                    >
+                        <Settings size={18} />
+                        Settings
+                    </Link>
+                    <button
+                        onClick={async () => {
+                            onClose()
+                            await signOut()
+                            router.replace('/login')
+                        }}
+                        className="flex w-full items-center gap-3 px-4 py-3 rounded-2xl text-[14px] font-medium text-destructive hover:bg-destructive/10 transition-colors duration-150"
+                    >
+                        <LogOut size={18} />
+                        Sign out
+                    </button>
+                </div>
+
+                {/* Safe area spacer */}
+                <div style={{ height: 'env(safe-area-inset-bottom)' }} />
+            </div>
+        </div>,
+        document.body
+    )
+}
+
 // ── Mobile bottom nav ──────────────────────────────────────
 function MobileBottomNav({ pathname, profile }: {
     pathname: string
     profile: { rank?: string } | null
 }) {
-    const allNav = [
-        ...BASE_NAV,
-        ...(profile?.rank && isInstructor(profile.rank) ? INSTRUCTOR_NAV : []),
-    ]
+    const [moreOpen, setMoreOpen] = useState(false)
+
+    // "More" tab appears active when the current page is in the overflow set
+    const overflowActive = [...OVERFLOW_NAV, ...INSTRUCTOR_NAV].some(
+        ({ href }) => pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+    )
 
     return (
-        <nav
-            className="fixed z-50 flex md:hidden items-center"
-            style={{
-                bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
-                left: '16px',
-                right: '16px',
-                background: 'rgba(255,255,255,0.35)',
-                backdropFilter: 'blur(28px) saturate(200%)',
-                WebkitBackdropFilter: 'blur(28px) saturate(200%)',
-                borderRadius: '999px',
-                border: '1px solid rgba(255,255,255,0.45)',
-                boxShadow: '0 8px 32px rgba(9,30,66,0.14), 0 1.5px 6px rgba(9,30,66,0.08), inset 0 1px 0 rgba(255,255,255,0.6)',
-                padding: '6px',
-                gap: '2px',
-            }}
-        >
-            {allNav.slice(0, 5).map(({ href, label, Icon }) => {
-                const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
-                return (
-                    <Link
-                        key={href}
-                        href={href}
-                        className={cn(
-                            'flex flex-col items-center justify-center gap-[3px] flex-1 py-2 px-1 text-[9px] font-semibold tracking-[0.04em] transition-all duration-200 rounded-[999px]',
-                            active
-                                ? 'text-primary bg-white/70 shadow-sm'
-                                : 'text-foreground/50 hover:text-foreground/80',
-                        )}
-                        style={active ? { boxShadow: '0 1px 4px rgba(9,30,66,0.10)' } : undefined}
-                    >
-                        <Icon />
-                        <span>{label}</span>
-                    </Link>
-                )
-            })}
-        </nav>
+        <>
+            <nav
+                className="fixed z-50 flex md:hidden items-center"
+                style={{
+                    bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
+                    left: '16px',
+                    right: '16px',
+                    background: 'rgba(255,255,255,0.35)',
+                    backdropFilter: 'blur(28px) saturate(200%)',
+                    WebkitBackdropFilter: 'blur(28px) saturate(200%)',
+                    borderRadius: '999px',
+                    border: '1px solid rgba(255,255,255,0.45)',
+                    boxShadow: '0 8px 32px rgba(9,30,66,0.14), 0 1.5px 6px rgba(9,30,66,0.08), inset 0 1px 0 rgba(255,255,255,0.6)',
+                    padding: '6px',
+                    gap: '2px',
+                }}
+            >
+                {PRIMARY_NAV.map(({ href, label, Icon }) => {
+                    const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+                    return (
+                        <Link
+                            key={href}
+                            href={href}
+                            className={cn(
+                                'flex flex-col items-center justify-center gap-[3px] flex-1 py-2 px-1 text-[9px] font-semibold tracking-[0.04em] transition-all duration-200 rounded-[999px]',
+                                active
+                                    ? 'text-primary bg-white/70 shadow-sm'
+                                    : 'text-foreground/50 hover:text-foreground/80',
+                            )}
+                            style={active ? { boxShadow: '0 1px 4px rgba(9,30,66,0.10)' } : undefined}
+                        >
+                            <Icon />
+                            <span>{label}</span>
+                        </Link>
+                    )
+                })}
+
+                {/* More button — opens the overflow sheet */}
+                <button
+                    onClick={() => setMoreOpen(true)}
+                    className={cn(
+                        'flex flex-col items-center justify-center gap-[3px] flex-1 py-2 px-1 text-[9px] font-semibold tracking-[0.04em] transition-all duration-200 rounded-[999px] border-none cursor-pointer',
+                        overflowActive
+                            ? 'text-primary bg-white/70 shadow-sm'
+                            : 'text-foreground/50 hover:text-foreground/80',
+                    )}
+                    style={overflowActive ? { boxShadow: '0 1px 4px rgba(9,30,66,0.10)' } : undefined}
+                >
+                    <MoreHorizontal size={18} />
+                    <span>More</span>
+                </button>
+            </nav>
+
+            <MobileMoreSheet
+                open={moreOpen}
+                onClose={() => setMoreOpen(false)}
+                pathname={pathname}
+                profile={profile}
+            />
+        </>
     )
 }
 
@@ -339,7 +466,12 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
     const initials = displayName
         .split(' ').map((w: string) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?'
 
-    const NavItem = ({ href, label, Icon }: { href: string; label: string; Icon: () => React.ReactElement }) => {
+    const NavItem = ({ href, label, Icon, iconClassName }: {
+        href: string
+        label: string
+        Icon: () => React.ReactElement
+        iconClassName?: string
+    }) => {
         const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
         return (
             <Link
@@ -353,7 +485,9 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
                         : 'text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
                 )}
             >
-                <span className="flex-shrink-0"><Icon /></span>
+                <span className={cn('flex-shrink-0 transition-transform duration-200', iconClassName)}>
+                    <Icon />
+                </span>
                 {expanded && (
                     <span className="text-[13px] font-medium whitespace-nowrap overflow-hidden">
                         {label}
@@ -382,7 +516,7 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
             {/* Logo */}
             <div className={cn('flex items-center gap-2.5 px-4 py-5 flex-shrink-0', !expanded && 'justify-center px-0')}>
                 <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center text-white flex-shrink-0">
-                    <svg viewBox="0 0 24 24" width={15} height={15} fill="currentColor"><circle cx="12" cy="4" r="1.8"/><path d="M9.5 8.5c-.4.1-.8.4-1 .8L7 12.5c-.2.5 0 1.1.5 1.3.5.2 1.1 0 1.3-.5l.9-2.1 1 .9-1.5 4.5c-.2.5.1 1.1.6 1.3.5.2 1.1-.1 1.3-.6l1-3 1 1.2V20c0 .6.4 1 1 1s1-.4 1-1v-4.5c0-.3-.1-.5-.3-.7l-1.4-1.7 .6-1.8 .7 .7c.2.2.4.3.7.3H17c.6 0 1-.4 1-1s-.4-1-1-1h-1.7l-1.5-1.5c-.5-.5-1.2-.7-1.9-.5l-2.4.7z"/></svg>
+                    <svg viewBox="0 0 24 24" width={15} height={15} fill="currentColor"><circle cx="12" cy="4" r="1.8" /><path d="M9.5 8.5c-.4.1-.8.4-1 .8L7 12.5c-.2.5 0 1.1.5 1.3.5.2 1.1 0 1.3-.5l.9-2.1 1 .9-1.5 4.5c-.2.5.1 1.1.6 1.3.5.2 1.1-.1 1.3-.6l1-3 1 1.2V20c0 .6.4 1 1 1s1-.4 1-1v-4.5c0-.3-.1-.5-.3-.7l-1.4-1.7 .6-1.8 .7 .7c.2.2.4.3.7.3H17c.6 0 1-.4 1-1s-.4-1-1-1h-1.7l-1.5-1.5c-.5-.5-1.2-.7-1.9-.5l-2.4.7z" /></svg>
                 </div>
                 {expanded && (
                     <span className="font-display text-[15px] font-extrabold tracking-tight text-sidebar-foreground whitespace-nowrap">
@@ -439,7 +573,7 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
                         onClick={() => setUserMenuOpen(false)}
                         className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-foreground hover:bg-accent transition-colors duration-100 cursor-pointer"
                     >
-                        <SettingsIcon /> Settings
+                        <Settings size={15} /> Settings
                     </Link>
                     <div
                         onClick={async () => {
@@ -449,7 +583,7 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
                         }}
                         className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-destructive hover:bg-destructive/10 transition-colors duration-100 cursor-pointer w-full border-none bg-transparent"
                     >
-                        <LogoutIcon /> Sign out
+                        <LogOut size={15} /> Sign out
                     </div>
                 </PopoverContent>
             </Popover>
@@ -464,7 +598,7 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
                 )}
                 title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
             >
-                {expanded ? <ChevronLeft /> : <ChevronRight />}
+                {expanded ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
             </button>
         </aside>
     )

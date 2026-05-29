@@ -937,7 +937,7 @@ export default function WingPage() {
                                                 onClick={() => {
                                                     setAdminConfirm({ cadetId: c.id, cadetName: c.full_name })
                                                     setTransferWing('')
-                                                    setTransferSection('')
+                                                    setTransferSection(c.section ?? '')
                                                 }}
                                                 title="Manage cadet assignment"
                                             >
@@ -984,7 +984,7 @@ export default function WingPage() {
                                             onClick={() => {
                                                 setAdminConfirm({ cadetId: c.id, cadetName: c.full_name })
                                                 setTransferWing('')
-                                                setTransferSection('')
+                                                setTransferSection(c.section ?? '')
                                             }}
                                             title="Manage cadet assignment"
                                         >

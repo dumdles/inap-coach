@@ -108,6 +108,17 @@ const DATA = [
     { id: 'delete', label: 'Delete my account', desc: 'Permanently delete your account and all associated data. This action cannot be undone!', action: 'delete' },
 ]
 
+// ── Wing → service mapping ────────────────────────────────
+// MIDS and Air Wings map to their respective services; DIS Wing maps to DIS;
+// all other wings are Army wings.
+function wingToService(wing: string): string {
+    const w = (wing ?? '').toUpperCase()
+    if (w.includes('MIDS')) return 'Navy'
+    if (w.includes('AIR')) return 'Air Force'
+    if (w.includes('DIS')) return 'DIS'
+    return 'Army'
+}
+
 // ── Derived stats ─────────────────────────────────────────
 function calcDerived(height: string, weight: string, dob: string, gender: string) {
     const h = parseFloat(height) || 0
@@ -311,7 +322,7 @@ export default function SettingsPage() {
                     username: data.username ?? '',
                     rank: data.rank ?? '',
                     wing: data.wing ?? '',
-                    service: data.service ?? '',
+                    service: wingToService(data.wing ?? ''),
                     height_cm: data.height_cm?.toString() ?? '',
                     weight_kg: data.weight_kg?.toString() ?? '',
                     date_of_birth: data.date_of_birth ?? '',
@@ -781,23 +792,37 @@ export default function SettingsPage() {
                 </div>
             </SCard>
             <SCard>
-                <div className="font-display text-[15px] font-bold text-foreground mb-1">Service</div>
-                <div className="text-[13px] text-muted-foreground mb-3">Your service branch. This tailors AI coaching insights to your training curriculum.</div>
-                <FieldLabel label="Service">
-                    <Select value={form.service} onValueChange={v => set('service', v)}>
-                        <SelectTrigger className="w-full"><SelectValue placeholder="Select service" /></SelectTrigger>
-                        <SelectContent>
-                            {services.map(name => (
-                                <SelectItem key={name} value={name}>{name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </FieldLabel>
+                <div className="flex items-center justify-between mb-1">
+                    <div className="font-display text-[15px] font-bold text-foreground">Service</div>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 bg-muted text-muted-foreground rounded-full">Auto-assigned</span>
+                </div>
+                <div className="text-[13px] text-muted-foreground mb-3">Derived from your wing. This tailors AI coaching insights to your training curriculum.</div>
+                <div className="h-10 flex items-center px-3 rounded-lg bg-muted border border-border text-[14px] font-medium text-foreground">
+                    {form.service || '—'}
+                </div>
             </SCard>
             <SCard>
                 <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                    <InputField label="Platoon" value={form.platoon} onChange={e => set('platoon', e.target.value)} placeholder="e.g. 1" />
-                    <InputField label="Section" value={form.section} onChange={e => set('section', e.target.value)} placeholder="e.g. A" />
+                    <FieldLabel label="Platoon">
+                        <Select value={form.platoon} onValueChange={v => set('platoon', v)}>
+                            <SelectTrigger className="w-full"><SelectValue placeholder="Select platoon" /></SelectTrigger>
+                            <SelectContent>
+                                {['1','2','3','4','5','6','7','8'].map(p => (
+                                    <SelectItem key={p} value={p}>Platoon {p}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </FieldLabel>
+                    <FieldLabel label="Section">
+                        <Select value={form.section} onValueChange={v => set('section', v)}>
+                            <SelectTrigger className="w-full"><SelectValue placeholder="Select section" /></SelectTrigger>
+                            <SelectContent>
+                                {['1','2','3','4'].map(s => (
+                                    <SelectItem key={s} value={s}>Section {s}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </FieldLabel>
                 </div>
             </SCard>
         </div>
@@ -921,7 +946,7 @@ export default function SettingsPage() {
                     { label: 'Weight units', desc: 'Used across logs and stat displays.', key: 'units_weight' as const, options: [{ value: 'kg', label: 'kg' }, { value: 'lb', label: 'lb' }] },
                     { label: 'Height units', desc: 'cm or feet/inches.', key: 'units_height' as const, options: [{ value: 'cm', label: 'cm' }, { value: 'in', label: 'ft / in' }] },
                 ]).map(row => (
-                    <div key={row.label} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <div key={row.label} className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
                             <div className="text-[14px] font-semibold text-foreground">{row.label}</div>
                             <div className="text-[12px] text-muted-foreground">{row.desc}</div>
@@ -960,7 +985,7 @@ export default function SettingsPage() {
             </main>
 
             {dirty && (
-                <div className="absolute inset-x-4 bottom-24 flex flex-wrap items-center justify-center gap-2 rounded-2xl bg-[#091E42] px-4 py-2 text-white shadow-xl z-50 animate-in fade-in slide-in-from-bottom-3 duration-200 md:inset-x-auto md:left-1/2 md:bottom-6 md:-translate-x-1/2 md:flex-nowrap md:rounded-full md:py-1.5" style={{ paddingLeft: 18 }}>
+                <div className="mb-2 fixed left-1/2 -translate-x-1/2 flex flex-nowrap items-center justify-center gap-2 rounded-full bg-[#091E42] px-4 py-1.5 text-white shadow-xl z-50 animate-in fade-in slide-in-from-bottom-3 duration-200 whitespace-nowrap" style={{ paddingLeft: 18, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 82px)' }}>
                     <span className="w-1.5 h-1.5 rounded-full bg-warning flex-shrink-0" />
                     <span className="text-[12px] font-medium mr-1.5">Unsaved changes</span>
                     <Button variant="ghost" size="sm" onClick={() => setForm(orig)} className="rounded-full text-white/75 hover:text-white hover:bg-white/[0.14] h-7 px-3">
