@@ -13,11 +13,12 @@ interface DatePickerProps {
     placeholder?: string
     disabled?: boolean
     className?: string
-    fromDate?: Date       // earliest month the calendar can navigate to (default: Jan 1940)
-    toDate?: Date         // latest month the calendar can navigate to (default: 5 years ahead)
+    fromDate?: Date
+    toDate?: Date
+    error?: boolean
 }
 
-export function DatePicker({ value, onChange, placeholder = "Pick a date", disabled, className, fromDate, toDate }: DatePickerProps) {
+export function DatePicker({ value, onChange, placeholder = "Pick a date", disabled, className, fromDate, toDate, error }: DatePickerProps) {
     const defaultToDate = React.useMemo(() => {
         const d = new Date()
         d.setFullYear(d.getFullYear() + 5)
@@ -35,23 +36,18 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", disab
                     type="button"
                     disabled={disabled}
                     className={cn(
-                        // Identical to Input component
-                        "flex h-10 w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2",
-                        "text-sm transition-colors outline-none",
-                        "hover:border-gray-400",
-                        "focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/12",
-                        "disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-300",
-                        // dark mode
-                        "dark:bg-[#0D1F3C] dark:border-[#344563] dark:text-gray-100",
-                        "dark:hover:border-[#505F79]",
-                        "dark:focus-visible:border-primary dark:focus-visible:ring-primary/20",
-                        "dark:disabled:bg-[#172B4D] dark:disabled:text-[#6B778C]",
-                        !validSelected && "text-gray-400 dark:text-[#6B778C]",
+                        "h-10 w-full rounded-xl border border-border bg-background px-3",
+                        "flex items-center justify-between text-[14px] text-foreground",
+                        "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40",
+                        "hover:border-border/80",
+                        "disabled:cursor-not-allowed disabled:opacity-50",
+                        !validSelected && "text-muted-foreground",
+                        error && "border-danger",
                         className
                     )}
                 >
                     {validSelected ? format(validSelected, "d MMM yyyy") : placeholder}
-                    <CalendarIcon className="size-4 text-gray-400 dark:text-[#6B778C] shrink-0" />
+                    <CalendarIcon className="size-4 text-muted-foreground shrink-0 ml-2" />
                 </button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">

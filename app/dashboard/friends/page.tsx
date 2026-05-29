@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import gsap from 'gsap'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type RankedUser = {
@@ -34,7 +35,7 @@ type FriendUser = {
     full_name: string
     rank: string
     wing: string
-    friendshipId?: string
+    friendshipId: string
 }
 
 type SearchUser = {
@@ -102,12 +103,41 @@ function RankingCard({
     total: number
     period: 'week' | 'month'
 }) {
+    const cardRef = useRef<HTMLDivElement>(null)
+    const rankRef = useRef<HTMLDivElement>(null)
+    const scoreRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (!user || !cardRef.current) return
+        const ctx = gsap.context(() => {
+            // Slide card in
+            gsap.fromTo(cardRef.current,
+                { opacity: 0, y: 20 },
+                { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' },
+            )
+            // Count up rank position and score
+            const counter = { pos: 1, score: 0 }
+            gsap.to(counter, {
+                pos: user.position,
+                score: user.score,
+                duration: 1.1,
+                ease: 'power2.out',
+                delay: 0.2,
+                onUpdate() {
+                    if (rankRef.current) rankRef.current.textContent = `#${Math.round(counter.pos)}`
+                    if (scoreRef.current) scoreRef.current.textContent = Math.round(counter.score).toLocaleString()
+                },
+            })
+        })
+        return () => ctx.revert()
+    }, [user])
+
     if (!user) return null
     const ahead = total - user.position
     const label = period === 'week' ? 'week' : 'month'
 
     return (
-        <div className="rounded-2xl bg-[#0D1F3C] p-6 text-white relative overflow-hidden">
+        <div ref={cardRef} className="rounded-2xl bg-[#0D1F3C] p-6 text-white relative overflow-hidden" style={{ opacity: 0 }}>
             <div
                 className="absolute inset-0 opacity-30"
                 style={{ background: 'radial-gradient(ellipse at 70% 50%, #1e3a8a 0%, transparent 70%)' }}
@@ -127,15 +157,15 @@ function RankingCard({
                 </div>
                 <div className="flex items-end gap-8">
                     <div>
-                        <div className="font-display font-extrabold text-[72px] leading-none tracking-tight">
-                            #{user.position}
+                        <div ref={rankRef} className="font-display font-extrabold text-[72px] leading-none tracking-tight">
+                            #1
                         </div>
                         <div className="text-white/50 text-sm mt-1">of {total} cadets</div>
                     </div>
                     <div className="pb-2">
                         <div className="text-white/50 text-xs uppercase tracking-widest mb-1">Your score</div>
-                        <div className="font-display font-extrabold text-[40px] leading-none text-primary">
-                            {user.score.toLocaleString()}
+                        <div ref={scoreRef} className="font-display font-extrabold text-[40px] leading-none text-primary">
+                            0
                         </div>
                         {ahead > 0 && (
                             <div className="text-white/40 text-xs mt-1.5">
@@ -150,12 +180,25 @@ function RankingCard({
 }
 
 function Podium({ top3, currentUserId, clickableIds }: { top3: RankedUser[]; currentUserId: string; clickableIds?: Set<string> }) {
+    const podiumRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (!podiumRef.current || top3.length === 0) return
+        const ctx = gsap.context(() => {
+            gsap.fromTo('[data-podium-col]',
+                { opacity: 0, y: 30 },
+                { opacity: 1, y: 0, duration: 0.5, stagger: 0.1, ease: 'power3.out', delay: 0.15 },
+            )
+        }, podiumRef)
+        return () => ctx.revert()
+    }, [top3])
+
     if (top3.length === 0) return null
     const [first, second, third] = top3
     const order = [second, first, third].filter(Boolean)
 
     return (
-        <div className="rounded-2xl bg-card border border-border p-6">
+        <div ref={podiumRef} className="rounded-2xl bg-card border border-border p-6">
             <h3 className="font-semibold text-foreground text-base mb-6">Top of the week</h3>
             <div className="flex items-end justify-center gap-4">
                 {order.map(u => {
@@ -184,9 +227,9 @@ function Podium({ top3, currentUserId, clickableIds }: { top3: RankedUser[]; cur
                     )
                     const colClass = cn('flex flex-col items-center gap-2 flex-1', isClickable && 'cursor-pointer')
                     return isClickable ? (
-                        <Link key={u.id} href={`/dashboard/wing/cadet/${u.id}`} className={colClass}>{inner}</Link>
+                        <Link key={u.id} href={`/dashboard/wing/cadet/${u.id}`} className={colClass} data-podium-col style={{ opacity: 0 }}>{inner}</Link>
                     ) : (
-                        <div key={u.id} className={colClass}>{inner}</div>
+                        <div key={u.id} className={colClass} data-podium-col style={{ opacity: 0 }}>{inner}</div>
                     )
                 })}
             </div>
@@ -195,10 +238,23 @@ function Podium({ top3, currentUserId, clickableIds }: { top3: RankedUser[]; cur
 }
 
 function LeaderboardList({ users, currentUserId, clickableIds }: { users: RankedUser[]; currentUserId: string; clickableIds?: Set<string> }) {
+    const listRef = useRef<HTMLDivElement>(null)
     const rest = users.slice(3)
+
+    useEffect(() => {
+        if (!listRef.current || rest.length === 0) return
+        const ctx = gsap.context(() => {
+            gsap.fromTo('[data-lb-row]',
+                { opacity: 0, x: -10 },
+                { opacity: 1, x: 0, duration: 0.35, stagger: 0.04, ease: 'power2.out' },
+            )
+        }, listRef)
+        return () => ctx.revert()
+    }, [rest.length])
+
     if (rest.length === 0) return null
     return (
-        <div className="rounded-2xl bg-card border border-border overflow-hidden">
+        <div ref={listRef} className="rounded-2xl bg-card border border-border overflow-hidden">
             {rest.map(u => {
                 const isClickable = u.id !== currentUserId && clickableIds?.has(u.id)
                 const inner = (
@@ -227,9 +283,9 @@ function LeaderboardList({ users, currentUserId, clickableIds }: { users: Ranked
                     isClickable && 'hover:bg-accent/50 cursor-pointer',
                 )
                 return isClickable ? (
-                    <Link key={u.id} href={`/dashboard/wing/cadet/${u.id}`} className={rowClass}>{inner}</Link>
+                    <Link key={u.id} href={`/dashboard/wing/cadet/${u.id}`} className={rowClass} data-lb-row style={{ opacity: 0 }}>{inner}</Link>
                 ) : (
-                    <div key={u.id} className={rowClass}>{inner}</div>
+                    <div key={u.id} className={rowClass} data-lb-row style={{ opacity: 0 }}>{inner}</div>
                 )
             })}
         </div>
@@ -237,8 +293,29 @@ function LeaderboardList({ users, currentUserId, clickableIds }: { users: Ranked
 }
 
 function WingStandingsCard({ standings, period }: { standings: WingStanding[]; period: 'week' | 'month' }) {
-    if (standings.length === 0) return null
+    const barRefs = useRef<(HTMLDivElement | null)[]>([])
     const max = standings[0]?.avgScore ?? 1
+
+    useEffect(() => {
+        if (standings.length === 0) return
+        const targets = standings.slice(0, 5).map(w => (w.avgScore / max) * 100)
+        const ctx = gsap.context(() => {
+            gsap.fromTo(
+                barRefs.current.filter(Boolean),
+                { width: '0%' },
+                {
+                    width: (i: number) => `${targets[i]}%`,
+                    duration: 1,
+                    stagger: 0.1,
+                    ease: 'power3.out',
+                    delay: 0.25,
+                },
+            )
+        })
+        return () => ctx.revert()
+    }, [standings, max])
+
+    if (standings.length === 0) return null
     return (
         <div className="rounded-2xl bg-card border border-border p-5">
             <h3 className="font-semibold text-foreground text-sm mb-0.5">Wing standings</h3>
@@ -246,7 +323,7 @@ function WingStandingsCard({ standings, period }: { standings: WingStanding[]; p
                 {period === 'week' ? 'for the past week' : 'for the past month'}
             </p>
             <div className="flex flex-col gap-3">
-                {standings.slice(0, 5).map(w => (
+                {standings.slice(0, 5).map((w, i) => (
                     <div key={w.wing} className="flex items-center gap-3">
                         <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center text-[11px] font-bold text-muted-foreground flex-shrink-0">
                             {w.position}
@@ -258,8 +335,9 @@ function WingStandingsCard({ standings, period }: { standings: WingStanding[]; p
                             </div>
                             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                                 <div
-                                    className="h-full bg-primary rounded-full transition-all duration-500"
-                                    style={{ width: `${(w.avgScore / max) * 100}%` }}
+                                    ref={el => { barRefs.current[i] = el }}
+                                    className="h-full bg-primary rounded-full"
+                                    style={{ width: '0%' }}
                                 />
                             </div>
                         </div>
@@ -292,17 +370,79 @@ function PendingRequestsCard({
                             <div className="text-[11px] text-muted-foreground">{u.rank} · {u.wing} Wing</div>
                         </div>
                         <button
-                            onClick={() => onAccept(u.friendshipId!)}
+                            onClick={() => onAccept(u.friendshipId)}
                             className="text-xs font-semibold text-primary hover:underline"
                         >
                             Accept
                         </button>
                         <button
-                            onClick={() => onReject(u.friendshipId!)}
+                            onClick={() => onReject(u.friendshipId)}
                             className="text-xs font-medium text-muted-foreground hover:text-destructive"
                         >
                             Decline
                         </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+function FriendsListCard({
+    friends,
+    onRemove,
+}: {
+    friends: FriendUser[]
+    onRemove: (friendshipId: string) => void
+}) {
+    const [confirmId, setConfirmId] = useState<string | null>(null)
+
+    if (friends.length === 0) {
+        return (
+            <div className="rounded-2xl bg-card border border-border p-5">
+                <h3 className="font-semibold text-foreground text-sm mb-3">My Friends</h3>
+                <p className="text-xs text-muted-foreground text-center py-4">No friends yet. Add some!</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="rounded-2xl bg-card border border-border overflow-hidden">
+            <div className="px-5 pt-4 pb-3 flex items-center justify-between">
+                <h3 className="font-semibold text-foreground text-sm">My Friends</h3>
+                <span className="text-xs text-muted-foreground">{friends.length}</span>
+            </div>
+            <div className="border-t border-border">
+                {friends.map(u => (
+                    <div key={u.id} className="flex items-center gap-3 px-5 py-3 border-b border-border last:border-0">
+                        <Avatar name={u.full_name} size="sm" />
+                        <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-foreground truncate">{u.full_name}</div>
+                            <div className="text-[11px] text-muted-foreground">{u.rank} · {u.wing} Wing</div>
+                        </div>
+                        {confirmId === u.friendshipId ? (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => { onRemove(u.friendshipId); setConfirmId(null) }}
+                                    className="text-[11px] font-semibold text-destructive hover:underline"
+                                >
+                                    Confirm
+                                </button>
+                                <button
+                                    onClick={() => setConfirmId(null)}
+                                    className="text-[11px] text-muted-foreground hover:text-foreground"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setConfirmId(u.friendshipId)}
+                                className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+                            >
+                                Remove
+                            </button>
+                        )}
                     </div>
                 ))}
             </div>
@@ -446,8 +586,8 @@ function AddFriendDialog({
                                             <div className="text-xs text-primary">{u.wing} Wing</div>
                                         </div>
                                         <div className="flex gap-2">
-                                            <Button size="sm" onClick={() => onAccept(u.friendshipId!)}>Accept</Button>
-                                            <Button size="sm" variant="outline" onClick={() => onReject(u.friendshipId!)}>Decline</Button>
+                                            <Button size="sm" onClick={() => onAccept(u.friendshipId)}>Accept</Button>
+                                            <Button size="sm" variant="outline" onClick={() => onReject(u.friendshipId)}>Decline</Button>
                                         </div>
                                     </div>
                                 ))}
@@ -529,6 +669,7 @@ export default function FriendsPage() {
     const [period, setPeriod] = useState<'week' | 'month'>('week')
     const [leaderboard, setLeaderboard] = useState<RankedUser[]>([])
     const [wingStandings, setWingStandings] = useState<WingStanding[]>([])
+    const [friends, setFriends] = useState<FriendUser[]>([])
     const [pendingReceived, setPendingReceived] = useState<FriendUser[]>([])
     const [addOpen, setAddOpen] = useState(false)
     const [loadingBoard, setLoadingBoard] = useState(true)
@@ -545,9 +686,11 @@ export default function FriendsPage() {
         if (!user) return
         const res = await fetch(`/api/friendships?userId=${user.id}`)
         const data = await res.json()
+        const acceptedFriends: FriendUser[] = data.friends ?? []
+        setFriends(acceptedFriends)
         // Only accepted friends go into existingFriendIds — pending sent tracked separately
         setExistingFriendIds(new Set<string>([
-            ...(data.friends ?? []).map((f: FriendUser) => f.id),
+            ...acceptedFriends.map(f => f.id),
             ...(data.pendingReceived ?? []).map((f: FriendUser) => f.id),
         ]))
         setPendingSentIds(new Set<string>((data.pendingSent ?? []).map((f: FriendUser) => f.id)))
@@ -594,6 +737,12 @@ export default function FriendsPage() {
             body: JSON.stringify({ friendshipId, action: 'reject' }),
         })
         fetchFriends()
+    }
+
+    const handleUnfriend = async (friendshipId: string) => {
+        await fetch(`/api/friendships?id=${friendshipId}`, { method: 'DELETE' })
+        fetchFriends()
+        fetchLeaderboard()
     }
 
     const me = leaderboard.find(u => u.id === user?.id)
@@ -746,6 +895,7 @@ export default function FriendsPage() {
                             </div>
                         )}
                         <WingStandingsCard standings={wingStandings} period={period} />
+                        <FriendsListCard friends={friends} onRemove={handleUnfriend} />
                     </div>
                 </div>
             )}

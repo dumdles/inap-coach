@@ -316,6 +316,19 @@ function deriveMacroTargets(calTarget: number, proteinTarget: number) {
     }
 }
 
+type HistoryDay = { date: string; logs: MealLog[]; totals: DailyTotals }
+type HistoryRange = 7 | 14 | 30
+const HISTORY_RANGES: { value: HistoryRange; label: string }[] = [
+    { value: 7,  label: 'Last 7 days' },
+    { value: 14, label: 'Last 14 days' },
+    { value: 30, label: 'Last 30 days' },
+]
+
+function fmtHistoryDate(dateStr: string) {
+    const d = new Date(dateStr + 'T00:00:00')
+    return d.toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
 export default function NutritionPage() {
     const { user } = useAuth()
     const [dialogOpen, setDialogOpen] = useState(false)
@@ -323,6 +336,12 @@ export default function NutritionPage() {
     const [meals, setMeals] = useState<MealLog[]>([])
     const [profile, setProfile] = useState<UserProfile | null>(null)
     const [loading, setLoading] = useState(true)
+
+    // History tab state
+    const [tab, setTab] = useState<'today' | 'history'>('today')
+    const [historyRange, setHistoryRange] = useState<HistoryRange>(7)
+    const [historyDays, setHistoryDays] = useState<HistoryDay[]>([])
+    const [historyLoading, setHistoryLoading] = useState(false)
 
     const todayStr = new Date().toLocaleDateString('en-CA')
 
@@ -345,6 +364,58 @@ export default function NutritionPage() {
         setLoading(false)
     }, [user, todayStr])
 
+    const fetchHistory = useCallback(async (days: HistoryRange) => {
+        if (!user) return
+        setHistoryLoading(true)
+        const from = new Date()
+        from.setDate(from.getDate() - days)
+        from.setHours(0, 0, 0, 0)
+        // Exclude today — it's shown in the Today tab
+        const endOfYesterday = new Date(todayStr)
+        endOfYesterday.setHours(0, 0, 0, 0)
+        endOfYesterday.setMilliseconds(-1)
+
+        const { data } = await supabase
+            .from('meal_logs')
+            .select('id, meal_type, quantity_g, logged_at, notes, food_items (id, name, calories_per_100g, protein_g, carbs_g, fat_g)')
+            .eq('user_id', user.id)
+            .gte('logged_at', from.toISOString())
+            .lte('logged_at', endOfYesterday.toISOString())
+            .order('logged_at', { ascending: false })
+
+        const logs = (data as unknown as MealLog[]) ?? []
+
+        // Group by local date (en-CA gives YYYY-MM-DD)
+        const byDate: Record<string, MealLog[]> = {}
+        for (const log of logs) {
+            const dateKey = new Date(log.logged_at).toLocaleDateString('en-CA')
+            if (!byDate[dateKey]) byDate[dateKey] = []
+            byDate[dateKey].push(log)
+        }
+
+        const grouped: HistoryDay[] = Object.entries(byDate)
+            .sort(([a], [b]) => b.localeCompare(a))
+            .map(([date, dayLogs]) => ({
+                date,
+                logs: dayLogs,
+                totals: dayLogs.reduce(
+                    (acc, log) => {
+                        const m = calcMacros(log)
+                        return {
+                            calories: acc.calories + m.calories,
+                            protein:  parseFloat((acc.protein + m.protein).toFixed(1)),
+                            carbs:    parseFloat((acc.carbs   + m.carbs).toFixed(1)),
+                            fat:      parseFloat((acc.fat     + m.fat).toFixed(1)),
+                        }
+                    },
+                    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+                ),
+            }))
+
+        setHistoryDays(grouped)
+        setHistoryLoading(false)
+    }, [user, todayStr])
+
     useEffect(() => {
         if (!user) return
         supabase
@@ -355,6 +426,11 @@ export default function NutritionPage() {
             .then(({ data }) => { if (data) setProfile(data) })
         fetchMeals()
     }, [user, fetchMeals])
+
+    // Fetch history whenever the history tab is active or range changes
+    useEffect(() => {
+        if (tab === 'history') fetchHistory(historyRange)
+    }, [tab, historyRange, fetchHistory])
 
     const targets: UserTargets = profile
         ? calculateTDEE({
@@ -389,8 +465,8 @@ export default function NutritionPage() {
     })).filter(g => g.logs.length > 0)
 
     return (
-        <div className="min-h-screen px-4 sm:px-8 pt-16 sm:pt-8 pb-12">
-            <div className="w-full max-w-2xl mx-auto space-y-7">
+        <div className="min-h-screen px-4 sm:px-6 lg:px-10 pt-8 pb-12 max-w-5xl mx-auto">
+            <div className="w-full space-y-7">
 
                 {/* ── Header ── */}
                 <div className="flex items-start justify-between animate-in fade-in slide-in-from-bottom-3 duration-300">
@@ -404,6 +480,26 @@ export default function NutritionPage() {
                         Log meal
                     </Button>
                 </div>
+
+                {/* ── Tab toggle: Today / History ── */}
+                <div className="flex gap-1 bg-muted rounded-xl p-1 w-fit animate-in fade-in duration-300">
+                    {(['today', 'history'] as const).map(t => (
+                        <button
+                            key={t}
+                            onClick={() => setTab(t)}
+                            className={cn(
+                                'px-5 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize',
+                                tab === t
+                                    ? 'bg-background text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            )}
+                        >
+                            {t === 'today' ? 'Today' : 'History'}
+                        </button>
+                    ))}
+                </div>
+
+                {tab === 'today' && (<>
 
                 {/* ── Daily progress card ── */}
                 <div
@@ -596,6 +692,131 @@ export default function NutritionPage() {
                                 </div>
                             )
                         })}
+                    </div>
+                )}
+
+                </>)}
+
+                {/* ── History tab ── */}
+                {tab === 'history' && (
+                    <div className="space-y-6 animate-in fade-in duration-200">
+                        {/* Range pills */}
+                        <div className="flex gap-2 flex-wrap">
+                            {HISTORY_RANGES.map(({ value, label }) => (
+                                <button
+                                    key={value}
+                                    onClick={() => setHistoryRange(value)}
+                                    className={cn(
+                                        'text-xs font-medium px-3 py-1.5 rounded-full border transition-colors',
+                                        historyRange === value
+                                            ? 'bg-primary text-white border-primary'
+                                            : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                                    )}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {historyLoading ? (
+                            <div className="space-y-4">
+                                {[0, 1, 2].map(i => (
+                                    <div key={i}>
+                                        <Skeleton className="h-4 w-32 mb-3" />
+                                        <div className="space-y-2">
+                                            {[0, 1].map(j => <Skeleton key={j} className="h-14 rounded-xl" />)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : historyDays.length === 0 ? (
+                            <div className="bg-card border border-border rounded-2xl p-10 flex flex-col items-center text-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
+                                    <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-foreground text-sm">No meals in this period</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Start logging meals to see your history here.</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-8">
+                                {historyDays.map(({ date, logs, totals: dayTotals }) => {
+                                    const dayMealsByType = MEAL_ORDER.map(type => ({
+                                        type,
+                                        logs: logs.filter(l => l.meal_type === type),
+                                    })).filter(g => g.logs.length > 0)
+
+                                    const calPctDay = targets.calories
+                                        ? Math.min(100, Math.round((dayTotals.calories / targets.calories) * 100))
+                                        : 0
+
+                                    return (
+                                        <div key={date}>
+                                            {/* Day header */}
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-bold text-foreground">{fmtHistoryDate(date)}</span>
+                                                    <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                                        {calPctDay}% of target
+                                                    </span>
+                                                </div>
+                                                <span className="text-xs font-semibold text-foreground tabular-nums">
+                                                    {dayTotals.calories.toLocaleString()} kcal
+                                                    <span className="font-normal text-muted-foreground ml-1">· {fmt(dayTotals.protein)}g P</span>
+                                                </span>
+                                            </div>
+
+                                            {/* Meals grouped by type */}
+                                            <div className="space-y-4">
+                                                {dayMealsByType.map(({ type, logs: typeLogs }) => (
+                                                    <div key={type}>
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                                                                {MEAL_ICONS[type]}
+                                                                <span className="text-[10px] font-bold uppercase tracking-widest">{MEAL_LABELS[type]}</span>
+                                                            </div>
+                                                            <div className="flex-1 h-px bg-border" />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            {typeLogs.map(log => {
+                                                                const m = calcMacros(log)
+                                                                return (
+                                                                    <div
+                                                                        key={log.id}
+                                                                        onClick={() => setSelectedLog(log)}
+                                                                        className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between gap-4 hover:border-primary/30 transition-colors cursor-pointer"
+                                                                    >
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <div className="text-sm font-medium text-foreground truncate">{log.food_items?.name ?? '—'}</div>
+                                                                            <div className="text-[11px] text-muted-foreground mt-0.5 flex gap-2">
+                                                                                <span>{log.quantity_g}g</span>
+                                                                                <span className="text-border">·</span>
+                                                                                <span>{fmt(m.protein)}g P</span>
+                                                                                <span className="text-border">·</span>
+                                                                                <span>{fmt(m.carbs)}g C</span>
+                                                                                <span className="text-border">·</span>
+                                                                                <span>{fmt(m.fat)}g F</span>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-right shrink-0">
+                                                                            <div className="text-sm font-bold text-foreground tabular-nums">{m.calories}</div>
+                                                                            <div className="text-[10px] text-muted-foreground uppercase">kcal</div>
+                                                                        </div>
+                                                                    </div>
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

@@ -14,7 +14,9 @@ import { DatePicker } from '@/components/ui/date-picker'
 import {
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
@@ -36,6 +38,7 @@ interface FormState {
     username: string
     rank: string
     wing: string
+    service: string
     height_cm: string
     weight_kg: string
     date_of_birth: string
@@ -67,7 +70,8 @@ const TABS: { id: TabId; label: string; desc: string; icon: React.ReactNode }[] 
     { id: 'appear', label: 'Appearance', desc: 'Theme, units and language', icon: <SunIcon /> },
 ]
 
-const RANKS = ['OCT', 'ME4T', '2LT', 'LTA', 'CPT', 'MAJ', 'LTC', 'SLTC', 'COL']
+const OFFICER_RANKS = ['OCT', '2LT', 'LTA', 'CPT', 'MAJ', 'LTC', 'SLTC', 'COL']
+const ME_RANKS = ['ME1', 'ME2', 'ME3', 'ME4', 'ME4T', 'ME5', 'ME6', 'ME7', 'ME8']
 
 const ACTIVITY_LEVELS = [
     { value: 'sedentary', label: 'Sedentary', description: 'Little to no exercise' },
@@ -185,7 +189,7 @@ const NAV_GROUPS: { label: string; ids: TabId[] }[] = [
 // Uses design-system tokens so it inherits light/dark automatically
 function SCard({ children, className }: { children: React.ReactNode; className?: string }) {
     return (
-        <div className={cn('bg-card border border-border rounded-xl p-6 text-card-foreground', className)}>
+        <div className={cn('bg-card border border-border rounded-xl p-4 text-card-foreground sm:p-6', className)}>
             {children}
         </div>
     )
@@ -262,6 +266,12 @@ export default function SettingsPage() {
     }
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [services, setServices] = useState<string[]>([])
+    useEffect(() => {
+        supabase.from('ocs_services').select('name').order('sort_order').then(({ data }) => {
+            if (data) setServices(data.map(s => s.name))
+        })
+    }, [])
     const [toast, setToast] = useState<string | null>(null)
     const [pwDialog, setPwDialog] = useState(false)
     const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
@@ -273,7 +283,7 @@ export default function SettingsPage() {
     const [deleting, setDeleting] = useState(false)
 
     const defaultForm: FormState = {
-        full_name: '', username: '', rank: '', wing: '',
+        full_name: '', username: '', rank: '', wing: '', service: '',
         height_cm: '', weight_kg: '', date_of_birth: '', gender: '',
         activity_level: 'moderate', goal_mode: 'bulk', ippt_date: '',
         target_weight_kg: '', weight_goal_date: '',
@@ -301,6 +311,7 @@ export default function SettingsPage() {
                     username: data.username ?? '',
                     rank: data.rank ?? '',
                     wing: data.wing ?? '',
+                    service: data.service ?? '',
                     height_cm: data.height_cm?.toString() ?? '',
                     weight_kg: data.weight_kg?.toString() ?? '',
                     date_of_birth: data.date_of_birth ?? '',
@@ -326,7 +337,7 @@ export default function SettingsPage() {
                 setGoalMode(loaded.goal_mode)
             })
             .then(() => setLoading(false))
-    }, [user])
+    }, [user, setGoalMode, setTheme])
 
     const showToast = (msg: string) => {
         setToast(msg)
@@ -357,6 +368,7 @@ export default function SettingsPage() {
             full_name: form.full_name,
             username: form.username,
             rank: form.rank,
+            service: form.service || null,
             height_cm: parseFloat(form.height_cm) || null,
             weight_kg: parseFloat(form.weight_kg) || null,
             date_of_birth: form.date_of_birth || null,
@@ -435,6 +447,7 @@ export default function SettingsPage() {
     const goal = GOALS.find(g => g.key === form.goal_mode) ?? GOALS[0]
     const derived = calcDerived(form.height_cm, form.weight_kg, form.date_of_birth, form.gender)
     const initials = form.full_name?.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'U'
+    const [renderedAt] = useState(() => Date.now())
 
     if (loading) {
         return (
@@ -446,7 +459,7 @@ export default function SettingsPage() {
 
     // ── Secondary nav sidebar ─────────────────────────────
     const secondarySidebar = (
-        <aside className="w-[196px] flex-shrink-0 h-full flex flex-col  border-r border-sidebar-border overflow-y-auto py-3">
+        <aside className="hidden w-[196px] flex-shrink-0 h-full flex-col border-r border-sidebar-border overflow-y-auto py-3 md:flex">
             {NAV_GROUPS.map(({ label, ids }, gi) => (
                 <div key={label} className={cn('flex flex-col', gi > 0 && 'mt-4')}>
                     <div className="px-4 pt-1 pb-1.5 text-[10px] font-semibold tracking-[0.12em] uppercase text-sidebar-foreground/40 select-none">
@@ -483,6 +496,51 @@ export default function SettingsPage() {
 
     const tabMeta = TABS.find(t => t.id === active)!
 
+    const mobileTabPicker = (
+        <div className="mb-5 md:hidden">
+            <FieldLabel label="Settings section">
+                <Select value={active} onValueChange={value => changeTab(value as TabId)}>
+                    <SelectTrigger className="h-11 w-full">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {NAV_GROUPS.map(group => (
+                            <SelectGroup key={group.label}>
+                                <SelectLabel>{group.label}</SelectLabel>
+                                {group.ids.map(id => {
+                                    const tab = TABS.find(t => t.id === id)!
+                                    return (
+                                        <SelectItem key={tab.id} value={tab.id}>
+                                            {tab.label}
+                                        </SelectItem>
+                                    )
+                                })}
+                            </SelectGroup>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </FieldLabel>
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {TABS.map(tab => (
+                    <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => changeTab(tab.id)}
+                        className={cn(
+                            'inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-[12px] font-semibold transition-colors',
+                            active === tab.id
+                                ? 'border-primary bg-primary text-white'
+                                : 'border-border bg-card text-muted-foreground',
+                        )}
+                    >
+                        {tab.icon}
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+        </div>
+    )
+
     const header = (
         <div className="mb-7">
             <div className="text-[11px] font-bold tracking-[0.14em] uppercase text-muted-foreground mb-2">
@@ -504,20 +562,29 @@ export default function SettingsPage() {
                         <div className="text-[12px] text-muted-foreground mt-0.5">{form.wing} Wing</div>
                     </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3.5">
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                     <InputField label="Full name" value={form.full_name} onChange={e => set('full_name', e.target.value)} />
                     <InputField label="Username" value={form.username} onChange={e => set('username', e.target.value)} />
                     <FieldLabel label="Rank">
                         <Select value={form.rank} onValueChange={v => set('rank', v)}>
                             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                            <SelectContent>{RANKS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                            <SelectContent>
+                                    <SelectGroup>
+                                        <SelectLabel>Officer</SelectLabel>
+                                        {OFFICER_RANKS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                                    </SelectGroup>
+                                    <SelectGroup>
+                                        <SelectLabel>Military Expert</SelectLabel>
+                                        {ME_RANKS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                                    </SelectGroup>
+                                </SelectContent>
                         </Select>
                     </FieldLabel>
                     <InputField label="Email" value={user?.email ?? ''} disabled />
                 </div>
             </SCard>
             <SCard>
-                <div className="flex flex-row w-full justify-between items-center">
+                <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-col gap-1">
                         <div className="font-display text-[15px] font-bold text-foreground">Password & security</div>
                         <div className="text-[12px] text-muted-foreground">Keep your account secure with a strong password.</div>
@@ -544,20 +611,20 @@ export default function SettingsPage() {
                 </FieldLabel>
             </SCard>
             <SCard>
-                <div className="grid grid-cols-3 gap-3.5 mb-5">
+                <div className="grid grid-cols-1 gap-3.5 mb-5 sm:grid-cols-3">
                     <InputField label="Height" hint="cm" type="number" value={form.height_cm} onChange={e => set('height_cm', e.target.value)} suffix="cm" />
                     <InputField label="Weight" hint="kg" type="number" value={form.weight_kg} onChange={e => set('weight_kg', e.target.value)} suffix="kg" />
                     <FieldLabel label="Date of Birth">
                         <DatePicker value={form.date_of_birth} onChange={v => set('date_of_birth', v)} className='mt-2' toDate={new Date()} />
                     </FieldLabel>
                 </div>
-                <div className="grid grid-cols-3 bg-muted border border-border rounded-[10px] overflow-hidden">
+                <div className="grid grid-cols-1 bg-muted border border-border rounded-[10px] overflow-hidden sm:grid-cols-3">
                     {[
                         { l: 'BMI', v: derived.bmi, s: derived.bmiClass },
                         { l: 'BMR', v: derived.bmr, s: 'kcal at rest' },
                         { l: 'TDEE', v: derived.tdee, s: 'kcal w/ training' },
                     ].map((r, i) => (
-                        <div key={r.l} className={cn('p-3.5', i < 2 && 'border-r border-border')}>
+                        <div key={r.l} className={cn('p-3.5', i < 2 && 'border-b border-border sm:border-b-0 sm:border-r')}>
                             <div className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground">{r.l}</div>
                             <div className="font-display text-[22px] font-bold text-foreground tracking-tight mt-0.5">{r.v}</div>
                             <div className="text-[11px] text-muted-foreground mt-0.5">{r.s}</div>
@@ -608,7 +675,7 @@ export default function SettingsPage() {
             <SCard>
                 <div className="font-display text-[15px] font-bold text-foreground mb-1">Goal mode</div>
                 <div className="text-[13px] text-muted-foreground mb-4">Your current nutritional objective. Targets are recalculated when you change this.</div>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                     {GOALS.map(g => {
                         const isActive = g.key === form.goal_mode
                         return (
@@ -651,7 +718,7 @@ export default function SettingsPage() {
                     <DatePicker value={form.ippt_date} onChange={v => set('ippt_date', v)} className="mt-2" />
                 </FieldLabel>
                 {form.ippt_date && (() => {
-                    const days = Math.ceil((new Date(form.ippt_date).getTime() - Date.now()) / 86_400_000)
+                    const days = Math.ceil((new Date(form.ippt_date).getTime() - renderedAt) / 86_400_000)
                     if (days < 0) return (
                         <div className="mt-3 text-[12px] text-muted-foreground">IPPT date has passed — update it when your next one is scheduled.</div>
                     )
@@ -667,7 +734,7 @@ export default function SettingsPage() {
             <SCard>
                 <div className="font-display text-[15px] font-bold text-foreground mb-1">Body target</div>
                 <div className="text-[13px] text-muted-foreground mb-4">Set a target weight and optional deadline. The Progress page will track your trajectory.</div>
-                <div className="grid grid-cols-2 gap-3.5">
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                     <InputField
                         label="Target weight"
                         hint="kg"
@@ -714,7 +781,21 @@ export default function SettingsPage() {
                 </div>
             </SCard>
             <SCard>
-                <div className="grid grid-cols-2 gap-3.5">
+                <div className="font-display text-[15px] font-bold text-foreground mb-1">Service</div>
+                <div className="text-[13px] text-muted-foreground mb-3">Your service branch. This tailors AI coaching insights to your training curriculum.</div>
+                <FieldLabel label="Service">
+                    <Select value={form.service} onValueChange={v => set('service', v)}>
+                        <SelectTrigger className="w-full"><SelectValue placeholder="Select service" /></SelectTrigger>
+                        <SelectContent>
+                            {services.map(name => (
+                                <SelectItem key={name} value={name}>{name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </FieldLabel>
+            </SCard>
+            <SCard>
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                     <InputField label="Platoon" value={form.platoon} onChange={e => set('platoon', e.target.value)} placeholder="e.g. 1" />
                     <InputField label="Section" value={form.section} onChange={e => set('section', e.target.value)} placeholder="e.g. A" />
                 </div>
@@ -734,12 +815,12 @@ export default function SettingsPage() {
             <div className="flex flex-col divide-y divide-border">
                 {NOTIFS.map(n => (
                     <div key={n.id} className="flex flex-col gap-2 py-3.5">
-                        <div className="flex items-center gap-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                             <div className="flex-1">
                                 <div className="text-[14px] font-semibold text-foreground">{n.label}</div>
                                 <div className="text-[12px] text-muted-foreground mt-0.5">{n.desc}</div>
                             </div>
-                            <div className="flex gap-1.5">
+                            <div className="flex gap-1.5 sm:ml-auto">
                                 {n.channels.map(c => (
                                     <span key={c} className="px-2 py-0.5 bg-muted border border-border rounded-full text-[10px] font-semibold tracking-wide uppercase text-muted-foreground">{c}</span>
                                 ))}
@@ -747,7 +828,7 @@ export default function SettingsPage() {
                             <Toggle value={form.notifs[n.id]} onChange={v => setForm(f => ({ ...f, notifs: { ...f.notifs, [n.id]: v } }))} />
                         </div>
                         {n.id === 'weekly_summary' && form.notifs['weekly_summary'] && (
-                            <div className="flex items-center gap-2 ml-0 mt-1">
+                            <div className="flex flex-wrap items-center gap-2 ml-0 mt-1">
                                 <span className="text-[12px] text-muted-foreground">Send on</span>
                                 <Select value={form.weekly_recap_day} onValueChange={v => set('weekly_recap_day', v)}>
                                     <SelectTrigger className="h-8 w-32 text-[12px]">
@@ -787,7 +868,7 @@ export default function SettingsPage() {
             </div>
             <SCard>
                  <div className="font-display text-[15px] font-bold text-foreground">Privacy</div>
-                <div className="text-[13px] text-muted-foreground mb-3">Manage your account's privacy preferences.</div>
+                <div className="text-[13px] text-muted-foreground mb-3">Manage your account&apos;s privacy preferences.</div>
                 <div className="flex flex-col divide-y divide-border">
                     {PRIVACY.map(p => (
                         <div key={p.id} className="flex items-center gap-4 py-3.5">
@@ -802,10 +883,10 @@ export default function SettingsPage() {
             </SCard>
             <SCard>
                 <div className="font-display text-[15px] font-bold text-foreground">Personal Data</div>
-                <div className="text-[13px] text-muted-foreground mb-3">Manage your account's personal information and data preferences.</div>
+                <div className="text-[13px] text-muted-foreground mb-3">Manage your account&apos;s personal information and data preferences.</div>
                 <div className="flex flex-col divide-y divide-border">
                     {DATA.map(p => (
-                        <div key={p.id} className="flex items-center gap-4 py-3.5">
+                        <div key={p.id} className="flex flex-col gap-3 py-3.5 sm:flex-row sm:items-center sm:gap-4">
                             <div className="flex-1">
                                 <div className="text-[14px] font-semibold text-foreground">{p.label}</div>
                                 <div className="text-[12px] text-muted-foreground mt-0.5">{p.desc}</div>
@@ -840,7 +921,7 @@ export default function SettingsPage() {
                     { label: 'Weight units', desc: 'Used across logs and stat displays.', key: 'units_weight' as const, options: [{ value: 'kg', label: 'kg' }, { value: 'lb', label: 'lb' }] },
                     { label: 'Height units', desc: 'cm or feet/inches.', key: 'units_height' as const, options: [{ value: 'cm', label: 'cm' }, { value: 'in', label: 'ft / in' }] },
                 ]).map(row => (
-                    <div key={row.label} className="flex items-center justify-between gap-4">
+                    <div key={row.label} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
                             <div className="text-[14px] font-semibold text-foreground">{row.label}</div>
                             <div className="text-[12px] text-muted-foreground">{row.desc}</div>
@@ -868,8 +949,9 @@ export default function SettingsPage() {
     return (
         <div className="flex h-full overflow-hidden relative bg-background">
             {secondarySidebar}
-            <main className="flex-1 overflow-y-auto px-10 py-9 pb-24">
+            <main className="flex-1 overflow-y-auto px-4 py-6 pb-32 sm:px-6 md:px-10 md:py-9 md:pb-24">
                 <div className="max-w-[680px]">
+                    {mobileTabPicker}
                     {header}
                     <div key={active} className="animate-in fade-in slide-in-from-bottom-2 duration-200">
                         {sections[active]}
@@ -878,7 +960,7 @@ export default function SettingsPage() {
             </main>
 
             {dirty && (
-                <div className="absolute left-1/2 bottom-6 -translate-x-1/2 flex items-center gap-2 bg-[#091E42] text-white rounded-full px-4 py-1.5 shadow-xl z-50 animate-in fade-in slide-in-from-bottom-3 duration-200" style={{ paddingLeft: 18 }}>
+                <div className="absolute inset-x-4 bottom-24 flex flex-wrap items-center justify-center gap-2 rounded-2xl bg-[#091E42] px-4 py-2 text-white shadow-xl z-50 animate-in fade-in slide-in-from-bottom-3 duration-200 md:inset-x-auto md:left-1/2 md:bottom-6 md:-translate-x-1/2 md:flex-nowrap md:rounded-full md:py-1.5" style={{ paddingLeft: 18 }}>
                     <span className="w-1.5 h-1.5 rounded-full bg-warning flex-shrink-0" />
                     <span className="text-[12px] font-medium mr-1.5">Unsaved changes</span>
                     <Button variant="ghost" size="sm" onClick={() => setForm(orig)} className="rounded-full text-white/75 hover:text-white hover:bg-white/[0.14] h-7 px-3">

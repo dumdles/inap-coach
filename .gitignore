@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Codex local config (may contain access tokens)
+.codex/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

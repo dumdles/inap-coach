@@ -42,6 +42,8 @@ export default function RootLayout({
         <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0A1428" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <link rel="preconnect" href="https://api.fontshare.com" />
+        <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,800&display=swap" />
       </head>
       <body className="min-h-full flex flex-col"><ThemeProvider><AuthProvider>{children}<Toaster /></AuthProvider></ThemeProvider></body>
     </html>

@@ -5,6 +5,7 @@ import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { calculateTDEE } from '@/lib/tdee'
 import { LogMealDialog } from '@/components/nutrition/log-meal-dialog'
+import { LogIPPTDialog } from '@/components/ippt/log-ippt-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import {
@@ -404,6 +405,10 @@ export default function DashboardPage() {
     const [aiSummary, setAiSummary]           = useState<string | null>(null)
     const [aiLoading, setAiLoading]           = useState(true)
 
+    // Track whether the user has already logged a result for their past IPPT date
+    const [ipptResultLogged, setIpptResultLogged] = useState<boolean | null>(null)
+    const [logIPPTOpen, setLogIPPTOpen]           = useState(false)
+
     // Fetch user profile
     useEffect(() => {
         if (!user) return
@@ -417,6 +422,20 @@ export default function DashboardPage() {
                 setProfileLoading(false)
             })
     }, [user])
+
+    // After profile loads, check if we should prompt for a post-IPPT result
+    useEffect(() => {
+        if (!user || !profile?.ippt_date) { setIpptResultLogged(null); return }
+        const daysPast = Math.floor((Date.now() - new Date(profile.ippt_date).getTime()) / 86_400_000)
+        if (daysPast < 0) { setIpptResultLogged(null); return }  // not yet passed
+        fetch(`/api/ippt-results?userId=${user.id}`)
+            .then(r => r.json())
+            .then((results: { test_date: string }[]) => {
+                const hasResult = results.some(r => r.test_date === profile.ippt_date)
+                setIpptResultLogged(hasResult)
+            })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, profile?.ippt_date])
 
     // Fetch today's meals
     const fetchMeals = useCallback(async () => {
@@ -759,13 +778,11 @@ export default function DashboardPage() {
                         workoutsLoading={workoutsLoading}
                     />
 
-                    {/* IPPT countdown */}
+                    {/* IPPT: countdown (upcoming) or post-test result prompt (passed) */}
                     {!profileLoading && ipptDaysLeft !== null && ipptDaysLeft >= 0 && (
                         <div
                             className="rounded-2xl p-5 flex items-center gap-4"
-                            style={{
-                                background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)',
-                            }}
+                            style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)' }}
                         >
                             <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
                                 <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -785,9 +802,30 @@ export default function DashboardPage() {
                                 </div>
                             </div>
                             <div className="font-display font-extrabold text-white/20 text-[36px] shrink-0 tabular-nums">
-                                {ipptDaysLeft === 0 ? '!' : ipptDaysLeft > 99 ? ipptDaysLeft : ipptDaysLeft}
+                                {ipptDaysLeft === 0 ? '!' : ipptDaysLeft}
                             </div>
                         </div>
+                    )}
+
+                    {/* Post-IPPT: prompt to log result if test date has passed and no result yet */}
+                    {!profileLoading && ipptDaysLeft !== null && ipptDaysLeft < 0 && ipptResultLogged === false && (
+                        <button
+                            onClick={() => setLogIPPTOpen(true)}
+                            className="w-full rounded-2xl border-2 border-dashed border-warning/40 bg-warning/5 p-5 flex items-center gap-4 hover:bg-warning/10 transition-colors text-left group"
+                        >
+                            <div className="w-10 h-10 rounded-xl bg-warning/15 flex items-center justify-center shrink-0">
+                                <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-warning-dark dark:text-yellow-400">
+                                    <path d="M6 4v16M18 4v16M2 8h4M18 8h4M2 16h4M18 16h4M6 12h12" />
+                                </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="text-[13px] font-semibold text-foreground">How did your IPPT go?</div>
+                                <div className="text-[11px] text-muted-foreground mt-0.5">Log your result to track your progress over time.</div>
+                            </div>
+                            <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0">
+                                <path d="M9 18l6-6-6-6" />
+                            </svg>
+                        </button>
                     )}
 
                     {/* Prompt to set IPPT date if not set */}
@@ -812,6 +850,13 @@ export default function DashboardPage() {
             </div>
 
             <LogMealDialog open={logMealOpen} onOpenChange={open => { setLogMealOpen(open); if (!open) fetchMeals() }} />
+            <LogIPPTDialog
+                open={logIPPTOpen}
+                onClose={() => setLogIPPTOpen(false)}
+                userId={user?.id ?? ''}
+                prefillDate={profile?.ippt_date ?? undefined}
+                onSaved={() => setIpptResultLogged(true)}
+            />
         </div>
     )
 }

@@ -28,8 +28,8 @@ export async function GET(req: NextRequest) {
     if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
 
     // Resolve user list
-    const USER_FIELDS = 'id, full_name, rank, wing, goal_mode'
-    let users: { id: string; full_name: string; rank: string; wing: string; goal_mode: string | null }[] = []
+    const USER_FIELDS = 'id, full_name, rank, wing, platoon, section, goal_mode'
+    let users: { id: string; full_name: string; rank: string; wing: string; platoon: string | null; section: string | null; goal_mode: string | null }[] = []
 
     if (scope === 'wing' && wing) {
         const { data, error } = await supabaseAdmin

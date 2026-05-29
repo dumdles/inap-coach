@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
@@ -8,6 +8,34 @@ import { cn } from '@/lib/utils'
 import { isInstructor } from '@/lib/scoring'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useRouter } from 'next/navigation'
+import gsap from 'gsap'
+import { ArrowLeftRight, ChevronRight, Flame, MoreHorizontal, Utensils } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
     ScatterChart, Scatter, ZAxis, ReferenceLine,
@@ -22,12 +50,18 @@ type CadetRow = {
     full_name: string
     rank: string
     wing: string
+    platoon: string | null
+    section: string | null
     goal_mode: GoalMode | null
     score: number
     streak: number
     mealsToday: number
     position: number
 }
+
+type AdminAction = 'remove_section' | 'assign_section' | 'transfer_wing'
+
+type AdminConfirm = { cadetId: string; cadetName: string } | null
 
 // ── Goal mode meta ────────────────────────────────────────────────────────────
 
@@ -90,6 +124,134 @@ function MealDots({ count }: { count: number }) {
                 <div key={i} className={cn('w-2.5 h-2.5 rounded-full', i < count ? 'bg-primary' : 'bg-muted')} />
             ))}
         </div>
+    )
+}
+
+function StatusBadge({ mealsToday }: { mealsToday: number }) {
+    const notLogged = mealsToday === 0
+
+    return (
+        <Badge
+            variant="outline"
+            className={cn(
+                'h-6 rounded-full border-transparent px-2.5 text-[11px] font-semibold',
+                notLogged
+                    ? 'bg-destructive/10 text-destructive'
+                    : mealsToday >= 3
+                        ? 'bg-success/10 text-success'
+                        : 'bg-warning/10 text-warning-dark',
+            )}
+        >
+            {notLogged ? 'Not logged' : mealsToday >= 3 ? 'On track' : 'Partial'}
+        </Badge>
+    )
+}
+
+type AssignmentDialogProps = {
+    cadet: CadetRow | null
+    currentWing: string
+    availableWings: string[]
+    transferSection: string
+    transferWing: string
+    adminWorking: boolean
+    onTransferSectionChange: (value: string) => void
+    onTransferWingChange: (value: string) => void
+    onAction: (cadetId: string, action: AdminAction) => void
+    onClose: () => void
+}
+
+function AssignmentDialog({
+    cadet,
+    currentWing,
+    availableWings,
+    transferSection,
+    transferWing,
+    adminWorking,
+    onTransferSectionChange,
+    onTransferWingChange,
+    onAction,
+    onClose,
+}: AssignmentDialogProps) {
+    return (
+        <Dialog open={Boolean(cadet)} onOpenChange={open => { if (!open) onClose() }}>
+            <DialogContent className="gap-5 rounded-2xl sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Manage assignment</DialogTitle>
+                    <DialogDescription>
+                        {cadet ? `${cadet.rank} ${cadet.full_name} · ${cadet.platoon ?? 'No platoon'}${cadet.section ? ` · Section ${cadet.section}` : ''}` : 'Update cadet assignment.'}
+                    </DialogDescription>
+                </DialogHeader>
+
+                {cadet && (
+                    <div className="grid gap-4">
+                        <div className="rounded-xl border border-border bg-muted/30 p-4">
+                            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                Section{cadet.section ? ` · currently Sec ${cadet.section}` : ''}
+                            </p>
+                            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                                <Select value={transferSection} onValueChange={onTransferSectionChange}>
+                                    <SelectTrigger className="h-11">
+                                        <SelectValue placeholder="Select section..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {['1', '2', '3', '4'].map(s => (
+                                            <SelectItem key={s} value={s}>Section {s}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    onClick={() => onAction(cadet.id, 'assign_section')}
+                                    disabled={adminWorking || !transferSection}
+                                    isLoading={adminWorking && Boolean(transferSection)}
+                                    className="w-full sm:w-auto"
+                                >
+                                    Assign
+                                </Button>
+                            </div>
+                            {cadet.section && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onAction(cadet.id, 'remove_section')}
+                                    disabled={adminWorking}
+                                    className="mt-3 text-muted-foreground"
+                                >
+                                    Remove from section
+                                </Button>
+                            )}
+                        </div>
+
+                        <div className="rounded-xl border border-border bg-muted/30 p-4">
+                            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Transfer wing</p>
+                            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                                <Select value={transferWing} onValueChange={onTransferWingChange}>
+                                    <SelectTrigger className="h-11">
+                                        <SelectValue placeholder="Select wing..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availableWings.filter(w => w !== currentWing).map(w => (
+                                            <SelectItem key={w} value={w}>{w} Wing</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    onClick={() => onAction(cadet.id, 'transfer_wing')}
+                                    disabled={adminWorking || !transferWing}
+                                    isLoading={adminWorking && Boolean(transferWing)}
+                                    className="w-full sm:w-auto"
+                                >
+                                    Transfer
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose} disabled={adminWorking}>Cancel</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     )
 }
 
@@ -378,6 +540,14 @@ export default function WingPage() {
     const [period, setPeriod] = useState<'week' | 'month'>('week')
     const [loading, setLoading] = useState(true)
     const [sortBy, setSortBy] = useState<'score' | 'streak' | 'name'>('score')
+    const [availableWings, setAvailableWings] = useState<string[]>([])
+    const [filterSection, setFilterSection] = useState<string | null>(null)
+    const [filterPlatoon, setFilterPlatoon] = useState<string | null>(null)
+    const [adminConfirm, setAdminConfirm] = useState<AdminConfirm>(null)
+    const [transferWing, setTransferWing] = useState('')
+    const [transferSection, setTransferSection] = useState('')
+    const [adminWorking, setAdminWorking] = useState(false)
+    const cadetListRef = useRef<HTMLDivElement | null>(null)
 
     useEffect(() => {
         if (!user) return
@@ -387,6 +557,10 @@ export default function WingPage() {
                 setProfile(data)
                 if (!isInstructor(data.rank)) router.replace('/dashboard')
             })
+        // Fetch all wings from the reference table (not distinct user values, so the list is always complete)
+        supabase.from('ocs_wings').select('name').order('name').then(({ data }) => {
+            if (data) setAvailableWings(data.map(w => w.name))
+        })
     }, [user, router])
 
     const fetchCadets = useCallback(async () => {
@@ -400,21 +574,78 @@ export default function WingPage() {
         setLoading(false)
     }, [user, profile, period])
 
-    useEffect(() => { fetchCadets() }, [fetchCadets])
+    useEffect(() => {
+        queueMicrotask(() => {
+            void fetchCadets()
+        })
+    }, [fetchCadets])
 
-    const sorted = [...cadets].sort((a, b) => {
+    // Derive unique sections and platoons for filter chips
+    const allSections = useMemo(() =>
+        [...new Set(cadets.map(c => c.section).filter(Boolean) as string[])].sort(),
+    [cadets])
+    const allPlatoons = useMemo(() =>
+        [...new Set(cadets.map(c => c.platoon).filter(Boolean) as string[])].sort(),
+    [cadets])
+
+    const handleAdminAction = async (cadetId: string, action: AdminAction) => {
+        if (!user) return
+        setAdminWorking(true)
+        try {
+            const body: Record<string, string> = { requesterId: user.id, cadetId, action }
+            if (action === 'transfer_wing') body.newWing = transferWing
+            if (action === 'assign_section') body.newSection = transferSection
+            const res = await fetch('/api/cadet-admin', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            })
+            if (!res.ok) throw new Error((await res.json()).error ?? 'Failed')
+            if (action === 'remove_section') {
+                setCadets(prev => prev.map(c => c.id === cadetId ? { ...c, section: null } : c))
+            } else if (action === 'assign_section') {
+                setCadets(prev => prev.map(c => c.id === cadetId ? { ...c, section: transferSection } : c))
+            } else {
+                // transfer_wing — remove from this wing's view entirely
+                setCadets(prev => prev.filter(c => c.id !== cadetId))
+            }
+        } finally {
+            setAdminWorking(false)
+            setAdminConfirm(null)
+            setTransferWing('')
+            setTransferSection('')
+        }
+    }
+
+    const filtered = cadets.filter(c =>
+        (!filterSection || c.section === filterSection) &&
+        (!filterPlatoon || c.platoon === filterPlatoon),
+    )
+
+    const sorted = [...filtered].sort((a, b) => {
         if (sortBy === 'score')  return b.score - a.score
         if (sortBy === 'streak') return b.streak - a.streak
         return a.full_name.localeCompare(b.full_name)
     })
+    const selectedCadet = adminConfirm ? cadets.find(c => c.id === adminConfirm.cadetId) ?? null : null
 
-    // Derived stats
-    const loggingToday   = cadets.filter(c => c.mealsToday > 0).length
-    const notLoggedToday = cadets.filter(c => c.mealsToday === 0)
-    const avgScore       = cadets.length ? Math.round(cadets.reduce((s, c) => s + c.score, 0) / cadets.length) : 0
-    const topStreak      = cadets.reduce((max, c) => Math.max(max, c.streak), 0)
-    const complianceRate = cadets.length ? Math.round((loggingToday / cadets.length) * 100) : 0
-    const topStreaker    = cadets.reduce((best, c) => c.streak > (best?.streak ?? 0) ? c : best, cadets[0])
+    useEffect(() => {
+        if (loading || !cadetListRef.current) return
+        const rows = cadetListRef.current.querySelectorAll('[data-cadet-row]')
+        gsap.fromTo(
+            rows,
+            { autoAlpha: 0, y: 14 },
+            { autoAlpha: 1, y: 0, duration: 0.38, ease: 'power2.out', stagger: 0.035, overwrite: true },
+        )
+    }, [loading, sortBy, filterSection, filterPlatoon, sorted.length])
+
+    // Derived stats (from filtered set so filters affect overview cards too)
+    const loggingToday   = filtered.filter(c => c.mealsToday > 0).length
+    const notLoggedToday = filtered.filter(c => c.mealsToday === 0)
+    const avgScore       = filtered.length ? Math.round(filtered.reduce((s, c) => s + c.score, 0) / filtered.length) : 0
+    const topStreak      = filtered.reduce((max, c) => Math.max(max, c.streak), 0)
+    const complianceRate = filtered.length ? Math.round((loggingToday / filtered.length) * 100) : 0
+    const topStreaker    = filtered.reduce((best, c) => c.streak > (best?.streak ?? 0) ? c : best, filtered[0])
 
     if (!profile || !isInstructor(profile.rank)) return null
 
@@ -447,12 +678,67 @@ export default function WingPage() {
                 </div>
             </div>
 
+            {/* ── Section / Platoon filters ───────────────────────────────────── */}
+            {(allSections.length > 0 || allPlatoons.length > 0) && (
+                <div className="flex flex-wrap items-center gap-2 mb-6">
+                    {allPlatoons.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Platoon</span>
+                            {allPlatoons.map(p => (
+                                <button
+                                    key={p}
+                                    onClick={() => setFilterPlatoon(filterPlatoon === p ? null : p)}
+                                    className={cn(
+                                        'px-3 py-1 rounded-full text-xs font-medium border transition-all',
+                                        filterPlatoon === p
+                                            ? 'bg-foreground text-background border-foreground'
+                                            : 'border-border text-muted-foreground hover:text-foreground',
+                                    )}
+                                >
+                                    {p}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {allSections.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            {allPlatoons.length > 0 && <div className="w-px h-4 bg-border mx-1" />}
+                            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Section</span>
+                            {allSections.map(s => (
+                                <button
+                                    key={s}
+                                    onClick={() => setFilterSection(filterSection === s ? null : s)}
+                                    className={cn(
+                                        'px-3 py-1 rounded-full text-xs font-medium border transition-all',
+                                        filterSection === s
+                                            ? 'bg-foreground text-background border-foreground'
+                                            : 'border-border text-muted-foreground hover:text-foreground',
+                                    )}
+                                >
+                                    {s}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {(filterSection || filterPlatoon) && (
+                        <button
+                            onClick={() => { setFilterSection(null); setFilterPlatoon(null) }}
+                            className="text-[11px] text-muted-foreground hover:text-foreground ml-1 underline underline-offset-2"
+                        >
+                            Clear
+                        </button>
+                    )}
+                </div>
+            )}
+
             {/* ── Stat cards ─────────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div className="rounded-2xl bg-card border border-border p-5">
                     <div className="text-xs text-muted-foreground mb-2">Cadets</div>
-                    <div className="font-display font-extrabold text-3xl text-foreground">{cadets.length}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{profile.wing} Wing</div>
+                    <div className="font-display font-extrabold text-3xl text-foreground">{filtered.length}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                        {filterSection || filterPlatoon ? `${filtered.length} of ${cadets.length} shown` : `${profile.wing} Wing`}
+                    </div>
                 </div>
 
                 <div className="rounded-2xl bg-card border border-border p-5">
@@ -509,20 +795,20 @@ export default function WingPage() {
                         <Skeleton className="h-40 rounded-2xl" />
                     </div>
                 </div>
-            ) : cadets.length > 0 ? (
+            ) : filtered.length > 0 ? (
                 <>
                     {/* Row 1: Score bar (left) + Goal donut + Streak histogram (right) */}
                     <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 mb-4">
-                        <ScoreChart cadets={cadets} />
+                        <ScoreChart cadets={filtered} />
                         <div className="flex flex-col gap-4">
-                            <GoalDonut cadets={cadets} />
-                            <StreakHistogram cadets={cadets} />
+                            <GoalDonut cadets={filtered} />
+                            <StreakHistogram cadets={filtered} />
                         </div>
                     </div>
 
                     {/* Row 2: Scatter chart full-width */}
                     <div className="mb-4">
-                        <EngagementScatter cadets={cadets} />
+                        <EngagementScatter cadets={filtered} />
                     </div>
                 </>
             ) : null}
@@ -533,7 +819,7 @@ export default function WingPage() {
                     <div className="flex items-center gap-2 mb-3">
                         <div className="w-2 h-2 rounded-full bg-danger shrink-0" />
                         <h3 className="text-[13px] font-semibold text-foreground">
-                            {notLoggedToday.length} cadet{notLoggedToday.length !== 1 ? 's' : ''} haven't logged today
+                            {notLoggedToday.length} cadet{notLoggedToday.length !== 1 ? 's' : ''} haven&apos;t logged today
                         </h3>
                         <span className="ml-auto text-[10px] text-muted-foreground">{complianceRate}% compliance</span>
                     </div>
@@ -580,103 +866,174 @@ export default function WingPage() {
 
             {/* ── Cadet table ──────────────────────────────────────────────────── */}
             {loading ? (
-                <div className="rounded-2xl border border-border bg-card overflow-hidden">
-                    <div className="grid grid-cols-[32px_1fr_120px_100px_90px_90px] gap-4 px-5 py-3 border-b border-border bg-muted/40 min-w-[640px]">
-                        {['#', 'Cadet', 'Score', 'Streak (7d)', "Today's meals", 'Status'].map(h => (
-                            <Skeleton key={h} className="h-3 w-full max-w-[80px]" />
-                        ))}
-                    </div>
+                <div className="grid gap-3">
                     {[0, 1, 2, 3, 4, 5].map(i => (
-                        <div key={i} className="grid grid-cols-[32px_1fr_120px_100px_90px_90px] gap-4 px-5 py-4 border-b border-border last:border-0 items-center min-w-[640px]">
-                            <Skeleton className="h-4 w-5" />
-                            <div className="flex items-center gap-2.5">
-                                <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
-                                <div className="space-y-1.5">
-                                    <Skeleton className="h-3 w-28" />
-                                    <Skeleton className="h-2.5 w-20" />
-                                </div>
-                            </div>
-                            <Skeleton className="h-5 w-14" />
-                            <div className="flex gap-0.5">{[0,1,2,3,4,5,6].map(d => <Skeleton key={d} className="w-4 h-4 rounded-sm" />)}</div>
-                            <div className="flex gap-1">{[0,1,2].map(d => <Skeleton key={d} className="w-2.5 h-2.5 rounded-full" />)}</div>
-                            <Skeleton className="h-5 w-20 rounded-full" />
-                        </div>
+                        <Skeleton key={i} className="h-24 rounded-2xl" />
                     ))}
                 </div>
             ) : cadets.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border p-12 text-center">
                     <p className="text-sm text-muted-foreground">No cadets found in {profile.wing} Wing.</p>
                 </div>
+            ) : sorted.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+                    <p className="text-sm text-muted-foreground">No cadets match the active filters.</p>
+                </div>
             ) : (
-                <div className="rounded-2xl border border-border bg-card overflow-hidden overflow-x-auto">
-                    <div className="grid grid-cols-[32px_1fr_120px_100px_90px_90px] gap-4 px-5 py-3 border-b border-border bg-muted/40 min-w-[640px]">
-                        {['#', 'Cadet', 'Score', 'Streak (7d)', "Today's meals", 'Status'].map(h => (
-                            <span key={h} className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{h}</span>
-                        ))}
+                <div ref={cadetListRef}>
+                    <div className="mb-3 flex items-end justify-between gap-3">
+                        <div>
+                            <h2 className="text-base font-semibold text-foreground">Cadet roster</h2>
+                            <p className="text-xs text-muted-foreground">{sorted.length} cadet{sorted.length !== 1 ? 's' : ''} shown by {sortBy}</p>
+                        </div>
                     </div>
 
-                    {sorted.map((c, idx) => {
-                        const notLogged = c.mealsToday === 0
-                        return (
-                            <Link
-                                key={c.id}
-                                href={`/dashboard/wing/cadet/${c.id}`}
-                                className={cn(
-                                    'grid grid-cols-[32px_1fr_120px_100px_90px_90px] gap-4 px-5 py-3.5 border-b border-border last:border-0 items-center min-w-[640px]',
-                                    'hover:bg-muted/50 transition-colors cursor-pointer',
-                                    notLogged && 'bg-destructive/[0.03]',
-                                )}
-                            >
-                                <span className="text-sm font-bold text-muted-foreground">{idx + 1}</span>
+                    <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm md:block">
+                        <Table>
+                            <TableHeader className="bg-muted/40">
+                                <TableRow className="hover:bg-transparent">
+                                    <TableHead className="w-14 text-[11px] uppercase tracking-wider text-muted-foreground">#</TableHead>
+                                    <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Cadet</TableHead>
+                                    <TableHead className="text-right text-[11px] uppercase tracking-wider text-muted-foreground">Score</TableHead>
+                                    <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Streak</TableHead>
+                                    <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Meals</TableHead>
+                                    <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Status</TableHead>
+                                    <TableHead className="w-12" />
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {sorted.map((c, idx) => (
+                                    <TableRow key={c.id} data-cadet-row className={cn(c.mealsToday === 0 && 'bg-destructive/[0.03] hover:bg-destructive/[0.05]')}>
+                                        <TableCell className="font-semibold text-muted-foreground">{idx + 1}</TableCell>
+                                        <TableCell>
+                                            <Link href={`/dashboard/wing/cadet/${c.id}`} className="flex min-w-0 items-center gap-3 hover:opacity-80">
+                                                <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white', avatarColor(c.full_name))}>
+                                                    {initials(c.full_name)}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="truncate font-semibold text-foreground">{c.full_name}</div>
+                                                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                                        <span>{c.rank}</span>
+                                                        {c.platoon && <span>{c.platoon}</span>}
+                                                        {c.section && <span>Sec {c.section}</span>}
+                                                        {c.goal_mode && (
+                                                            <Badge variant="outline" className={cn('h-5 border-transparent text-[10px]', GOAL_META[c.goal_mode].bg, GOAL_META[c.goal_mode].text)}>
+                                                                {GOAL_META[c.goal_mode].label}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </Link>
+                                        </TableCell>
+                                        <TableCell className="text-right font-display text-lg font-bold tabular-nums text-foreground">{c.score.toLocaleString()}</TableCell>
+                                        <TableCell><StreakBar streak={Math.min(c.streak, 7)} /></TableCell>
+                                        <TableCell><MealDots count={Math.min(c.mealsToday, 3)} /></TableCell>
+                                        <TableCell><StatusBadge mealsToday={c.mealsToday} /></TableCell>
+                                        <TableCell>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 text-muted-foreground hover:text-primary"
+                                                onClick={() => {
+                                                    setAdminConfirm({ cadetId: c.id, cadetName: c.full_name })
+                                                    setTransferWing('')
+                                                    setTransferSection('')
+                                                }}
+                                                title="Manage cadet assignment"
+                                            >
+                                                <ArrowLeftRight size={16} />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
 
-                                {/* Cadet info with goal mode badge */}
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0', avatarColor(c.full_name))}>
-                                        {initials(c.full_name)}
+                    <div className="grid gap-3 md:hidden">
+                        {sorted.map((c, idx) => (
+                            <Card key={c.id} data-cadet-row size="sm" className={cn('rounded-2xl border border-border shadow-sm', c.mealsToday === 0 && 'ring-destructive/20')}>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className={cn('mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white', avatarColor(c.full_name))}>
+                                            {initials(c.full_name)}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold text-muted-foreground">#{idx + 1}</span>
+                                                <StatusBadge mealsToday={c.mealsToday} />
+                                            </div>
+                                            <Link href={`/dashboard/wing/cadet/${c.id}`} className="mt-1 block truncate text-base font-semibold text-foreground">
+                                                {c.full_name}
+                                            </Link>
+                                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                                <span>{c.rank}</span>
+                                                {c.platoon && <span>{c.platoon}</span>}
+                                                {c.section && <span>Sec {c.section}</span>}
+                                                {c.goal_mode && (
+                                                    <Badge variant="outline" className={cn('h-5 border-transparent text-[10px]', GOAL_META[c.goal_mode].bg, GOAL_META[c.goal_mode].text)}>
+                                                        {GOAL_META[c.goal_mode].label}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-9 w-9 text-muted-foreground"
+                                            onClick={() => {
+                                                setAdminConfirm({ cadetId: c.id, cadetName: c.full_name })
+                                                setTransferWing('')
+                                                setTransferSection('')
+                                            }}
+                                            title="Manage cadet assignment"
+                                        >
+                                            <MoreHorizontal size={18} />
+                                        </Button>
                                     </div>
-                                    <div className="min-w-0">
-                                        <div className="text-sm font-medium text-foreground truncate">{c.full_name}</div>
-                                        <div className="flex items-center gap-1.5 mt-0.5">
-                                            <span className="text-xs text-muted-foreground">{c.rank}</span>
-                                            {c.goal_mode && (
-                                                <span className={cn(
-                                                    'inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
-                                                    GOAL_META[c.goal_mode].bg,
-                                                    GOAL_META[c.goal_mode].text,
-                                                )}>
-                                                    {GOAL_META[c.goal_mode].label}
-                                                </span>
-                                            )}
+
+                                    <div className="grid grid-cols-3 divide-x divide-border rounded-xl border border-border bg-muted/20">
+                                        <div className="p-3">
+                                            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Score</div>
+                                            <div className="mt-1 font-display text-xl font-bold tabular-nums text-foreground">{c.score.toLocaleString()}</div>
+                                        </div>
+                                        <div className="p-3">
+                                            <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                                <Flame size={12} /> Streak
+                                            </div>
+                                            <div className="mt-1 text-sm font-semibold text-foreground">{Math.min(c.streak, 7)} days</div>
+                                        </div>
+                                        <div className="p-3">
+                                            <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                                <Utensils size={12} /> Meals
+                                            </div>
+                                            <div className="mt-2"><MealDots count={Math.min(c.mealsToday, 3)} /></div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <span className="font-display font-bold text-base text-foreground tabular-nums">
-                                    {c.score.toLocaleString()}
-                                </span>
-                                <StreakBar streak={Math.min(c.streak, 7)} />
-                                <MealDots count={Math.min(c.mealsToday, 3)} />
-
-                                <div className="flex items-center gap-2">
-                                    <span className={cn(
-                                        'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold',
-                                        notLogged
-                                            ? 'bg-destructive/10 text-destructive'
-                                            : c.mealsToday >= 3
-                                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                                                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-                                    )}>
-                                        {notLogged ? 'Not logged' : c.mealsToday >= 3 ? 'On track' : 'Partial'}
-                                    </span>
-                                    <svg viewBox="0 0 24 24" width={12} height={12} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/40 flex-shrink-0">
-                                        <path d="M9 18l6-6-6-6" />
-                                    </svg>
-                                </div>
-                            </Link>
-                        )
-                    })}
+                                    <Link href={`/dashboard/wing/cadet/${c.id}`} className="flex items-center justify-between text-sm font-semibold text-primary">
+                                        View cadet details
+                                        <ChevronRight size={16} />
+                                    </Link>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
                 </div>
             )}
+
+            <AssignmentDialog
+                cadet={selectedCadet}
+                currentWing={profile.wing}
+                availableWings={availableWings}
+                transferSection={transferSection}
+                transferWing={transferWing}
+                adminWorking={adminWorking}
+                onTransferSectionChange={setTransferSection}
+                onTransferWingChange={setTransferWing}
+                onAction={handleAdminAction}
+                onClose={() => { setAdminConfirm(null); setTransferWing(''); setTransferSection('') }}
+            />
         </div>
     )
 }

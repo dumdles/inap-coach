@@ -18,6 +18,7 @@ Tone guidelines:
 - Be encouraging, positive, and growth-oriented. Frame every observation as an opportunity, not a failure.
 - Acknowledge the difficulty of tracking nutrition in a military camp environment.
 - Never sound judgmental or discouraging. Use language like "great opportunity to...", "building on...", "to keep up your momentum...".
+- Address the cadet by their first name (provided in the profile) if available. Never address them by rank. If no name is available, use "Cadet".
 
 Date and time awareness:
 - You will be given the current Singapore time. If it is before 20:00 SGT today, dinner may not yet have been logged — do not penalise the cadet for missing dinner data on the current day.
@@ -92,10 +93,24 @@ function buildUserMessage(user: Record<string, unknown>, dailySummaries: Record<
         }).join('\n')
         : 'No sleep data — encourage cadet to start tracking sleep for richer recovery insights.'
 
+    const firstName = user.full_name
+        ? (user.full_name as string).trim().split(' ')[0]
+        : null
+
+    const serviceContext: Record<string, string> = {
+        'Army':      'High-volume field training, route marches, obstacle courses, and strength work. High caloric expenditure; protein and carb intake are critical for muscle repair and energy.',
+        'Navy':      'Swim fitness, VO₂ endurance sessions, and maritime drills. Emphasis on aerobic capacity and hydration. Watch electrolyte intake given water-based training.',
+        'Air Force': 'Aerobic base building, precision conditioning, and HIIT cycles. Moderate-to-high intensity; consistent energy intake matters more than peak loading.',
+        'DIS':       'Balanced physical conditioning with cognitive performance demands. Training load is moderate; nutrition should support focus and sustained mental stamina.',
+        'MIDS':      'Mixed-intensity training. Balanced macro targets; adequate sleep and recovery nutrition are especially important for adaptation.',
+    }
+    const serviceNote = user.service ? serviceContext[user.service as string] : null
+
     return `Current Singapore time: ${sgtDateStr} ${sgtTimeStr}
 
 Cadet profile:
-- Rank: ${user.rank ?? 'unknown'}, Wing: ${user.wing ?? 'unknown'}
+- First name: ${firstName ?? 'unknown'}, Rank: ${user.rank ?? 'unknown'}, Wing: ${user.wing ?? 'unknown'}
+- Service: ${user.service ?? 'unknown'}${serviceNote ? ` — ${serviceNote}` : ''}
 - Gender: ${user.gender ?? 'unknown'}, Age: ${age} years
 - Height: ${user.height_cm ?? '?'}cm, Current weight: ${user.weight_kg ?? '?'}kg
 - Goal: ${user.goal_mode ?? 'maintain'}, Daily calorie target: ${user.calorie_target ?? 'not set'} kcal
@@ -139,7 +154,7 @@ export async function GET(req: NextRequest) {
     }
 
     const [userRes, summariesRes, weightRes, scoresRes, sleepRes] = await Promise.all([
-        supabaseAdmin.from('users').select('goal_mode, activity_level, height_cm, weight_kg, gender, date_of_birth, ippt_date, rank, wing, calorie_target').eq('id', userId).single(),
+        supabaseAdmin.from('users').select('goal_mode, activity_level, height_cm, weight_kg, gender, date_of_birth, ippt_date, rank, wing, service, calorie_target, full_name').eq('id', userId).single(),
         supabaseAdmin.from('daily_summaries').select('date, total_calories, total_protein_g, total_carbs_g, total_fat_g, calorie_target').eq('user_id', userId).order('date', { ascending: false }).limit(14),
         supabaseAdmin.from('weight_logs').select('weight_kg, body_fat_pct, polar_steps, logged_at').eq('user_id', userId).order('logged_at', { ascending: false }).limit(14),
         supabaseAdmin.from('leaderboard_scores').select('total_score, week_start').eq('user_id', userId).order('week_start', { ascending: false }).limit(4),

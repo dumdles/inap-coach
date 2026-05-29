@@ -91,6 +91,11 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
 
     const [custom, setCustom] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '', is_cookhouse_item: false })
     const [customErrors, setCustomErrors] = useState<Record<string, string>>({})
+    const [estimating, setEstimating] = useState(false)
+    const [estimateError, setEstimateError] = useState<string | null>(null)
+    const [estimateSuccess, setEstimateSuccess] = useState(false)
+    // Suggested portion size from AI estimate — applied when entering the details stage
+    const [suggestedQty, setSuggestedQty] = useState<number | null>(null)
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -138,6 +143,46 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         return Object.keys(errs).length === 0
     }
 
+    async function estimateMacros() {
+        if (!custom.name.trim()) return
+        setEstimating(true)
+        setEstimateError(null)
+        setEstimateSuccess(false)
+        try {
+            const res = await fetch('/api/food-items/estimate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: custom.name.trim() }),
+            })
+            if (res.status === 422) {
+                const body = await res.json()
+                if (body.error === 'unrecognised_food') {
+                    setEstimateError(`Couldn't recognise "${custom.name.trim()}" as a food. Try a more specific name — e.g. "chicken rice", "McSpicy", or "protein shake".`)
+                    return
+                }
+            }
+            if (!res.ok) throw new Error('ai_unavailable')
+            const data = await res.json()
+            setCustom(p => ({
+                ...p,
+                calories: String(data.calories_per_100g),
+                protein:  String(data.protein_g),
+                carbs:    String(data.carbs_g),
+                fat:      String(data.fat_g),
+            }))
+            // Store suggested portion — will pre-fill quantity in the details stage
+            if (data.typical_serving_g) setSuggestedQty(data.typical_serving_g)
+            setCustomErrors({})
+            // Brief success animation on the button
+            setEstimateSuccess(true)
+            setTimeout(() => setEstimateSuccess(false), 1400)
+        } catch {
+            setEstimateError('AI is unavailable right now — please enter macros manually.')
+        } finally {
+            setEstimating(false)
+        }
+    }
+
     function reset() {
         setStage('pick')
         setQuery('')
@@ -151,6 +196,10 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         setError(null)
         setCustom({ name: '', calories: '', protein: '', carbs: '', fat: '', is_cookhouse_item: false })
         setCustomErrors({})
+        setEstimating(false)
+        setEstimateError(null)
+        setEstimateSuccess(false)
+        setSuggestedQty(null)
     }
 
     useEffect(() => { if (!open) reset() }, [open])
@@ -203,6 +252,8 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         if (!res.ok) { setError('Failed to create food item'); return }
         const item: FoodItem = await res.json()
         setSelected(item)
+        // Apply AI-suggested portion size if available
+        if (suggestedQty) setQuantity(String(suggestedQty))
         setStage('details')
     }
 
@@ -430,6 +481,55 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                             onChange={e => setCustom(p => ({ ...p, name: e.target.value }))}
                             autoFocus
                         />
+                        {/* AI macro estimation — pre-fills the four macro fields */}
+                        <div>
+                            <button
+                                type="button"
+                                onClick={estimateMacros}
+                                disabled={!custom.name.trim() || estimating}
+                                className={cn(
+                                    'w-full flex items-center justify-center gap-2 h-9 rounded-xl border text-[13px] font-medium',
+                                    custom.name.trim() && !estimating
+                                        ? estimateSuccess
+                                            ? 'ai-glow-button ai-glow-button-success text-success border-success/50'
+                                            : 'ai-glow-button text-primary'
+                                        : 'border-border text-muted-foreground opacity-40 cursor-not-allowed'
+                                )}
+                            >
+                                {estimating ? (
+                                    <>
+                                        <div className="w-3.5 h-3.5 rounded-full border-[1.5px] border-primary border-t-transparent animate-spin" />
+                                        <span>Analysing with AI…</span>
+                                    </>
+                                ) : estimateSuccess ? (
+                                    <>
+                                        <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M5 12l5 5L20 7" />
+                                        </svg>
+                                        Macros filled in
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* Sparkles icon */}
+                                        <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.937A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+                                            <path d="M20 3v4M22 5h-4M4 17v2M5 18H3" />
+                                        </svg>
+                                        Estimate macros with AI
+                                    </>
+                                )}
+                            </button>
+                            {/* Inline error below button — shown when AI fails or doesn't recognise the food */}
+                            {estimateError && (
+                                <div className="flex items-start gap-2 mt-2 px-1">
+                                    <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-warning mt-0.5 flex-shrink-0">
+                                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                        <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                                    </svg>
+                                    <p className="text-[12px] text-warning leading-relaxed">{estimateError}</p>
+                                </div>
+                            )}
+                        </div>
                         <div className="grid grid-cols-2 gap-3">
                             {([
                                 { key: 'calories' as const, label: 'Calories', unit: 'kcal', max: 900 },
@@ -510,9 +610,20 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
 
                         {/* Quantity */}
                         <div>
-                            <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">
-                                Serving size (g)
-                            </label>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="text-[12px] font-medium text-muted-foreground">
+                                    Serving size (g)
+                                </label>
+                                {suggestedQty && quantity === String(suggestedQty) && (
+                                    <span className="text-[10px] font-medium text-primary/80 flex items-center gap-1">
+                                        <svg viewBox="0 0 24 24" width={10} height={10} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M12 2a8 8 0 0 1 8 8c0 3-1.5 5.5-4 7l-1 5H9l-1-5C5.5 15.5 4 13 4 10a8 8 0 0 1 8-8z" />
+                                            <line x1="9" y1="17" x2="15" y2="17" />
+                                        </svg>
+                                        AI suggested
+                                    </span>
+                                )}
+                            </div>
                             <Input
                                 type="number"
                                 placeholder="100"

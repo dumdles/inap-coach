@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { AwardBadge, secondsToRunTime, AWARD_META, type IPPTResult } from '@/components/ippt/log-ippt-dialog'
 
 type DayEntry = { calories: number; protein: number; carbs: number; fat: number; calorie_target: number }
 
@@ -74,9 +75,11 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
     const [data, setData] = useState<CadetData | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const [activeTab, setActiveTab] = useState<'nutrition' | 'workouts' | 'profile'>('nutrition')
+    const [activeTab, setActiveTab] = useState<'nutrition' | 'workouts' | 'ippt' | 'profile'>('nutrition')
     const [workoutLogs, setWorkoutLogs] = useState<WorkoutLogRow[]>([])
     const [workoutsLoading, setWorkoutsLoading] = useState(false)
+    const [ipptResults, setIpptResults] = useState<IPPTResult[]>([])
+    const [ipptLoading, setIpptLoading] = useState(false)
 
     useEffect(() => {
         if (!user) return
@@ -104,6 +107,16 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
             .then(d => setWorkoutLogs(Array.isArray(d) ? d : []))
             .finally(() => setWorkoutsLoading(false))
     }, [activeTab, cadetId, workoutLogs.length])
+
+    // Fetch IPPT results lazily
+    useEffect(() => {
+        if (activeTab !== 'ippt' || ipptResults.length > 0) return
+        setIpptLoading(true)
+        fetch(`/api/ippt-results?userId=${cadetId}`)
+            .then(r => r.json())
+            .then(d => setIpptResults(Array.isArray(d) ? d : []))
+            .finally(() => setIpptLoading(false))
+    }, [activeTab, cadetId, ipptResults.length])
 
     if (loading) return (
         <div className="px-4 md:px-8 py-8 max-w-3xl mx-auto space-y-6">
@@ -202,8 +215,8 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
 
                 {/* Tabs — profile tab hidden for friend view */}
                 {!isFriendView && (
-                    <div className="flex items-center bg-muted dark:bg-[#091E42] rounded-full p-0.5 gap-0.5 w-fit mb-6">
-                        {(['nutrition', 'profile'] as const).map(t => (
+                    <div className="flex items-center bg-muted dark:bg-[#091E42] rounded-full p-0.5 gap-0.5 w-fit mb-6 flex-wrap">
+                        {(['nutrition', 'ippt', 'profile'] as const).map(t => (
                             <button
                                 key={t}
                                 onClick={() => setActiveTab(t)}
@@ -214,7 +227,7 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
                                         : 'text-muted-foreground hover:text-foreground',
                                 )}
                             >
-                                {t === 'nutrition' ? 'Nutrition' : 'Profile'}
+                                {t === 'nutrition' ? 'Nutrition' : t === 'ippt' ? 'IPPT' : 'Profile'}
                             </button>
                         ))}
                     </div>
@@ -369,6 +382,85 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
                                     </div>
                                 )
                             })
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'ippt' && (
+                    <div className="space-y-4">
+                        {ipptLoading ? (
+                            <div className="space-y-3">
+                                {[0,1,2].map(i => <Skeleton key={i} className="h-16 rounded-2xl" />)}
+                            </div>
+                        ) : ipptResults.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed border-border p-10 flex flex-col items-center text-center gap-3">
+                                <svg viewBox="0 0 24 24" width={28} height={28} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                                    <path d="M6 4v16M18 4v16M2 8h4M18 8h4M2 16h4M18 16h4M6 12h12" />
+                                </svg>
+                                <p className="text-sm text-muted-foreground">No IPPT results logged yet.</p>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Best/latest summary pills */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <StatPill
+                                        label="Latest score"
+                                        value={ipptResults[0].total_points}
+                                        sub={ipptResults[0].award ? AWARD_META[ipptResults[0].award as keyof typeof AWARD_META]?.label : new Date(ipptResults[0].test_date).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    />
+                                    <StatPill
+                                        label="Best score"
+                                        value={Math.max(...ipptResults.map(r => r.total_points))}
+                                        sub={`over ${ipptResults.length} test${ipptResults.length !== 1 ? 's' : ''}`}
+                                    />
+                                </div>
+
+                                {/* Results list */}
+                                <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                                    <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+                                        <span className="text-[13px] font-semibold text-foreground">All results</span>
+                                        <span className="text-[11px] text-muted-foreground">{ipptResults.length} test{ipptResults.length !== 1 ? 's' : ''}</span>
+                                    </div>
+                                    {ipptResults.map(r => (
+                                        <div key={r.id} className="px-5 py-4 border-b border-border last:border-0">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-[13px] font-semibold text-foreground">
+                                                            {new Date(r.test_date).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                        </span>
+                                                        <AwardBadge award={r.award} />
+                                                    </div>
+                                                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                                                        {[
+                                                            r.pushup_reps != null && `${r.pushup_reps} push-ups`,
+                                                            r.situp_reps  != null && `${r.situp_reps} sit-ups`,
+                                                            r.run_time_seconds != null && secondsToRunTime(r.run_time_seconds),
+                                                        ].filter(Boolean).join(' · ')}
+                                                    </div>
+                                                    {/* Station point breakdown */}
+                                                    {(r.pushup_points != null || r.situp_points != null || r.run_points != null) && (
+                                                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                                            {[
+                                                                { label: 'Push-up', pts: r.pushup_points },
+                                                                { label: 'Sit-up', pts: r.situp_points },
+                                                                { label: '2.4 km', pts: r.run_points },
+                                                            ].filter(s => s.pts != null).map(s => (
+                                                                <span key={s.label} className="text-[10px] text-muted-foreground">
+                                                                    {s.label}: <span className="font-semibold text-foreground">{s.pts} pts</span>
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="font-display font-extrabold text-[22px] text-primary tabular-nums flex-shrink-0">
+                                                    {r.total_points}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
                         )}
                     </div>
                 )}

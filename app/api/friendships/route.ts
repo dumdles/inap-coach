@@ -24,9 +24,10 @@ export async function GET(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+    // Include friendshipId so the client can call DELETE /api/friendships?id=<uuid>
     const friends = (data ?? [])
         .filter(r => r.status === 'accepted')
-        .map(r => (r.requester_id === userId ? r.addressee : r.requester))
+        .map(r => ({ ...(r.requester_id === userId ? r.addressee : r.requester), friendshipId: r.id }))
 
     const pendingSent = (data ?? [])
         .filter(r => r.status === 'pending' && r.requester_id === userId)

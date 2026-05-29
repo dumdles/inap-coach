@@ -27,6 +27,7 @@ function BellIcon({ size = 16 }: { size?: number }) { return <svg viewBox="0 0 2
 function CheckIcon() { return <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> }
 function InsightsIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 7 7c0 2.5-1.3 4.7-3.3 6L12 18l-3.7-3C6.3 13.7 5 11.5 5 9a7 7 0 0 1 7-7z"/></svg> }
 function SleepIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> }
+function IPPTIcon() { return <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M6 4v16M18 4v16M2 8h4M18 8h4M2 16h4M18 16h4M6 12h12" /></svg> }
 
 // ── Notification types ─────────────────────────────────────
 type Notification = {
@@ -231,6 +232,7 @@ const BASE_NAV = [
     { href: '/dashboard/workouts', label: 'Workouts', Icon: WorkoutsIcon },
     { href: '/dashboard/sleep', label: 'Sleep', Icon: SleepIcon },
     { href: '/dashboard/progress', label: 'Progress', Icon: ProgressIcon },
+    { href: '/dashboard/ippt',     label: 'IPPT',      Icon: IPPTIcon     },
     { href: '/dashboard/friends', label: 'Leaderboard', Icon: FriendsIcon },
     { href: '/dashboard/insights', label: 'Insights', Icon: InsightsIcon },
 ]

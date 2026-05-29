@@ -73,16 +73,17 @@ All colors are defined as CSS custom properties. Never hardcode hex values in co
 
 ## Typography
 
-Two fonts: **Syne** for headings and display numbers (expressive, distinctive), **DM Sans** for all body text (clean, readable).
+Two fonts: **Satoshi** for headings and display numbers (geometric grotesque, clean and legible), **DM Sans** for all body text (clean, readable).
 
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap');
 ```
 
 ### CSS tokens
 
 ```css
---font-display: 'Syne', sans-serif;
+--font-display: 'Satoshi', sans-serif;
 --font-body:    'DM Sans', sans-serif;
 ```
 
@@ -90,16 +91,16 @@ Two fonts: **Syne** for headings and display numbers (expressive, distinctive), 
 
 | Style | Font | Size | Weight | Letter-spacing | Line-height | Usage |
 |---|---|---|---|---|---|---|
-| Display XL | Syne | 40px | 800 | −0.03em | 1.1 | Large numbers (e.g. `2,184 kcal`) |
-| Display LG | Syne | 32px | 700 | −0.025em | 1.15 | Page / section titles |
-| Display MD | Syne | 24px | 600 | −0.02em | 1.2 | Card headings |
-| Heading | Syne | 20px | 600 | −0.01em | 1.3 | Sub-section headings |
+| Display XL | Satoshi | 40px | 800 | −0.03em | 1.1 | Large numbers (e.g. `2,184 kcal`) |
+| Display LG | Satoshi | 32px | 700 | −0.025em | 1.15 | Page / section titles |
+| Display MD | Satoshi | 24px | 600 | −0.02em | 1.2 | Card headings |
+| Heading | Satoshi | 20px | 600 | −0.01em | 1.3 | Sub-section headings |
 | Subheading | DM Sans | 17px | 500 | — | 1.4 | Supporting headings |
 | Body | DM Sans | 15px | 400 | — | 1.6 | Default body copy |
 | Body SM | DM Sans | 13px | 400 | — | 1.5 | Meta text, timestamps |
 | Caption | DM Sans | 12px | 400 | — | 1.4 | Fine print, footnotes |
 | Label / overline | DM Sans | 11px | 500 | 0.08em | — | Uppercase section labels |
-| Stat number | Syne | 36px | 700 | −0.02em | 1 | Dashboard stat values |
+| Stat number | Satoshi | 36px | 700 | −0.02em | 1 | Dashboard stat values |
 
 ---
 
@@ -249,14 +250,14 @@ White surface, 1px border, 12px radius. Cards never have colored backgrounds —
 
 - Flex row, space-between, center-aligned
 - 16px bottom padding + 1px `--gray-200` border separator
-- Title: Syne 600 · 16px · `--gray-900` · −0.01em tracking
+- Title: Satoshi 600 · 16px · `--gray-900` · −0.01em tracking
 
 ### Stat card
 
 | Element | Style |
 |---|---|
 | Label | DM Sans 500 · 12px · uppercase · 0.07em tracking · `--gray-400` |
-| Value | Syne 700 · 32px · `--gray-900` · −0.02em · line-height 1 |
+| Value | Satoshi 700 · 32px · `--gray-900` · −0.02em · line-height 1 |
 | Sub text | DM Sans 400 · 13px · `--gray-500` |
 | Delta pill (up) | `--success-light` bg · `--success-dark` text |
 | Delta pill (down) | `--danger-light` bg · `--danger-dark` text |
@@ -276,7 +277,7 @@ White surface, 1px border, 12px radius. Cards never have colored backgrounds —
 - 36×36px icon container · `--radius-md` · emoji centered
 - Name: DM Sans 500 · 14px · `--gray-800` (truncated with ellipsis)
 - Meta: DM Sans 400 · 12px · `--gray-400`
-- Calorie value: Syne 600 · 15px · `--primary`
+- Calorie value: Satoshi 600 · 15px · `--primary`
 - Rows separated by 1px `--gray-100` bottom border; last row has no border
 
 ---
@@ -326,7 +327,7 @@ Height: 60px · white background · `--gray-200` bottom border · horizontal pad
 
 | Element | Style |
 |---|---|
-| Logo | Syne 800 · 20px · `--gray-900` · −0.03em; accent dot in `--primary` |
+| Logo | Satoshi 800 · 20px · `--gray-900` · −0.03em; accent dot in `--primary` |
 | Nav link (default) | DM Sans 500 · 14px · `--gray-500` · `--radius-md` padding |
 | Nav link (hover) | `--gray-50` bg · `--gray-800` text |
 | Nav link (active) | `--primary-light` bg · `--primary` text |
@@ -374,7 +375,7 @@ Used for leaderboards and food logs. Always include a hover state. Header row us
 | #3 | `#92400E` (bronze) |
 | 4+ | `--gray-900` |
 
-Rank number font: Syne 700
+Rank number font: Satoshi 700
 
 ---
 

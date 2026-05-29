@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { InputField } from '@/components/ui/input-field'
 import { Alert } from '@/components/ui/alert'
@@ -24,17 +25,6 @@ const RANKS = [
     'ME4A', 'ME5', 'ME6', 'ME7', 'ME8', 'ME9',
 ]
 
-const WINGS = [
-    { value: 'Alpha', label: 'Alpha Wing' },
-    { value: 'Charlie', label: 'Charlie Wing' },
-    { value: 'Delta', label: 'Delta Wing' },
-    { value: 'Echo', label: 'Echo Wing' },
-    { value: 'Sierra', label: 'Sierra Wing' },
-    { value: 'Tango', label: 'Tango Wing' },
-    { value: 'MIDS', label: 'MIDS Wing' },
-    { value: 'Air', label: 'Air Wing' },
-    { value: 'DIS', label: 'DIS Wing' },
-]
 
 const GENDERS = [
     { value: 'Male',   label: 'Male' },
@@ -99,6 +89,7 @@ export const SignUpForm: React.FC = () => {
         username: '',
         rank: '',
         wing: '',
+        service: '',
         platoon: '',
         section: '',
         email: '',
@@ -117,6 +108,17 @@ export const SignUpForm: React.FC = () => {
         goalMode: 'bulk',
     })
 
+    const [wings, setWings] = useState<string[]>([])
+    const [services, setServices] = useState<string[]>([])
+    useEffect(() => {
+        supabase.from('ocs_wings').select('name').order('name').then(({ data }) => {
+            if (data) setWings(data.map(w => w.name))
+        })
+        supabase.from('ocs_services').select('name').order('sort_order').then(({ data }) => {
+            if (data) setServices(data.map(s => s.name))
+        })
+    }, [])
+
     const validateStep1 = (): boolean => {
         const errors: Record<string, string> = {}
         if (!step1.fullName) errors.fullName = 'Full name is required'
@@ -127,6 +129,7 @@ export const SignUpForm: React.FC = () => {
         }
         if (!step1.rank) errors.rank = 'Rank is required'
         if (!step1.wing) errors.wing = 'Wing is required'
+        if (!step1.service) errors.service = 'Service is required'
         if (!step1.email) {
             errors.email = 'Email is required'
         } else if (!step1.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
@@ -178,6 +181,7 @@ export const SignUpForm: React.FC = () => {
                 username: step1.username,
                 rank: step1.rank,
                 wing: step1.wing,
+                service: step1.service,
                 platoon: step1.platoon,
                 section: step1.section,
                 date_of_birth: step2.dateOfBirth,
@@ -312,8 +316,8 @@ export const SignUpForm: React.FC = () => {
                                         <SelectValue placeholder="Select wing" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {WINGS.map(({ value, label }) => (
-                                            <SelectItem key={value} value={value}>{label}</SelectItem>
+                                        {wings.map(name => (
+                                            <SelectItem key={name} value={name}>{name} Wing</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -321,6 +325,31 @@ export const SignUpForm: React.FC = () => {
                                     <p className="text-xs text-danger">{validationErrors.wing}</p>
                                 )}
                             </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Service <span className="text-danger">*</span>
+                            </label>
+                            <Select
+                                value={step1.service}
+                                onValueChange={(v) => {
+                                    setStep1(prev => ({ ...prev, service: v }))
+                                    if (validationErrors.service) setValidationErrors(prev => ({ ...prev, service: '' }))
+                                }}
+                            >
+                                <SelectTrigger className="w-full h-10 rounded-md border border-gray-300 dark:border-[#344563] bg-white dark:bg-[#0D1F3C] px-3 text-sm text-gray-800 dark:text-gray-100">
+                                    <SelectValue placeholder="Select service" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {services.map(name => (
+                                        <SelectItem key={name} value={name}>{name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {validationErrors.service && (
+                                <p className="text-xs text-danger">{validationErrors.service}</p>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
