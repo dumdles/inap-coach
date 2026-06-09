@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth } from '@/app/api/_lib/auth'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,8 +31,12 @@ export async function GET(req: NextRequest) {
 
 // POST /api/weight-logs  { userId, weight_kg, body_fat_pct? }
 export async function POST(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const { userId, weight_kg, body_fat_pct } = await req.json()
     if (!userId || !weight_kg) return NextResponse.json({ error: 'missing fields' }, { status: 400 })
+    if (auth.user.id !== userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     if (weight_kg < 20 || weight_kg > 300)
         return NextResponse.json({ error: 'weight_kg must be 20–300' }, { status: 400 })
     if (body_fat_pct != null && (body_fat_pct < 1 || body_fat_pct > 60))
@@ -61,21 +66,31 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/weight-logs?id=<uuid>
 export async function DELETE(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const id = req.nextUrl.searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-    const { error } = await supabaseAdmin.from('weight_logs').delete().eq('id', id)
+
+    // user_id filter ensures a user can only delete their own logs
+    const { error } = await supabaseAdmin.from('weight_logs').delete().eq('id', id).eq('user_id', auth.user.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true })
 }
 
 // PATCH /api/weight-logs?id=<uuid>  — edit a specific log entry
 export async function PATCH(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const id = req.nextUrl.searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     const { weight_kg, body_fat_pct } = await req.json()
     if (!weight_kg) return NextResponse.json({ error: 'weight_kg required' }, { status: 400 })
     const payload: Record<string, unknown> = { weight_kg, body_fat_pct: body_fat_pct ?? null }
-    const { error } = await supabaseAdmin.from('weight_logs').update(payload).eq('id', id)
+
+    // user_id filter ensures a user can only edit their own logs
+    const { error } = await supabaseAdmin.from('weight_logs').update(payload).eq('id', id).eq('user_id', auth.user.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true })
 }

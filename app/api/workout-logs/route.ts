@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth } from '@/app/api/_lib/auth'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,6 +42,9 @@ export async function GET(req: NextRequest) {
 
 // POST /api/workout-logs
 export async function POST(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const body = await req.json()
     const {
         userId, templateId, source, name,
@@ -50,6 +54,7 @@ export async function POST(req: NextRequest) {
         taggerName,      // display name of the person logging (for notification body)
     } = body
     if (!userId || !name) return NextResponse.json({ error: 'userId and name required' }, { status: 400 })
+    if (auth.user.id !== userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     if (duration_min != null && (duration_min < 0 || duration_min > 600))
         return NextResponse.json({ error: 'duration_min must be 0–600' }, { status: 400 })
@@ -115,15 +120,20 @@ export async function POST(req: NextRequest) {
 
 // PATCH /api/workout-logs?id=<uuid>
 export async function PATCH(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const id = req.nextUrl.searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
     const { duration_min, calories, distance_km, sets, reps, rounds, heart_rate_avg, notes } = await req.json()
 
+    // user_id filter ensures a user can only edit their own logs
     const { error } = await supabaseAdmin
         .from('workout_logs')
         .update({ duration_min, calories, distance_km, sets, reps, rounds, heart_rate_avg, notes })
         .eq('id', id)
+        .eq('user_id', auth.user.id)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true })
@@ -131,9 +141,14 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE /api/workout-logs?id=<uuid>
 export async function DELETE(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const id = req.nextUrl.searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-    const { error } = await supabaseAdmin.from('workout_logs').delete().eq('id', id)
+
+    // user_id filter ensures a user can only delete their own logs
+    const { error } = await supabaseAdmin.from('workout_logs').delete().eq('id', id).eq('user_id', auth.user.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true })
 }

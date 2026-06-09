@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/app/api/cron/_lib'
+import { verifyAuth } from '@/app/api/_lib/auth'
 
 // GET /api/sleep-logs?userId=<uuid>&limit=<n>
 export async function GET(req: NextRequest) {
@@ -41,11 +42,15 @@ type SleepLogPayload = {
 
 // POST /api/sleep-logs
 export async function POST(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const body = (await req.json()) as SleepLogPayload
     const { userId, sleep_start, sleep_end } = body
     if (!userId || !sleep_start || !sleep_end) {
         return NextResponse.json({ error: 'userId, sleep_start, sleep_end required' }, { status: 400 })
     }
+    if (auth.user.id !== userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const start = new Date(sleep_start)
     const end = new Date(sleep_end)
@@ -90,6 +95,9 @@ export async function POST(req: NextRequest) {
 
 // PATCH /api/sleep-logs?id=<uuid>
 export async function PATCH(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const id = req.nextUrl.searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
@@ -110,16 +118,22 @@ export async function PATCH(req: NextRequest) {
         }
     }
 
-    const { error } = await supabaseAdmin.from('sleep_logs').update(patch).eq('id', id)
+    // user_id filter ensures a user can only edit their own logs
+    const { error } = await supabaseAdmin.from('sleep_logs').update(patch).eq('id', id).eq('user_id', auth.user.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true })
 }
 
 // DELETE /api/sleep-logs?id=<uuid>
 export async function DELETE(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const id = req.nextUrl.searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-    const { error } = await supabaseAdmin.from('sleep_logs').delete().eq('id', id)
+
+    // user_id filter ensures a user can only delete their own logs
+    const { error } = await supabaseAdmin.from('sleep_logs').delete().eq('id', id).eq('user_id', auth.user.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true })
 }

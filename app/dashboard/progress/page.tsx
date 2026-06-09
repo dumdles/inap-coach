@@ -200,7 +200,7 @@ function WeightChart({ logs, targetWeight }: { logs: WeightLog[]; targetWeight: 
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function ProgressPage() {
-    const { user } = useAuth()
+    const { user, session } = useAuth()
     const router = useRouter()
     const [profile, setProfile] = useState<UserProfile | null>(null)
     const [weightLogs, setWeightLogs] = useState<WeightLog[]>([])
@@ -226,7 +226,7 @@ export default function ProgressPage() {
     const logWeight = async (weight_kg: number, body_fat_pct: number | null) => {
         await fetch('/api/weight-logs', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
             body: JSON.stringify({ userId: user?.id, weight_kg, body_fat_pct }),
         })
         await supabase.from('users').update({ weight_kg }).eq('id', user!.id)
@@ -237,14 +237,14 @@ export default function ProgressPage() {
         if (!editLog) return
         await fetch(`/api/weight-logs?id=${editLog.id}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
             body: JSON.stringify({ weight_kg, body_fat_pct }),
         })
         fetchData()
     }
 
     const deleteWeight = async (id: string) => {
-        await fetch(`/api/weight-logs?id=${id}`, { method: 'DELETE' })
+        await fetch(`/api/weight-logs?id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${session?.access_token}` } })
         setWeightLogs(prev => prev.filter(l => l.id !== id))
         setDeleteConfirmId(null)
     }

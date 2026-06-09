@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { calculateTDEE } from '@/lib/tdee'
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import router from 'next/router'
 import { Button } from '@/components/ui/button'
+import { NumberPopIn } from '@/components/ui/transitions'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -121,33 +122,6 @@ function nutritionTip(calLeft: number, proteinLeft: number): string {
     return `Aim for a ~${calLeft} kcal ${meal}${protHint} to hit today's target.`
 }
 
-// ── Count-up animation ─────────────────────────────────────────────────────────
-// Animates a number from 0 to `target` with an ease-out cubic curve.
-// `ready` is the trigger — the animation fires once when it first becomes true.
-function useCountUp(target: number, ready: boolean, duration = 900): number {
-    const [display, setDisplay] = useState(0)
-    const rafRef    = useRef<number>(0)
-    const hasRun    = useRef(false)
-    const targetRef = useRef(target)
-    targetRef.current = target
-
-    useEffect(() => {
-        if (!ready || hasRun.current) return
-        hasRun.current = true
-        const final     = targetRef.current
-        const startTime = performance.now()
-        const animate   = (now: number) => {
-            const p     = Math.min((now - startTime) / duration, 1)
-            const eased = 1 - (1 - p) ** 3          // ease-out cubic
-            setDisplay(Math.round(final * eased))
-            if (p < 1) rafRef.current = requestAnimationFrame(animate)
-        }
-        rafRef.current = requestAnimationFrame(animate)
-        return () => cancelAnimationFrame(rafRef.current)
-    }, [ready, duration])
-
-    return display
-}
 
 // ── Calorie donut ring ─────────────────────────────────────────────────────────
 
@@ -534,10 +508,6 @@ export default function DashboardPage() {
     const calLeft     = targets.calories - totals.calories
     const proteinLeft = targets.protein  - totals.protein
 
-    // Animated headline numbers — count up once data is ready
-    const statsReady      = !mealsLoading && !profileLoading
-    const calDisplayed    = useCountUp(calLeft > 0 ? calLeft : 0, statsReady)
-    const proteinDisplayed = useCountUp(proteinLeft > 0 ? Math.round(proteinLeft) : 0, statsReady)
 
     // IPPT countdown
     const ipptDaysLeft = profile?.ippt_date
@@ -582,9 +552,21 @@ export default function DashboardPage() {
                 ) : (
                     <h1 className="font-display text-[32px] sm:text-[38px] font-extrabold text-foreground leading-[1.1]">
                         You have{' '}
-                        <span className="text-primary tabular-nums">{calDisplayed.toLocaleString()} kcal</span>
+                        <span className="text-primary tabular-nums">
+                            <NumberPopIn
+                                key={String(calLeft > 0 ? calLeft : 0)}
+                                value={(calLeft > 0 ? calLeft : 0).toLocaleString()}
+                            />
+                            {' kcal'}
+                        </span>
                         {' '}and{' '}
-                        <span className="text-success tabular-nums">{proteinDisplayed}g protein</span>
+                        <span className="text-success tabular-nums">
+                            <NumberPopIn
+                                key={String(proteinLeft > 0 ? Math.round(proteinLeft) : 0)}
+                                value={String(proteinLeft > 0 ? Math.round(proteinLeft) : 0)}
+                            />
+                            {'g protein'}
+                        </span>
                         {' '}left today.
                     </h1>
                 )}

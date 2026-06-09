@@ -1281,7 +1281,7 @@ function SettingsPopover({
 // ── Main page ─────────────────────────────────────────────────────────────
 
 export default function SleepPage() {
-    const { user } = useAuth()
+    const { user, session } = useAuth()
 
     const [logs, setLogs] = useState<SleepLog[]>([])
     const [logsLoading, setLogsLoading] = useState(true)
@@ -1328,7 +1328,7 @@ export default function SleepPage() {
     }, [user?.id, fetchLogs])
 
     async function handleDelete(id: string) {
-        await fetch(`/api/sleep-logs?id=${id}`, { method: 'DELETE' })
+        await fetch(`/api/sleep-logs?id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${session?.access_token}` } })
         setLogs(prev => prev.filter(l => l.id !== id))
         setConfirmDeleteId(null)
     }

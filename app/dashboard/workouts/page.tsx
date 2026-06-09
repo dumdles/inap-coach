@@ -764,7 +764,7 @@ function LogModal({
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function WorkoutsPage() {
-    const { user } = useAuth()
+    const { user, session } = useAuth()
     const [templates, setTemplates] = React.useState<ExerciseTemplate[]>([])
     const [friends, setFriends] = React.useState<Friend[]>([])
     const [logs, setLogs] = React.useState<WorkoutLog[]>([])
@@ -840,47 +840,28 @@ export default function WorkoutsPage() {
     React.useEffect(() => { setHistoryPage(1) }, [activeFilter, activePeriod, logs])
 
     const syncPolar = React.useCallback(async (force = false) => {
-        if (!user?.id || templates.length === 0) return
+        if (!user?.id) return
         const storageKey = `polar_last_sync_${user.id}`
         const lastSync = localStorage.getItem(storageKey)
         const oneDayMs = 24 * 60 * 60 * 1000
         if (!force && lastSync && Date.now() - parseInt(lastSync) < oneDayMs) return
 
         setPolarLoading(true)
-        fetch(`/api/polar/exercises?userId=${user.id}`)
-            .then(r => r.json())
-            .then(async (data: { exercises?: PolarExercise[]; error?: string }) => {
-                if (data.error || !data.exercises?.length) return
+        try {
+            // The server route handles the upsert directly — no need to re-POST each exercise
+            const res = await fetch(`/api/polar/exercises?userId=${user.id}`)
+            const data = await res.json()
+            if (!data.error) {
                 setIsPolarConnected(true)
-                const inserts = data.exercises.map(ex => {
-                    const template = templates.find(t =>
-                        t.polar_sport_keys.some(k => k === ex.sport)
-                    ) ?? templates.find(t => t.category === "other")!
-                    return {
-                        userId: user.id!,
-                        templateId: template.id,
-                        source: "polar" as const,
-                        name: template.name,
-                        duration_min: parseDuration(ex.duration ?? ""),
-                        calories: ex.calories,
-                        distance_km: ex.distance ? +(ex.distance / 1000).toFixed(2) : undefined,
-                        heart_rate_avg: ex.heart_rate?.average,
-                        polar_exercise_id: ex.id,
-                        logged_at: ex.start_time,
-                    }
-                })
-                await Promise.all(inserts.map(i =>
-                    fetch("/api/workout-logs", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(i),
-                    })
-                ))
                 localStorage.setItem(storageKey, Date.now().toString())
-                await fetchLogs()
-            })
-            .finally(() => setPolarLoading(false))
-    }, [user?.id, templates, fetchLogs])
+            }
+        } catch {
+            // Non-fatal — still refresh the list in case prior syncs added data
+        } finally {
+            await fetchLogs()
+            setPolarLoading(false)
+        }
+    }, [user?.id, fetchLogs])
 
     React.useEffect(() => { syncPolar() }, [syncPolar])
 
@@ -894,7 +875,7 @@ export default function WorkoutsPage() {
         const taggerName = [profile?.rank, profile?.full_name].filter(Boolean).join(" ") || "Someone"
         await fetch("/api/workout-logs", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
             body: JSON.stringify({ userId: user?.id, taggerName, ...data }),
         })
         await fetchLogs()
@@ -903,14 +884,14 @@ export default function WorkoutsPage() {
     async function handleEdit(id: string, data: Record<string, unknown>) {
         await fetch(`/api/workout-logs?id=${id}`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
             body: JSON.stringify(data),
         })
         await fetchLogs()
     }
 
     async function handleDelete(id: string) {
-        await fetch(`/api/workout-logs?id=${id}`, { method: "DELETE" })
+        await fetch(`/api/workout-logs?id=${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${session?.access_token}` } })
         setLogs(prev => prev.filter(l => l.id !== id))
         setConfirmDeleteId(null)
     }

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const MODEL = process.env.INSIGHTS_MODEL ?? 'google/gemini-2.0-flash-001'
+import { callOpenRouter } from '@/app/api/_lib/ai'
 
 const SYSTEM_PROMPT = `You are a nutrition data assistant specialised in Singapore and Asian food. Given a food name, estimate its macronutrients per 100g AND the typical portion size a person would eat.
 
@@ -33,32 +31,19 @@ export async function POST(req: NextRequest) {
     if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 })
     if (name.length > 200) return NextResponse.json({ error: 'name too long' }, { status: 400 })
 
-    const response = await fetch(OPENROUTER_URL, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'inap-coach',
-        },
-        body: JSON.stringify({
-            model: MODEL,
-            messages: [
+    let content: string
+    try {
+        content = await callOpenRouter(
+            [
                 { role: 'system', content: SYSTEM_PROMPT },
                 { role: 'user', content: `Estimate macros per 100g and typical serving size for: ${name}` },
             ],
-            temperature: 0.1,
-            response_format: { type: 'json_object' },
-        }),
-    })
-
-    if (!response.ok) {
-        console.error('[estimate] OpenRouter error:', response.status)
+            { temperature: 0.1, response_format: { type: 'json_object' } },
+        )
+    } catch (err) {
+        console.error('[estimate] OpenRouter error:', err)
         return NextResponse.json({ error: 'ai_unavailable' }, { status: 502 })
     }
-
-    const json = await response.json()
-    let content: string = json.choices?.[0]?.message?.content ?? ''
-    content = content.replace(/^```json?\n?([\s\S]*?)\n?```$/m, '$1').trim()
 
     let parsed: {
         confidence?: string

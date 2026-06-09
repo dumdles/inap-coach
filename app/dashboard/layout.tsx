@@ -14,7 +14,7 @@ import type { GoalMode } from '@/app/context/theme-context'
 import {
     Home, Utensils, Dumbbell, Moon, TrendingUp,
     Trophy, Brain, LayoutGrid, Bell, Settings, LogOut,
-    ChevronLeft, ChevronRight, Check, SportShoe, MoreHorizontal,
+    ChevronLeft, ChevronRight, Check, SportShoe, MoreHorizontal, Calculator,
 } from 'lucide-react'
 
 // ── Notification types ─────────────────────────────────────
@@ -217,14 +217,15 @@ function NotificationBell({ userId, expanded, unread, setUnread }: { userId: str
 // ── Nav items ──────────────────────────────────────────────
 // iconClassName is applied to the icon wrapper — use group-hover: classes for hover animations
 const BASE_NAV = [
-    { href: '/dashboard',           label: 'Home',        Icon: () => <Home size={18} />,       iconClassName: 'group-hover:-translate-y-0.5' },
-    { href: '/dashboard/nutrition', label: 'Nutrition',   Icon: () => <Utensils size={18} />,   iconClassName: 'group-hover:rotate-12' },
-    { href: '/dashboard/workouts',  label: 'Workouts',    Icon: () => <Dumbbell size={18} />,   iconClassName: 'group-hover:-rotate-12' },
-    { href: '/dashboard/sleep',     label: 'Sleep',       Icon: () => <Moon size={18} />,       iconClassName: 'group-hover:-rotate-12' },
-    { href: '/dashboard/progress',  label: 'Progress',    Icon: () => <TrendingUp size={18} />, iconClassName: 'group-hover:-translate-y-0.5' },
-    { href: '/dashboard/ippt',      label: 'IPPT',        Icon: () => <SportShoe size={18} />,  iconClassName: 'group-hover:-translate-y-1' },
-    { href: '/dashboard/friends',   label: 'Leaderboard', Icon: () => <Trophy size={18} />,     iconClassName: 'group-hover:scale-110' },
-    { href: '/dashboard/insights',  label: 'Insights',    Icon: () => <Brain size={18} />,      iconClassName: 'group-hover:scale-110' },
+    { href: '/dashboard',                        label: 'Home',        Icon: () => <Home size={18} />,         iconClassName: 'group-hover:-translate-y-0.5' },
+    { href: '/dashboard/nutrition',              label: 'Nutrition',   Icon: () => <Utensils size={18} />,     iconClassName: 'group-hover:rotate-12' },
+    { href: '/dashboard/workouts',               label: 'Workouts',    Icon: () => <Dumbbell size={18} />,     iconClassName: 'group-hover:-rotate-12' },
+    { href: '/dashboard/sleep',                  label: 'Sleep',       Icon: () => <Moon size={18} />,         iconClassName: 'group-hover:-rotate-12' },
+    { href: '/dashboard/progress',               label: 'Progress',    Icon: () => <TrendingUp size={18} />,   iconClassName: 'group-hover:-translate-y-0.5' },
+    { href: '/dashboard/ippt',                   label: 'IPPT',        Icon: () => <SportShoe size={18} />,    iconClassName: 'group-hover:-translate-y-1' },
+    { href: '/dashboard/friends',                label: 'Leaderboard', Icon: () => <Trophy size={18} />,       iconClassName: 'group-hover:scale-110' },
+    { href: '/dashboard/insights',               label: 'Insights',    Icon: () => <Brain size={18} />,        iconClassName: 'group-hover:scale-110' },
+    { href: '/dashboard/nutrition/calculator',   label: 'Calculator',  Icon: () => <Calculator size={18} />,  iconClassName: 'group-hover:scale-110' },
 ]
 
 const INSTRUCTOR_NAV = [
@@ -472,7 +473,13 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
         Icon: () => React.ReactElement
         iconClassName?: string
     }) => {
-        const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+        // A nav item is active if the path starts with its href,
+        // unless a more specific nav item also matches (e.g. /nutrition/calculator beats /nutrition).
+        const active = pathname === href || (
+            href !== '/dashboard' &&
+            pathname.startsWith(href) &&
+            !BASE_NAV.some(n => n.href !== href && n.href.startsWith(href + '/') && pathname.startsWith(n.href))
+        )
         return (
             <Link
                 href={href}
@@ -520,7 +527,7 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
                 </div>
                 {expanded && (
                     <span className="font-display text-[15px] font-extrabold tracking-tight text-sidebar-foreground whitespace-nowrap">
-                        INAP<span className="text-primary">·</span>Coach
+                        FitRep
                     </span>
                 )}
             </div>
