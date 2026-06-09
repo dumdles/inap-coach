@@ -229,13 +229,13 @@ export const SignUpForm: React.FC = () => {
                 className={direction === 'forward' ? 'animate-step-forward' : 'animate-step-back'}
             >
                 <div className="font-display text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-6">
-                    INAP<span className="text-primary">·</span>Coach
+                    FitRep
                 </div>
 
                 {step === 1 ? (
                     <>
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Create your account</h1>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Set up your INAP Coach account.</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Set up your FitRep account.</p>
                     </>
                 ) : step === 2 ? (
                     <>

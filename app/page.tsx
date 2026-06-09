@@ -636,7 +636,7 @@ export default function LandingPage() {
         borderBottom: '1px solid rgba(38,132,255,0.1)',
       }}>
         <div style={{ fontFamily: 'Satoshi, sans-serif', fontSize: 20, fontWeight: 800, letterSpacing: '-0.03em', color: TEXT }}>
-          INAP<span style={{ color: '#2684FF' }}>·</span>Coach
+          FitRep
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Link href="/login" style={{
@@ -864,7 +864,7 @@ export default function LandingPage() {
               Trained for your service.
             </h2>
             <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 15, color: TEXT_DIM, lineHeight: 1.75, marginBottom: 24 }}>
-              Army, Navy, Air Force, DIS — each service runs a different training curriculum. INAP Coach knows the difference, and tailors every coaching insight, macro target, and recovery recommendation to your specific training load.
+              Army, Navy, Air Force, DIS — each service runs a different training curriculum. FitRep knows the difference, and tailors every coaching insight, macro target, and recovery recommendation to your specific training load.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
@@ -985,7 +985,7 @@ export default function LandingPage() {
         gap: 16,
       }}>
         <div style={{ fontFamily: 'Satoshi, sans-serif', fontSize: 16, fontWeight: 800, color: TEXT }}>
-          INAP<span style={{ color: '#2684FF' }}>·</span>Coach
+          FitRep
         </div>
         <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: TEXT_DIM }}>
           Built for DIS Wing 14/26 Innovation Day.

@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/app/api/cron/_lib'
+import { callOpenRouter, PRIMARY_MODEL, FALLBACK_MODEL } from '@/app/api/_lib/ai'
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const PRIMARY_MODEL   = process.env.INSIGHTS_MODEL          ?? 'google/gemini-2.0-flash-001'
-const FALLBACK_MODEL  = process.env.INSIGHTS_FALLBACK_MODEL ?? 'meta-llama/llama-3.3-70b-instruct:free'
 const CACHE_HOURS = 24
 
-const SYSTEM_PROMPT = `You are a supportive nutrition and fitness coach embedded in INAP Coach — a meal and health tracking app built exclusively for Officer Cadet School (OCS) cadets in Singapore. Do not mention, recommend, or reference any other apps, platforms, or external services.
+const SYSTEM_PROMPT = `You are a supportive nutrition and fitness coach embedded in FitRep — a meal and health tracking app built exclusively for Officer Cadet School (OCS) cadets in Singapore. Do not mention, recommend, or reference any other apps, platforms, or external services.
 
 Context about the cadets:
 - OCS cadets are young, active adults undergoing intensive military training.
@@ -171,44 +169,16 @@ export async function GET(req: NextRequest) {
         (sleepRes.data ?? []) as Record<string, unknown>[],
     )
 
-    async function callModel(model: string) {
-        const response = await fetch(OPENROUTER_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'inap-coach',
-            },
-            body: JSON.stringify({
-                model,
-                messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
-                    { role: 'user', content: userMessage },
-                ],
-                temperature: 0.4,
-                response_format: { type: 'json_object' },
-            }),
-        })
-        if (!response.ok) throw Object.assign(new Error(`OpenRouter ${response.status}`), { status: response.status })
-        const json = await response.json()
-        let content: string = json.choices[0].message.content
-        content = content.replace(/^```json?\n?([\s\S]*?)\n?```$/m, '$1').trim()
-        return JSON.parse(content) as { summary: string; insights: unknown[] }
-    }
-
     let parsed: { summary: string; insights: unknown[] }
     try {
-        try {
-            parsed = await callModel(PRIMARY_MODEL)
-        } catch (primaryErr: unknown) {
-            const status = (primaryErr as { status?: number }).status
-            if (status === 429 || (status && status >= 500)) {
-                console.warn(`[insights] Primary model (${PRIMARY_MODEL}) failed with ${status}, trying fallback (${FALLBACK_MODEL})`)
-                parsed = await callModel(FALLBACK_MODEL)
-            } else {
-                throw primaryErr
-            }
-        }
+        const content = await callOpenRouter(
+            [
+                { role: 'system', content: SYSTEM_PROMPT },
+                { role: 'user', content: userMessage },
+            ],
+            { temperature: 0.4, response_format: { type: 'json_object' } },
+        )
+        parsed = JSON.parse(content) as { summary: string; insights: unknown[] }
     } catch (err) {
         console.error('[insights] OpenRouter error:', err)
         return NextResponse.json({ error: 'ai_unavailable' }, { status: 502 })

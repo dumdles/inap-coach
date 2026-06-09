@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
         let products: OFFProduct[] = []
 
         const sgRes = await fetch(sgUrl, {
-            headers: { 'User-Agent': 'INAP-Coach/1.0 (educational nutrition tracker)' },
+            headers: { 'User-Agent': 'FitRep/1.0 (educational nutrition tracker)' },
             signal: AbortSignal.timeout(4000),
         })
 
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
         // If not enough SG results, supplement with broader Asian-filtered search
         if (products.length < 3) {
             const worldRes = await fetch(worldUrl, {
-                headers: { 'User-Agent': 'INAP-Coach/1.0 (educational nutrition tracker)' },
+                headers: { 'User-Agent': 'FitRep/1.0 (educational nutrition tracker)' },
                 signal: AbortSignal.timeout(4000),
             })
             if (worldRes.ok) {

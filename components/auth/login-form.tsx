@@ -81,13 +81,13 @@ export const LoginForm: React.FC = () => {
         <div className="w-full max-w-md mx-auto p-8 bg-white dark:bg-[#172B4D] rounded-2xl border border-gray-200 dark:border-[#344563] shadow-lg animate-fade-in">
             <div className="mb-8">
                 <div className="font-display text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-6">
-                    INAP<span className="text-primary">·</span>Coach
+                    FitRep
                 </div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                     Welcome Back
                 </h1>
                 <p className="text-gray-500 dark:text-gray-400">
-                    Sign in to your INAP Coach account
+                    Sign in to your FitRep account
                 </p>
             </div>
 

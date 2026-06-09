@@ -6,9 +6,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ---
 
-# INAP Coach — Agent & Codebase Guide
+# fitrep — Agent & Codebase Guide
 
-## What is INAP Coach?
+## What is fitrep?
 
 A nutrition and fitness tracking web app built exclusively for **Officer Cadet School (OCS) cadets in Singapore**. Cadets live in camp Mon–Fri (cookhouse meals provided) and return home on weekends. The app helps them track meals, workouts, body weight, and gives AI-powered coaching insights.
 

@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "INAP Coach",
+  title: "FitRep",
   description: "Your personal fitness coach.",
   other: {
     'theme-color': '#F5F7FA',
