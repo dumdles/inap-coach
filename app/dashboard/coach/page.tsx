@@ -30,7 +30,12 @@ const TOOL_LABELS: Record<string, string> = {
     getLeaderboard: 'Checked leaderboard scores',
     getIpptResults: 'Checked IPPT records',
     getTargets: 'Recalculated daily targets',
+    setIpptDate: 'Saved your IPPT date',
 }
+
+// Pill widths for the starter-chip loading skeleton — varied so the row of
+// placeholders looks like real questions rather than identical blocks.
+const CHIP_SKELETON_WIDTHS = ['9rem', '12rem', '7.5rem', '10.5rem']
 
 // Starter chips shown on the empty state before the first message.
 const STARTER_CHIPS = [
@@ -187,9 +192,12 @@ export default function CoachPage() {
     const [sessions, setSessions] = useState<ChatSession[]>([])
     const [historyOpen, setHistoryOpen] = useState(false)
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-    // Empty-state chips: seeded with the static set so there's no flash, then
-    // replaced with profile-tailored questions once the API responds.
-    const [starterChips, setStarterChips] = useState<string[]>(STARTER_CHIPS)
+    // Empty-state chips: start empty and show a loading skeleton while the
+    // profile-tailored questions are generated, then reveal them. Avoids the
+    // jarring swap from static defaults to personalised ones. Static set is the
+    // fallback if the request fails.
+    const [starterChips, setStarterChips] = useState<string[]>([])
+    const [chipsLoading, setChipsLoading] = useState(true)
     const suggestionsForRef = useRef<string | null>(null)
     const dissolveRef = useRef<DissolveInputHandle>(null)
 
@@ -219,14 +227,20 @@ export default function CoachPage() {
     // starter mode) for opening questions tailored to this cadet's profile.
     useEffect(() => {
         if (!token) return
+        // chipsLoading starts true, so the skeleton shows from mount through
+        // auth until this personalised fetch resolves — no flash of defaults.
         fetch('/api/chat/suggestions', {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
         })
             .then(r => r.ok ? r.json() : { suggestions: [] })
-            .then(({ suggestions }) => { if (suggestions?.length) setStarterChips(suggestions) })
-            .catch(() => {})
+            .then(({ suggestions }) => {
+                // Use the personalised set, or fall back to the static defaults.
+                setStarterChips(suggestions?.length ? suggestions : STARTER_CHIPS)
+            })
+            .catch(() => setStarterChips(STARTER_CHIPS))
+            .finally(() => setChipsLoading(false))
     }, [token])
 
     /** Returns the active session id, creating a session on the first message. */
@@ -407,18 +421,37 @@ export default function CoachPage() {
                                 I can see your logged meals, workouts, sleep and progress — ask me anything.
                             </p>
                         </div>
-                        <div className="flex flex-wrap justify-center gap-2 max-w-md">
-                            {starterChips.map(chip => (
-                                <button
-                                    key={chip}
-                                    onClick={() => handleSend(chip)}
-                                    className="px-3.5 py-2 rounded-full border border-border bg-card text-[13px] font-medium text-foreground
-                                               hover:border-primary/40 hover:bg-primary/5 hover:text-primary active:scale-[0.98] transition-all"
-                                >
-                                    {chip}
-                                </button>
-                            ))}
-                        </div>
+                        {chipsLoading ? (
+                            <div className="flex flex-col items-center gap-2.5">
+                                <Shimmer className="text-[12px]">Personalising suggestions…</Shimmer>
+                                <div className="flex flex-wrap justify-center gap-2 max-w-md">
+                                    {CHIP_SKELETON_WIDTHS.map((w, i) => (
+                                        <div
+                                            key={i}
+                                            className="chip-skeleton h-[37px]"
+                                            style={{ width: w }}
+                                            aria-hidden
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-wrap justify-center gap-2 max-w-md">
+                                {starterChips.map((chip, i) => (
+                                    <button
+                                        key={chip}
+                                        onClick={() => handleSend(chip)}
+                                        // Stagger each chip in so the personalised set arrives gracefully.
+                                        style={{ animationDelay: `${i * 70}ms` }}
+                                        className="px-3.5 py-2 rounded-full border border-border bg-card text-[13px] font-medium text-foreground
+                                                   hover:border-primary/40 hover:bg-primary/5 hover:text-primary active:scale-[0.98] transition-all
+                                                   animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both"
+                                    >
+                                        {chip}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
 

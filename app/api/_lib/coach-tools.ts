@@ -6,7 +6,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import {
     getNutritionSummary, getMealsForDate, getWorkouts, getWeightTrend,
-    getSleep, getLeaderboard, getIpptResults, getTargets,
+    getSleep, getLeaderboard, getIpptResults, getTargets, setIpptDate,
 } from './coach-data'
 
 const daysSchema = z.number().int().min(1).max(90).default(14)
@@ -55,6 +55,13 @@ export function buildCoachTools(userId: string) {
             description: "The cadet's recommended daily calorie and protein targets computed from their profile (TDEE), alongside their currently set target.",
             inputSchema: z.object({}),
             execute: async () => getTargets(userId),
+        }),
+        setIpptDate: tool({
+            description: "Save or update the cadet's upcoming IPPT date in their profile. ONLY call this after the cadet has explicitly agreed to log a date AND has given a concrete date — never guess or set it speculatively. Confirm the saved date back to them afterwards.",
+            inputSchema: z.object({
+                date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('The IPPT date the cadet confirmed, in YYYY-MM-DD'),
+            }),
+            execute: async ({ date }) => setIpptDate(userId, date),
         }),
     }
 }

@@ -141,6 +141,34 @@ export async function getIpptResults(userId: string) {
     return { upcomingIpptDate: user?.ippt_date ?? null, pastResults: results ?? [] }
 }
 
+/**
+ * Writes the cadet's upcoming IPPT date to their profile. The only mutating
+ * coach tool — used when the cadet asks the coach to log/update their next
+ * IPPT. Scoped to the authed userId, so a cadet can only set their own date.
+ * Rejects malformed dates and anything more than ~2 years out as a guard
+ * against the model passing a bad value.
+ */
+export async function setIpptDate(userId: string, date: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return { error: 'Date must be in YYYY-MM-DD format.' }
+    }
+    const parsed = new Date(`${date}T00:00:00+08:00`)
+    if (Number.isNaN(parsed.getTime())) {
+        return { error: 'That is not a valid calendar date.' }
+    }
+    const twoYears = Date.now() + 2 * 365.25 * 86400_000
+    if (parsed.getTime() > twoYears) {
+        return { error: 'IPPT date looks too far in the future — please confirm the year.' }
+    }
+
+    const { error } = await supabaseAdmin
+        .from('users')
+        .update({ ippt_date: date })
+        .eq('id', userId)
+    if (error) return { error: 'Could not save the IPPT date — please try again.' }
+    return { saved: true, ipptDate: date }
+}
+
 /** Recomputes the cadet's recommended calorie/protein targets from their profile. */
 export async function getTargets(userId: string) {
     const { data: user } = await supabaseAdmin

@@ -126,7 +126,7 @@ docs/
 
 ### AI Coach chat (`app/dashboard/coach/`)
 - Streaming chatbot built on AI SDK `useChat` + `/api/chat` (`streamText` with tool calling, `stopWhen: stepCountIs(6)`).
-- Tools in `app/api/_lib/coach-tools.ts` fetch the authed cadet's own data only (nutrition, meals, workouts, weight, sleep, leaderboard, IPPT, TDEE targets) — userId comes from `verifyAuth`, never from the model.
+- Tools in `app/api/_lib/coach-tools.ts` fetch the authed cadet's own data (nutrition, meals, workouts, weight, sleep, leaderboard, IPPT, TDEE targets) — userId comes from `verifyAuth`, never from the model. The coach proactively pulls multiple sources before planning answers. One write tool, `setIpptDate`, lets the coach save the cadet's upcoming IPPT date after they confirm one.
 - Persona + per-service context in `app/api/_lib/coach-prompt.ts` (shared with insights via `SERVICE_CONTEXT`).
 - Conversations persisted in `chat_sessions` / `chat_messages` (full UIMessage `parts` as jsonb, replaced wholesale in `onFinish`).
 - Suggestion chips: static starter chips on the empty state; after each reply the client POSTs the conversation tail to `/api/chat/suggestions` for 3 AI-generated follow-up chips.
