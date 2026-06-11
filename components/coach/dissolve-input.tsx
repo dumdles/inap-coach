@@ -30,6 +30,7 @@ type Props = {
     onEnter: () => void
     placeholder: string
     className?: string
+    disabled?: boolean
 }
 
 // Resting height (single line) and the cap before the textarea scrolls
@@ -126,7 +127,7 @@ function buildGlowLayers(wrapWidth: number, text: string): string {
 }
 
 export const DissolveInput = forwardRef<DissolveInputHandle, Props>(function DissolveInput(
-    { value, onChange, onEnter, placeholder, className },
+    { value, onChange, onEnter, placeholder, className, disabled },
     ref,
 ) {
     const wrapRef = useRef<HTMLDivElement>(null)
@@ -247,6 +248,7 @@ export const DissolveInput = forwardRef<DissolveInputHandle, Props>(function Dis
             <textarea
                 ref={textareaRef}
                 value={value}
+                disabled={disabled}
                 onChange={e => onChange(e.target.value)}
                 onKeyDown={e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -263,7 +265,8 @@ export const DissolveInput = forwardRef<DissolveInputHandle, Props>(function Dis
                 className="block w-full resize-none rounded-2xl border-[1.5px] border-input bg-card pl-4 pr-11 py-[10px]
                            text-[14px] leading-6 text-foreground
                            focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15
-                           transition-[height,border-color,box-shadow] duration-150"
+                           transition-[height,border-color,box-shadow] duration-150
+                           disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{ minHeight: BASE_HEIGHT, maxHeight: MAX_HEIGHT, boxSizing: 'border-box' }}
             />
             <div ref={mirrorRef} className="t-clear-mirror" aria-hidden="true" />

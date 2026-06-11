@@ -85,6 +85,7 @@ docs/
 - **Design system**: Always use CSS custom property tokens (e.g. `text-primary`, `bg-muted`, `border-border`). Never hardcode hex values. See `docs/DESIGN_SYSTEM.md` for the full token reference.
 - **Leave comments for junior developers**: Briefly explain what code does and how it links to related features if possible.
 - **Validation**: All numeric user inputs must be validated both client-side (inline error under the field, shown on change) and server-side (API returns 400 with a message). Limits are domain-appropriate (e.g. duration max 600 min, weight 20–300 kg).
+- **Dates & times**: Never use native `<input type="date|time|datetime-local">` — they render inconsistently across browsers. Use the in-app `DatePicker`, `TimePicker`, or `DateTimePicker` from `components/ui/` (all built on the shared Popover + Calendar, themed in 24h SGT).
 
 ## Authentication
 
@@ -131,6 +132,7 @@ docs/
 - Conversations persisted in `chat_sessions` / `chat_messages` (full UIMessage `parts` as jsonb, replaced wholesale in `onFinish`).
 - Suggestion chips: static starter chips on the empty state; after each reply the client POSTs the conversation tail to `/api/chat/suggestions` for 3 AI-generated follow-up chips.
 - Client auth: Bearer token + sessionId passed per request via `sendMessage` request-level options.
+- Daily AI limit: each cadet gets `AI_DAILY_MESSAGE_LIMIT` coach messages per Singapore day. `app/api/_lib/ai-usage.ts` atomically consumes quota via the `increment_ai_usage` Postgres function (table `ai_usage`); `/api/chat` returns 429 `rate_limited` when exhausted. The UI reads `/api/chat/usage` to show remaining messages and disables the input at zero.
 - `scripts/create-test-user.mjs` creates/resets a seeded test cadet (`coach-e2e-test@fitrep.local`) for local E2E testing.
 
 ### Wing / leaderboard (`app/dashboard/wing/`)
@@ -153,6 +155,7 @@ docs/
 | `INSIGHTS_MODEL` | Override primary model (default: `google/gemini-3.1-flash-lite`) |
 | `INSIGHTS_FALLBACK_MODEL` | Fallback model |
 | `CHAT_MODEL` | Override coach chat model (default: same as `INSIGHTS_MODEL`; must support tool calling) |
+| `AI_DAILY_MESSAGE_LIMIT` | Per-cadet daily AI coach message cap (default 25) |
 | `POLAR_CLIENT_ID` / `POLAR_CLIENT_SECRET` | Polar Flow OAuth |
 | `CRON_SECRET` | Protects cron route handlers |
 

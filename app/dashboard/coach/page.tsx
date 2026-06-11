@@ -200,16 +200,33 @@ export default function CoachPage() {
     const [chipsLoading, setChipsLoading] = useState(true)
     const suggestionsForRef = useRef<string | null>(null)
     const dissolveRef = useRef<DissolveInputHandle>(null)
+    // Daily AI usage — how many coach messages the cadet has left today.
+    const [usage, setUsage] = useState<{ used: number; limit: number; remaining: number } | null>(null)
 
     const token = session?.access_token
 
     const { messages, sendMessage, setMessages, status, error } = useChat({ transport: chatTransport })
     const busy = status === 'submitted' || status === 'streaming'
+    const limitReached = usage ? usage.remaining <= 0 : false
 
     const authHeaders = useCallback((): Record<string, string> => ({
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
     }), [token])
+
+    // ── Daily AI usage ─────────────────────────────────────
+    const refreshUsage = useCallback(() => {
+        if (!token) return
+        fetch('/api/chat/usage', { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.ok ? r.json() : null)
+            .then(u => { if (u) setUsage(u) })
+            .catch(() => {})
+    }, [token])
+
+    useEffect(() => { refreshUsage() }, [refreshUsage])
+    // Re-read the count whenever a turn settles (ready) or errors (a 429 from
+    // the limit also lands here), so the indicator stays in sync.
+    useEffect(() => { if (status === 'ready' || error) refreshUsage() }, [status, error, refreshUsage])
 
     // ── Session management ─────────────────────────────────
 
@@ -291,6 +308,10 @@ export default function CoachPage() {
     async function handleSend(text: string) {
         const trimmed = text.trim()
         if (!trimmed || busy) return
+        if (limitReached) {
+            toast.error("You've used all your AI coach messages for today. Resets at midnight (SGT).")
+            return
+        }
         setChips([])
         // Dissolve the typed text out of the input (no-op for chip sends,
         // where the input is already empty).
@@ -465,7 +486,9 @@ export default function CoachPage() {
 
                 {error && (
                     <div className="flex items-center gap-2 text-[13px] text-destructive bg-destructive/5 border border-destructive/20 rounded-xl px-4 py-3">
-                        The coach hit a snag. Check your connection and try again.
+                        {limitReached
+                            ? `You've reached your daily limit of ${usage?.limit} coach messages. It resets at midnight (SGT).`
+                            : 'The coach hit a snag. Check your connection and try again.'}
                     </div>
                 )}
             </div>
@@ -474,6 +497,12 @@ export default function CoachPage() {
             <div className="flex-shrink-0 space-y-2.5 pb-4 pt-1">
                 {status === 'ready' && messages.length > 0 && (
                     <SuggestionChips chips={chips} onPick={handleSend} disabled={busy} />
+                )}
+                {limitReached && (
+                    <div className="flex items-center gap-2 text-[12px] text-muted-foreground bg-muted/50 border border-border rounded-xl px-3.5 py-2.5">
+                        <Sparkles size={13} className="text-primary flex-shrink-0" />
+                        Daily AI coach limit reached. Your {usage?.limit} messages reset at midnight (SGT).
+                    </div>
                 )}
                 <form
                     onSubmit={e => { e.preventDefault(); handleSend(input) }}
@@ -484,12 +513,13 @@ export default function CoachPage() {
                         value={input}
                         onChange={setInput}
                         onEnter={() => handleSend(input)}
-                        placeholder="Ask your coach…"
+                        placeholder={limitReached ? 'Daily limit reached — back tomorrow' : 'Ask your coach…'}
                         className="flex-1"
+                        disabled={limitReached}
                     />
                     <button
                         type="submit"
-                        disabled={!input.trim() || busy}
+                        disabled={!input.trim() || busy || limitReached}
                         className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0
                                    hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
                         title="Send"
@@ -497,9 +527,16 @@ export default function CoachPage() {
                         {busy ? <Loader2 size={17} className="animate-spin" /> : <SendHorizontal size={17} />}
                     </button>
                 </form>
-                <p className="text-[11px] text-muted-foreground/70 text-center">
-                    AI coach can make mistakes. For medical concerns, see your MO.
-                </p>
+                {/* Show the remaining count once the cadet is running low; otherwise the usual disclaimer. */}
+                {usage && !limitReached && usage.remaining <= 5 ? (
+                    <p className="text-[11px] text-muted-foreground/70 text-center">
+                        {usage.remaining} of {usage.limit} daily AI messages left
+                    </p>
+                ) : (
+                    <p className="text-[11px] text-muted-foreground/70 text-center">
+                        AI coach can make mistakes. For medical concerns, see your MO.
+                    </p>
+                )}
             </div>
         </div>
     )

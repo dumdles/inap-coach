@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { useAuth } from '@/app/context/auth-context'
 import { cn } from '@/lib/utils'
 
@@ -121,8 +122,6 @@ export function LogSleepDialog({ open, onOpenChange, onLogged, editing }: Props)
         onOpenChange(false)
     }
 
-    const inputCls = 'h-10 w-full rounded-xl border border-border bg-background px-3 text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40'
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
@@ -131,15 +130,15 @@ export function LogSleepDialog({ open, onOpenChange, onLogged, editing }: Props)
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    {/* Sleep window */}
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* Sleep window — in-app DatePicker + TimePicker, not the native control */}
+                    <div className="space-y-3">
                         <div>
                             <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Bedtime</label>
-                            <input type="datetime-local" className={inputCls} value={sleepStart} onChange={e => setSleepStart(e.target.value)} />
+                            <DateTimePicker value={sleepStart} onChange={setSleepStart} toDate={new Date()} />
                         </div>
                         <div>
                             <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Woke up</label>
-                            <input type="datetime-local" className={inputCls} value={sleepEnd} onChange={e => setSleepEnd(e.target.value)} />
+                            <DateTimePicker value={sleepEnd} onChange={setSleepEnd} toDate={new Date()} />
                         </div>
                     </div>
 

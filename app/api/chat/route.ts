@@ -6,6 +6,7 @@ import { chatModel } from '@/app/api/_lib/ai'
 import { buildChatSystemPrompt } from '@/app/api/_lib/coach-prompt'
 import { getCoachProfile } from '@/app/api/_lib/coach-data'
 import { buildCoachTools } from '@/app/api/_lib/coach-tools'
+import { consumeAiQuota } from '@/app/api/_lib/ai-usage'
 
 // Keep conversations bounded: only the most recent messages go to the model.
 // Older turns are still stored and rendered, just not re-sent as context.
@@ -37,6 +38,22 @@ export async function POST(req: NextRequest) {
         .single()
     if (!session || session.user_id !== userId) {
         return NextResponse.json({ error: 'session not found' }, { status: 404 })
+    }
+
+    // Enforce the per-cadet daily AI limit before spending a model call. This
+    // atomically consumes one unit of today's quota; if it's exhausted we stop
+    // here with 429 so no generation happens.
+    const quota = await consumeAiQuota(userId)
+    if (!quota.allowed) {
+        return NextResponse.json(
+            {
+                error: `You've reached your daily limit of ${quota.limit} coach messages. It resets at midnight (SGT).`,
+                code: 'rate_limited',
+                limit: quota.limit,
+                remaining: 0,
+            },
+            { status: 429 },
+        )
     }
 
     const profile = await getCoachProfile(userId)
