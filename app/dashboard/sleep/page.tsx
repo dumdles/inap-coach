@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/pagination'
 import { LogSleepDialog, SleepLog as LogSleepDialogLog } from '@/components/sleep/log-sleep-dialog'
 import { AppleHealthImportDialog } from '@/components/sleep/apple-health-import-dialog'
+import { TimePicker } from '@/components/ui/time-picker'
 import { recoveryReadiness, sleepDebtHours, type ReadinessLevel } from '@/lib/scoring'
 import {
     MoonIcon, RefreshCwIcon, PlusIcon, HeartIcon, ZapIcon, FootprintsIcon,
@@ -1247,21 +1248,11 @@ function SettingsPopover({
             <div className="grid grid-cols-2 gap-2">
                 <div>
                     <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Bedtime</label>
-                    <input
-                        type="time"
-                        value={bedtime}
-                        onChange={e => setBedtime(e.target.value)}
-                        className="h-9 w-full rounded-lg border border-border bg-background px-3 text-[13px]"
-                    />
+                    <TimePicker value={bedtime} onChange={setBedtime} placeholder="Bedtime" />
                 </div>
                 <div>
                     <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Wake</label>
-                    <input
-                        type="time"
-                        value={wake}
-                        onChange={e => setWake(e.target.value)}
-                        className="h-9 w-full rounded-lg border border-border bg-background px-3 text-[13px]"
-                    />
+                    <TimePicker value={wake} onChange={setWake} placeholder="Wake" />
                 </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-1">

@@ -73,6 +73,11 @@
 }
 
 :root {
+  /* Make native controls (datetime-local pickers, number spinners, selects,
+     scrollbars) render in light mode — overridden to dark by .dark below.
+     Without this the native date/time text + picker icons stay dark-on-dark. */
+  color-scheme: light;
+
   --primary-foreground: #FFFFFF;
 
   /* Brand Colors */
@@ -180,6 +185,10 @@
 }
 
 .dark {
+    /* Native controls (date/time pickers, spinners, selects) adopt the
+       browser's dark styling so their text and icons stay legible. */
+    color-scheme: dark;
+
     /* Brand */
     --primary:       #2684FF;
     --primary-light: rgba(38, 132, 255, 0.15);
@@ -458,4 +467,161 @@ h1, h2, h3, h4, h5, h6 {
   animation: insights-card-glow 4s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
+}
+/* ── AI Coach: shimmer text (transitions.dev) ─────────────────
+   Two-layer construction: the base text renders in the muted
+   color; ::before duplicates it via content: attr(data-text),
+   paints a moving highlight gradient and clips it to the glyphs
+   with background-clip: text. Used for "generating" states. */
+:root {
+  --shimmer-dur: 2000ms;
+  --shimmer-base: var(--muted-foreground);
+  --shimmer-highlight: var(--foreground);
+  --shimmer-band: 400%;
+}
+.t-shimmer {
+  position: relative;
+  display: inline-block;
+  color: var(--shimmer-base);
+}
+.t-shimmer::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 40%,
+    var(--shimmer-highlight) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: var(--shimmer-band) 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: t-shimmer var(--shimmer-dur) linear infinite;
+}
+@keyframes t-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: 0% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-shimmer::before { animation: none !important; }
+}
+
+/* ── AI Coach: starter-chip loading skeleton ──────────────────
+   Pill-shaped placeholders shown while the personalised starter
+   questions are being generated. A soft highlight band sweeps
+   across each pill so it reads as "loading" rather than empty,
+   then the real chips stagger-fade in to replace them. */
+.chip-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--muted);
+}
+.chip-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--foreground) 8%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: chip-skeleton 1300ms linear infinite;
+}
+@keyframes chip-skeleton {
+  0%   { background-position: 150% 0; }
+  100% { background-position: -50% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chip-skeleton::after { animation: none !important; }
+}
+
+/* ── AI Coach: input clear with dissolve (transitions.dev) ────
+   On send, a mirror of the typed text flies up and dissolves
+   (blur + fade) while the placeholder flies back in, with a
+   per-word glow streak along the bottom edge. The per-frame
+   tweening lives in components/coach/dissolve-input.tsx — this
+   stylesheet owns the resting state and the tuning variables. */
+:root {
+  --clear-dur: 1000ms;
+  --clear-out-dur: 400ms;
+  --clear-in-dur: 400ms;
+  --clear-out-fly: 12px;
+  --clear-in-fly: 12px;
+  --clear-out-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --clear-in-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --clear-blur: 2px;
+  --glow-delay: 50ms;
+  --glow-peak-at: 0.15;
+  --glow-opacity: 0.42;
+  --glow-spread: 1.5;
+}
+/* No overflow:hidden here — it would clip the textarea's focus ring.
+   The glow clips itself via its own border-radius instead (below). */
+.t-clear {
+  position: relative;
+}
+/* The mirror and fake placeholder only stand in for a SINGLE resting
+   line (the dissolve snapshot / the empty-state placeholder), so they
+   pin to the top 48px of the field and stay vertically centred there
+   even when the textarea has grown taller. */
+.t-clear-mirror,
+.t-clear-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  white-space: pre;
+  overflow: hidden;
+  z-index: 2;
+  /* Must match the textarea's text metrics for a seamless swap */
+  padding: 0 16px;
+  font-size: 14px;
+  line-height: 24px;
+  font-family: var(--font-body);
+}
+/* The mirror rests invisible; during a dissolve, JS drives its
+   opacity/transform/filter inline every frame. Inline styles (not
+   a state class) because the parent re-renders mid-animation and
+   React's className writes would clobber an imperative class. */
+.t-clear-mirror { opacity: 0; color: var(--foreground); }
+/* The fake placeholder is the only placeholder — the textarea gets
+   no native one. Hidden while there is text; during the clear
+   animation JS drives its opacity/transform inline. */
+.t-clear-placeholder { color: var(--muted-foreground); }
+.t-clear.has-value .t-clear-placeholder { opacity: 0; }
+/* Streak overlay: JS writes radial-gradient layers per word and
+   animates opacity. multiply darkens in light mode; screen
+   lightens the same alpha values in dark mode. */
+.t-clear-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 3;
+  mix-blend-mode: multiply;
+  /* Self-clip the radial-gradient streak to the field's rounded box
+     (background is clipped to border-radius), so we don't need
+     overflow:hidden on the wrap — which would eat the focus ring. */
+  border-radius: 16px;
+}
+.dark .t-clear-glow {
+  mix-blend-mode: screen;
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-clear-glow { opacity: 0 !important; }
 }

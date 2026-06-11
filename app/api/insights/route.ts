@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { supabaseAdmin } from '@/app/api/cron/_lib'
-import { callOpenRouter, PRIMARY_MODEL, FALLBACK_MODEL } from '@/app/api/_lib/ai'
+import { generateStructured } from '@/app/api/_lib/ai'
+import { SERVICE_CONTEXT } from '@/app/api/_lib/coach-prompt'
 
 const CACHE_HOURS = 24
+
+// Schema enforced by the AI SDK — replaces manual JSON.parse of the response.
+const insightsSchema = z.object({
+    summary: z.string(),
+    insights: z.array(z.object({
+        id: z.string(),
+        priority: z.enum(['high', 'medium', 'low']),
+        category: z.enum(['nutrition', 'weight', 'performance', 'recovery', 'adherence', 'service']),
+        title: z.string(),
+        observation: z.string(),
+        action: z.string(),
+    })).min(1).max(8),
+})
 
 const SYSTEM_PROMPT = `You are a supportive nutrition and fitness coach embedded in FitRep — a meal and health tracking app built exclusively for Officer Cadet School (OCS) cadets in Singapore. Do not mention, recommend, or reference any other apps, platforms, or external services.
 
@@ -97,14 +112,7 @@ function buildUserMessage(user: Record<string, unknown>, dailySummaries: Record<
         ? (user.full_name as string).trim().split(' ')[0]
         : null
 
-    const serviceContext: Record<string, string> = {
-        'Army':      'High-volume field training: route marches (up to 16–24 km with full pack), obstacle courses, and strength conditioning. Caloric expenditure is 200–300 kcal/day higher than other services. Protein and complex carb intake are critical for muscle repair and sustained energy. Pre-march carb loading and post-exercise protein (30–40 g) are priority actions.',
-        'Navy':      'Swim fitness, VO₂ endurance sessions, and maritime drills. Aerobic capacity and hydration are key — pool chlorine and water exposure increase fluid and electrolyte loss. Iron-rich foods support oxygen transport. Avoid heavy pre-swim meals.',
-        'Air Force': 'Aerobic base building, HIIT cycles, and precision conditioning. Moderate-to-high intensity; consistent energy intake across the day matters more than peak loading. Post-HIIT 3:1 carb-to-protein recovery meals optimise glycogen resynthesis. Avoid energy crashes that impair both physical and mental performance.',
-        'DIS':       'Balanced physical conditioning with significant cognitive performance demands. Training load is moderate; nutrition should prioritise steady blood glucose (complex carbs), brain health (omega-3s, B-vitamins, zinc), and hydration. Even mild dehydration measurably impairs reaction time and decision accuracy. Sleep quality and nutrition are tightly linked for DIS cadets.',
-        'MIDS':      'Maritime training including water confidence, sea drills, and VO₂ conditioning. Cold-water exposure increases metabolic demand. Electrolyte replenishment, iron intake, and adequate post-training calories are priorities. Like Navy, pre-exercise meals should be moderate and easily digested.',
-    }
-    const serviceNote = user.service ? serviceContext[user.service as string] : null
+    const serviceNote = user.service ? SERVICE_CONTEXT[user.service as string] : null
 
     return `Current Singapore time: ${sgtDateStr} ${sgtTimeStr}
 
@@ -171,18 +179,16 @@ export async function GET(req: NextRequest) {
         (sleepRes.data ?? []) as Record<string, unknown>[],
     )
 
-    let parsed: { summary: string; insights: unknown[] }
+    let parsed: z.infer<typeof insightsSchema>
     try {
-        const content = await callOpenRouter(
-            [
-                { role: 'system', content: SYSTEM_PROMPT },
-                { role: 'user', content: userMessage },
-            ],
-            { temperature: 0.4, response_format: { type: 'json_object' } },
-        )
-        parsed = JSON.parse(content) as { summary: string; insights: unknown[] }
+        parsed = await generateStructured({
+            schema: insightsSchema,
+            system: SYSTEM_PROMPT,
+            prompt: userMessage,
+            temperature: 0.4,
+        })
     } catch (err) {
-        console.error('[insights] OpenRouter error:', err)
+        console.error('[insights] AI error:', err)
         return NextResponse.json({ error: 'ai_unavailable' }, { status: 502 })
     }
 
