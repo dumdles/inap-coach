@@ -21,7 +21,7 @@ A nutrition and fitness tracking web app built exclusively for **Officer Cadet S
 | Database | Supabase (Postgres) via `@supabase/supabase-js` |
 | Auth | Custom Supabase auth (email/password) + `app/context/auth-context.tsx` |
 | Styling | Tailwind CSS v4 + shadcn/ui |
-| AI | OpenRouter API (`OPENROUTER_API_KEY`) with Gemini 2.0 Flash as primary model |
+| AI | Vercel AI SDK v6 (`ai` + `@openrouter/ai-sdk-provider`) over OpenRouter (`OPENROUTER_API_KEY`). Gemini Flash primary with OpenRouter-native model fallback. Shared helpers in `app/api/_lib/ai.ts` |
 | Fitness data | Polar Flow API (OAuth) |
 | Notifications | Supabase `notifications` table — push-style, in-app only |
 | Deployment | Vercel |
@@ -31,8 +31,10 @@ A nutrition and fitness tracking web app built exclusively for **Officer Cadet S
 ```
 app/
   api/                    # Route handlers (Next.js App Router)
+    _lib/                 # ai.ts (AI SDK helpers), auth.ts (verifyAuth), coach-prompt/data/tools.ts (AI coach chat)
     auth/                 # Supabase auth + Polar OAuth callbacks
     cadet/                # Cadet profile
+    chat/                 # AI coach chat: streaming route, sessions, suggestion chips
     cron/                 # Scheduled jobs (Vercel Cron) — macro alerts, weekly recap, leaderboard
     food-items/           # CRUD for food items (custom and cookhouse)
     food-templates/       # Read-only preset food items (DB-seeded)
@@ -48,6 +50,7 @@ app/
     auth-context.tsx      # useAuth() — current user session
     theme-context.tsx     # Dark/light mode
   dashboard/
+    coach/                # AI coach chat (useChat streaming UI + suggestion chips)
     friends/              # Friend management
     insights/             # AI insights page
     notifications/        # Notification list
@@ -67,6 +70,7 @@ components/
     gpx-map.tsx           # GPX track visualisation
     workout-detail-dialog.tsx
 lib/
+  analytics.ts            # Deterministic stats (trends, averages, adherence) shared by UI + AI
   polar.ts                # Polar Flow API helpers
   scoring.ts              # IPPT and wing scoring logic
   supabase.ts             # Supabase client (browser)
@@ -115,10 +119,19 @@ docs/
 - Polar steps and calories burned auto-imported from Polar cron.
 
 ### Insights (`app/dashboard/insights/`)
-- Calls `/api/insights?userId=<uuid>` which hits OpenRouter (Gemini 2.0 Flash → Llama 3.3 fallback).
-- Results cached 24h in `ai_insights` table per user.
+- Calls `/api/insights?userId=<uuid>` which generates schema-validated insights via `generateStructured()` (AI SDK, Gemini Flash → fallback model).
+- Results cached 24h in `user_insights` table per user.
 - Pass `&refresh=1` to force regeneration.
 - Loading state shows animated spinner + friendly "Analysing your data…" message (not a silent skeleton).
+
+### AI Coach chat (`app/dashboard/coach/`)
+- Streaming chatbot built on AI SDK `useChat` + `/api/chat` (`streamText` with tool calling, `stopWhen: stepCountIs(6)`).
+- Tools in `app/api/_lib/coach-tools.ts` fetch the authed cadet's own data only (nutrition, meals, workouts, weight, sleep, leaderboard, IPPT, TDEE targets) — userId comes from `verifyAuth`, never from the model.
+- Persona + per-service context in `app/api/_lib/coach-prompt.ts` (shared with insights via `SERVICE_CONTEXT`).
+- Conversations persisted in `chat_sessions` / `chat_messages` (full UIMessage `parts` as jsonb, replaced wholesale in `onFinish`).
+- Suggestion chips: static starter chips on the empty state; after each reply the client POSTs the conversation tail to `/api/chat/suggestions` for 3 AI-generated follow-up chips.
+- Client auth: Bearer token + sessionId passed per request via `sendMessage` request-level options.
+- `scripts/create-test-user.mjs` creates/resets a seeded test cadet (`coach-e2e-test@fitrep.local`) for local E2E testing.
 
 ### Wing / leaderboard (`app/dashboard/wing/`)
 - Cadets compete in wings. Points from IPPT scores, workout logs, nutrition adherence.
@@ -136,9 +149,10 @@ docs/
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (browser) |
 | `SUPABASE_SECRET_KEY` | Supabase service role key (server only) |
-| `OPENROUTER_API_KEY` | OpenRouter for AI insights |
-| `INSIGHTS_MODEL` | Override primary model (default: `google/gemini-2.0-flash-001`) |
+| `OPENROUTER_API_KEY` | OpenRouter for AI insights + coach chat |
+| `INSIGHTS_MODEL` | Override primary model (default: `google/gemini-3.1-flash-lite`) |
 | `INSIGHTS_FALLBACK_MODEL` | Fallback model |
+| `CHAT_MODEL` | Override coach chat model (default: same as `INSIGHTS_MODEL`; must support tool calling) |
 | `POLAR_CLIENT_ID` / `POLAR_CLIENT_SECRET` | Polar Flow OAuth |
 | `CRON_SECRET` | Protects cron route handlers |
 

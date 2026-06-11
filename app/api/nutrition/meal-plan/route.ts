@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { verifyAuth } from '@/app/api/_lib/auth'
-import { callOpenRouter } from '@/app/api/_lib/ai'
+import { generateStructured } from '@/app/api/_lib/ai'
+
+// Schema enforced by the AI SDK — replaces manual JSON.parse of the response.
+const mealPlanSchema = z.object({
+    plan: z.array(z.object({
+        slot: z.enum(['breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner']),
+        time: z.string(),
+        options: z.array(z.object({
+            name: z.string(),
+            description: z.string(),
+            macros: z.object({
+                calories: z.number(), protein: z.number(), carbs: z.number(), fat: z.number(),
+            }),
+            tip: z.string(),
+        })).min(2).max(2),
+    })).min(1),
+})
 
 // Full-day plan: 5 slots, 2 options each, protein shakes/bars in snack slots.
 const SYSTEM_PROMPT = `You are a sports nutrition coach for OCS cadets in Singapore. Create a personalised full-day meal plan.
@@ -70,16 +87,14 @@ export async function POST(req: NextRequest) {
 
     let parsed: { plan: MealSlot[] }
     try {
-        const content = await callOpenRouter(
-            [
-                { role: 'system', content: SYSTEM_PROMPT },
-                { role: 'user', content: lines },
-            ],
-            { temperature: 0.65, response_format: { type: 'json_object' } },
-        )
-        parsed = JSON.parse(content) as { plan: MealSlot[] }
+        parsed = await generateStructured({
+            schema: mealPlanSchema,
+            system: SYSTEM_PROMPT,
+            prompt: lines,
+            temperature: 0.65,
+        }) as { plan: MealSlot[] }
     } catch (err) {
-        console.error('[meal-plan] OpenRouter error:', err)
+        console.error('[meal-plan] AI error:', err)
         return NextResponse.json({ error: 'ai_unavailable' }, { status: 502 })
     }
 

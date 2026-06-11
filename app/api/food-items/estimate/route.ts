@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { callOpenRouter } from '@/app/api/_lib/ai'
+import { z } from 'zod'
+import { generateStructured } from '@/app/api/_lib/ai'
+
+// Schema enforced by the AI SDK — replaces manual JSON.parse of the response.
+const estimateSchema = z.object({
+    confidence: z.enum(['high', 'medium', 'low', 'unrecognised']),
+    calories_per_100g: z.number(),
+    protein_g: z.number(),
+    carbs_g: z.number(),
+    fat_g: z.number(),
+    typical_serving_g: z.number(),
+})
 
 const SYSTEM_PROMPT = `You are a nutrition data assistant specialised in Singapore and Asian food. Given a food name, estimate its macronutrients per 100g AND the typical portion size a person would eat.
 
@@ -31,33 +42,17 @@ export async function POST(req: NextRequest) {
     if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 })
     if (name.length > 200) return NextResponse.json({ error: 'name too long' }, { status: 400 })
 
-    let content: string
+    let parsed: z.infer<typeof estimateSchema>
     try {
-        content = await callOpenRouter(
-            [
-                { role: 'system', content: SYSTEM_PROMPT },
-                { role: 'user', content: `Estimate macros per 100g and typical serving size for: ${name}` },
-            ],
-            { temperature: 0.1, response_format: { type: 'json_object' } },
-        )
+        parsed = await generateStructured({
+            schema: estimateSchema,
+            system: SYSTEM_PROMPT,
+            prompt: `Estimate macros per 100g and typical serving size for: ${name}`,
+            temperature: 0.1,
+        })
     } catch (err) {
-        console.error('[estimate] OpenRouter error:', err)
+        console.error('[estimate] AI error:', err)
         return NextResponse.json({ error: 'ai_unavailable' }, { status: 502 })
-    }
-
-    let parsed: {
-        confidence?: string
-        calories_per_100g: number
-        protein_g: number
-        carbs_g: number
-        fat_g: number
-        typical_serving_g: number
-    }
-    try {
-        parsed = JSON.parse(content)
-    } catch {
-        console.error('[estimate] Failed to parse AI response:', content)
-        return NextResponse.json({ error: 'invalid_response' }, { status: 502 })
     }
 
     if (parsed.confidence === 'unrecognised') {

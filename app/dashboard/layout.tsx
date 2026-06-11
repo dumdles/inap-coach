@@ -14,7 +14,7 @@ import type { GoalMode } from '@/app/context/theme-context'
 import {
     Home, Utensils, Dumbbell, Moon, TrendingUp,
     Trophy, Brain, LayoutGrid, Bell, Settings, LogOut,
-    ChevronLeft, ChevronRight, Check, SportShoe, MoreHorizontal, Calculator,
+    ChevronLeft, ChevronRight, Check, SportShoe, MoreHorizontal, Calculator, Sparkles,
 } from 'lucide-react'
 
 // ── Notification types ─────────────────────────────────────
@@ -225,6 +225,7 @@ const BASE_NAV = [
     { href: '/dashboard/ippt',                   label: 'IPPT',        Icon: () => <SportShoe size={18} />,    iconClassName: 'group-hover:-translate-y-1' },
     { href: '/dashboard/friends',                label: 'Leaderboard', Icon: () => <Trophy size={18} />,       iconClassName: 'group-hover:scale-110' },
     { href: '/dashboard/insights',               label: 'Insights',    Icon: () => <Brain size={18} />,        iconClassName: 'group-hover:scale-110' },
+    { href: '/dashboard/coach',                  label: 'AI Coach',    Icon: () => <Sparkles size={18} />,     iconClassName: 'group-hover:scale-110' },
     { href: '/dashboard/nutrition/calculator',   label: 'Calculator',  Icon: () => <Calculator size={18} />,  iconClassName: 'group-hover:scale-110' },
 ]
 
