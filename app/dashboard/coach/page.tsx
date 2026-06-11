@@ -187,6 +187,9 @@ export default function CoachPage() {
     const [sessions, setSessions] = useState<ChatSession[]>([])
     const [historyOpen, setHistoryOpen] = useState(false)
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+    // Empty-state chips: seeded with the static set so there's no flash, then
+    // replaced with profile-tailored questions once the API responds.
+    const [starterChips, setStarterChips] = useState<string[]>(STARTER_CHIPS)
     const suggestionsForRef = useRef<string | null>(null)
     const dissolveRef = useRef<DissolveInputHandle>(null)
 
@@ -211,6 +214,20 @@ export default function CoachPage() {
     }, [token])
 
     useEffect(() => { refreshSessions() }, [refreshSessions])
+
+    // Personalised starter chips: ask the suggestions API (no conversation →
+    // starter mode) for opening questions tailored to this cadet's profile.
+    useEffect(() => {
+        if (!token) return
+        fetch('/api/chat/suggestions', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        })
+            .then(r => r.ok ? r.json() : { suggestions: [] })
+            .then(({ suggestions }) => { if (suggestions?.length) setStarterChips(suggestions) })
+            .catch(() => {})
+    }, [token])
 
     /** Returns the active session id, creating a session on the first message. */
     async function ensureSession(firstMessage: string): Promise<string | null> {
@@ -353,7 +370,7 @@ export default function CoachPage() {
                                     key={s.id}
                                     onClick={() => loadSession(s.id)}
                                     className={cn(
-                                        'group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-accent transition-colors',
+                                        'group flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-accent transition-colors',
                                         activeSessionId === s.id && 'bg-primary/5',
                                     )}
                                 >
@@ -391,7 +408,7 @@ export default function CoachPage() {
                             </p>
                         </div>
                         <div className="flex flex-wrap justify-center gap-2 max-w-md">
-                            {STARTER_CHIPS.map(chip => (
+                            {starterChips.map(chip => (
                                 <button
                                     key={chip}
                                     onClick={() => handleSend(chip)}

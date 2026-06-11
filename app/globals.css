@@ -524,14 +524,22 @@ h1, h2, h3, h4, h5, h6 {
   --glow-opacity: 0.42;
   --glow-spread: 1.5;
 }
+/* No overflow:hidden here — it would clip the textarea's focus ring.
+   The glow clips itself via its own border-radius instead (below). */
 .t-clear {
   position: relative;
-  overflow: hidden;
 }
+/* The mirror and fake placeholder only stand in for a SINGLE resting
+   line (the dissolve snapshot / the empty-state placeholder), so they
+   pin to the top 48px of the field and stay vertically centred there
+   even when the textarea has grown taller. */
 .t-clear-mirror,
 .t-clear-placeholder {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
   display: flex;
   align-items: center;
   pointer-events: none;
@@ -541,6 +549,7 @@ h1, h2, h3, h4, h5, h6 {
   /* Must match the textarea's text metrics for a seamless swap */
   padding: 0 16px;
   font-size: 14px;
+  line-height: 24px;
   font-family: var(--font-body);
 }
 /* The mirror rests invisible; during a dissolve, JS drives its
@@ -563,6 +572,10 @@ h1, h2, h3, h4, h5, h6 {
   opacity: 0;
   z-index: 3;
   mix-blend-mode: multiply;
+  /* Self-clip the radial-gradient streak to the field's rounded box
+     (background is clipped to border-radius), so we don't need
+     overflow:hidden on the wrap — which would eat the focus ring. */
+  border-radius: 16px;
 }
 .dark .t-clear-glow {
   mix-blend-mode: screen;
