@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { calculateTDEE } from '@/lib/tdee'
+import { wingToService, SERVICE_META, SERVICE_GOAL_RECOMMENDATION, SERVICE_CALORIE_OFFSET } from '@/lib/service'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/app/context/theme-context'
 import { Button } from '@/components/ui/button'
@@ -108,19 +109,8 @@ const DATA = [
     { id: 'delete', label: 'Delete my account', desc: 'Permanently delete your account and all associated data. This action cannot be undone!', action: 'delete' },
 ]
 
-// ── Wing → service mapping ────────────────────────────────
-// MIDS and Air Wings map to their respective services; DIS Wing maps to DIS;
-// all other wings are Army wings.
-function wingToService(wing: string): string {
-    const w = (wing ?? '').toUpperCase()
-    if (w.includes('MIDS')) return 'Navy'
-    if (w.includes('AIR')) return 'Air Force'
-    if (w.includes('DIS')) return 'DIS'
-    return 'Army'
-}
-
 // ── Derived stats ─────────────────────────────────────────
-function calcDerived(height: string, weight: string, dob: string, gender: string) {
+function calcDerived(height: string, weight: string, dob: string, gender: string, service?: string) {
     const h = parseFloat(height) || 0
     const w = parseFloat(weight) || 0
     const age = dob ? new Date().getFullYear() - new Date(dob).getFullYear() : 22
@@ -129,7 +119,8 @@ function calcDerived(height: string, weight: string, dob: string, gender: string
     const bmr = isFemale
         ? Math.round(10 * w + 6.25 * h - 5 * age - 161)
         : Math.round(10 * w + 6.25 * h - 5 * age + 5)
-    const tdee = Math.round(bmr * 1.55)
+    const serviceOffset = service ? (SERVICE_CALORIE_OFFSET[service] ?? 0) : 0
+    const tdee = Math.round(bmr * 1.55) + serviceOffset
     const bmiClass = bmi < 18.5 ? 'Under' : bmi < 25 ? 'Healthy' : bmi < 30 ? 'Over' : 'High'
     return { bmi: bmi.toFixed(1), bmr, tdee, bmiClass }
 }
@@ -370,6 +361,7 @@ export default function SettingsPage() {
                     date_of_birth: form.date_of_birth,
                     activity_level: form.activity_level as Parameters<typeof calculateTDEE>[0]['activity_level'],
                     goal_mode: form.goal_mode as Parameters<typeof calculateTDEE>[0]['goal_mode'],
+                    service: form.service || undefined,
                 })
                 calorie_target = calories
             } catch { /* incomplete profile — leave null */ }
@@ -456,7 +448,7 @@ export default function SettingsPage() {
     }
 
     const goal = GOALS.find(g => g.key === form.goal_mode) ?? GOALS[0]
-    const derived = calcDerived(form.height_cm, form.weight_kg, form.date_of_birth, form.gender)
+    const derived = calcDerived(form.height_cm, form.weight_kg, form.date_of_birth, form.gender, form.service)
     const initials = form.full_name?.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'U'
     const [renderedAt] = useState(() => Date.now())
 
@@ -689,6 +681,9 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                     {GOALS.map(g => {
                         const isActive = g.key === form.goal_mode
+                        const serviceRec = form.service ? SERVICE_GOAL_RECOMMENDATION[form.service] : null
+                        const isRecommended = serviceRec?.goalMode === g.key
+                        const serviceMeta = form.service ? SERVICE_META[form.service] : null
                         return (
                             <button
                                 key={g.key} type="button" onClick={() => set('goal_mode', g.key)}
@@ -699,9 +694,20 @@ export default function SettingsPage() {
                                 )}
                                 style={isActive ? { borderColor: g.color, background: g.color, boxShadow: `0 4px 16px ${g.color}40` } : undefined}
                             >
-                                <div>
+                                <div className="flex-1 min-w-0">
                                     <div className={cn('font-display text-[16px] font-bold tracking-tight mb-0.5', isActive ? 'text-white' : 'text-foreground')}>{g.label}</div>
                                     <div className={cn('text-[11px]', isActive ? 'text-white/80' : 'text-muted-foreground')}>{g.desc} · {g.target}</div>
+                                    {isRecommended && serviceMeta && (
+                                        <div className={cn(
+                                            'inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border',
+                                            isActive
+                                                ? 'bg-white/20 text-white border-white/30'
+                                                : cn(serviceMeta.bg, serviceMeta.text, serviceMeta.border),
+                                        )}>
+                                            <svg viewBox="0 0 24 24" width={9} height={9} fill="currentColor"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z" /></svg>
+                                            Recommended for {serviceMeta.label}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
                                     {isActive ? (
@@ -796,10 +802,20 @@ export default function SettingsPage() {
                     <div className="font-display text-[15px] font-bold text-foreground">Service</div>
                     <span className="text-[11px] font-semibold px-2 py-0.5 bg-muted text-muted-foreground rounded-full">Auto-assigned</span>
                 </div>
-                <div className="text-[13px] text-muted-foreground mb-3">Derived from your wing. This tailors AI coaching insights to your training curriculum.</div>
-                <div className="h-10 flex items-center px-3 rounded-lg bg-muted border border-border text-[14px] font-medium text-foreground">
-                    {form.service || '—'}
-                </div>
+                <div className="text-[13px] text-muted-foreground mb-3">Derived from your wing. Tailors AI coaching insights, calorie targets, and goal recommendations to your training curriculum.</div>
+                {form.service && SERVICE_META[form.service] ? (
+                    <div className={cn(
+                        'inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-[14px] font-semibold',
+                        SERVICE_META[form.service].bg,
+                        SERVICE_META[form.service].text,
+                        SERVICE_META[form.service].border,
+                    )}>
+                        <svg viewBox="0 0 24 24" width={14} height={14} fill="currentColor"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z" /></svg>
+                        {SERVICE_META[form.service].label}
+                    </div>
+                ) : (
+                    <div className="h-10 flex items-center px-3 rounded-lg bg-muted border border-border text-[14px] font-medium text-foreground">—</div>
+                )}
             </SCard>
             <SCard>
                 <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">

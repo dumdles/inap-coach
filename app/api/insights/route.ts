@@ -31,14 +31,16 @@ Output rules:
     {
       "id": "snake_case_slug",
       "priority": "high" | "medium" | "low",
-      "category": "nutrition" | "weight" | "performance" | "recovery" | "adherence",
+      "category": "nutrition" | "weight" | "performance" | "recovery" | "adherence" | "service",
       "title": "Short action-oriented title (max 8 words)",
       "observation": "What the data shows (1-2 sentences, factual and neutral)",
       "action": "Encouraging, specific recommendation (1-2 sentences)"
     }
   ]
 }
-Return 3 to 5 insights. Sort by priority: high first. Do not add any text outside the JSON object.`
+Return 4 to 6 insights. Sort by priority: high first.
+Always include exactly one insight with category "service" that connects the cadet's data to the specific demands of their service branch — e.g. pre-march carb loading for Army, hydration for Navy, cognitive nutrition for DIS. If service is unknown, omit the service insight.
+Do not add any text outside the JSON object.`
 
 function toSGT(date = new Date()) {
     return new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Singapore' }))
@@ -96,11 +98,11 @@ function buildUserMessage(user: Record<string, unknown>, dailySummaries: Record<
         : null
 
     const serviceContext: Record<string, string> = {
-        'Army':      'High-volume field training, route marches, obstacle courses, and strength work. High caloric expenditure; protein and carb intake are critical for muscle repair and energy.',
-        'Navy':      'Swim fitness, VO₂ endurance sessions, and maritime drills. Emphasis on aerobic capacity and hydration. Watch electrolyte intake given water-based training.',
-        'Air Force': 'Aerobic base building, precision conditioning, and HIIT cycles. Moderate-to-high intensity; consistent energy intake matters more than peak loading.',
-        'DIS':       'Balanced physical conditioning with cognitive performance demands. Training load is moderate; nutrition should support focus and sustained mental stamina.',
-        'MIDS':      'Mixed-intensity training. Balanced macro targets; adequate sleep and recovery nutrition are especially important for adaptation.',
+        'Army':      'High-volume field training: route marches (up to 16–24 km with full pack), obstacle courses, and strength conditioning. Caloric expenditure is 200–300 kcal/day higher than other services. Protein and complex carb intake are critical for muscle repair and sustained energy. Pre-march carb loading and post-exercise protein (30–40 g) are priority actions.',
+        'Navy':      'Swim fitness, VO₂ endurance sessions, and maritime drills. Aerobic capacity and hydration are key — pool chlorine and water exposure increase fluid and electrolyte loss. Iron-rich foods support oxygen transport. Avoid heavy pre-swim meals.',
+        'Air Force': 'Aerobic base building, HIIT cycles, and precision conditioning. Moderate-to-high intensity; consistent energy intake across the day matters more than peak loading. Post-HIIT 3:1 carb-to-protein recovery meals optimise glycogen resynthesis. Avoid energy crashes that impair both physical and mental performance.',
+        'DIS':       'Balanced physical conditioning with significant cognitive performance demands. Training load is moderate; nutrition should prioritise steady blood glucose (complex carbs), brain health (omega-3s, B-vitamins, zinc), and hydration. Even mild dehydration measurably impairs reaction time and decision accuracy. Sleep quality and nutrition are tightly linked for DIS cadets.',
+        'MIDS':      'Maritime training including water confidence, sea drills, and VO₂ conditioning. Cold-water exposure increases metabolic demand. Electrolyte replenishment, iron intake, and adequate post-training calories are priorities. Like Navy, pre-exercise meals should be moderate and easily digested.',
     }
     const serviceNote = user.service ? serviceContext[user.service as string] : null
 

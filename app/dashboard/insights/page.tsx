@@ -14,7 +14,7 @@ const COOLDOWN_KEY = 'insights_last_refresh'
 type Insight = {
     id: string
     priority: 'high' | 'medium' | 'low'
-    category: 'nutrition' | 'weight' | 'performance' | 'recovery' | 'adherence'
+    category: 'nutrition' | 'weight' | 'performance' | 'recovery' | 'adherence' | 'service'
     title: string
     observation: string
     action: string
@@ -45,6 +45,7 @@ const CATEGORY_META: Record<Insight['category'], { label: string; icon: React.Re
     performance: { label: 'Performance', icon: <><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></> },
     recovery:    { label: 'Recovery',    icon: <><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></> },
     adherence:   { label: 'Adherence',   icon: <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></> },
+    service:     { label: 'Service',     icon: <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z" /> },
 }
 
 function relativeTime(iso: string) {

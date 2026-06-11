@@ -680,7 +680,7 @@ export default function WingPage() {
 
             {/* ── Section / Platoon filters ───────────────────────────────────── */}
             {(allSections.length > 0 || allPlatoons.length > 0) && (
-                <div className="flex flex-wrap items-center gap-2 mb-6">
+                <div className="flex flex-wrap items-center gap-2 mb-6 bg-white border dark:bg-background/50 rounded-xl px-3 py-2">
                     {allPlatoons.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Platoon</span>

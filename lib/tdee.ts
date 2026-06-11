@@ -1,3 +1,5 @@
+import { SERVICE_CALORIE_OFFSET, SERVICE_PROTEIN_BOOST } from './service'
+
 export type Gender = 'Male' | 'Female'
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
 export type GoalMode = 'bulk' | 'cut' | 'maintain' | 'ippt'
@@ -31,8 +33,9 @@ export function calculateTDEE(params: {
     date_of_birth: string
     activity_level: ActivityLevel
     goal_mode: GoalMode
+    service?: string
 }): { calories: number; protein: number } {
-    const { gender, weight_kg, height_cm, date_of_birth, activity_level, goal_mode } = params
+    const { gender, weight_kg, height_cm, date_of_birth, activity_level, goal_mode, service } = params
 
     const ageMs = Date.now() - new Date(date_of_birth).getTime()
     const age = Math.floor(ageMs / (365.25 * 24 * 3600 * 1000))
@@ -43,8 +46,15 @@ export function calculateTDEE(params: {
             : 10 * weight_kg + 6.25 * height_cm - 5 * age - 161
 
     const tdee = bmr * ACTIVITY_MULTIPLIERS[activity_level]
-    const calories = Math.round(tdee + GOAL_CALORIE_ADJUSTMENTS[goal_mode])
-    const protein = Math.round(weight_kg * GOAL_PROTEIN_MULTIPLIERS[goal_mode])
+
+    // Apply per-service calorie and protein adjustments on top of the base formula.
+    // These offsets account for training load differences between services that
+    // the generic activity multiplier doesn't capture (e.g. Army route marches).
+    const calorieOffset = service ? (SERVICE_CALORIE_OFFSET[service] ?? 0) : 0
+    const proteinBoost  = service ? (SERVICE_PROTEIN_BOOST[service] ?? 0) : 0
+
+    const calories = Math.round(tdee + GOAL_CALORIE_ADJUSTMENTS[goal_mode] + calorieOffset)
+    const protein  = Math.round(weight_kg * (GOAL_PROTEIN_MULTIPLIERS[goal_mode] + proteinBoost))
 
     return { calories, protein }
 }
