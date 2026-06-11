@@ -34,6 +34,18 @@ export async function POST(req: NextRequest) {
     if (fat_g == null || fat_g < 0 || fat_g > 100)
         return NextResponse.json({ error: 'fat_g must be 0–100' }, { status: 400 })
 
+    // Enforce per-user custom food item cap
+    if (created_by) {
+        const { count, error: countError } = await supabaseAdmin
+            .from('food_items')
+            .select('*', { count: 'exact', head: true })
+            .eq('created_by', created_by)
+            .eq('is_cookhouse_item', false)
+        if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
+        if ((count ?? 0) >= 200)
+            return NextResponse.json({ error: 'Custom food item limit reached (200). Delete some items to add new ones.' }, { status: 429 })
+    }
+
     // Return existing if a food with this exact name already exists
     const { data: existing } = await supabaseAdmin
         .from('food_items')

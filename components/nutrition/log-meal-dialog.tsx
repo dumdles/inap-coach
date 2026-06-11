@@ -249,7 +249,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
             }),
         })
         setSubmitting(false)
-        if (!res.ok) { setError('Failed to create food item'); return }
+        if (!res.ok) { const body = await res.json().catch(() => ({})); setError(body.error ?? 'Failed to create food item'); return }
         const item: FoodItem = await res.json()
         setSelected(item)
         // Apply AI-suggested portion size if available
@@ -272,7 +272,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: selected.name, calories_per_100g: selected.calories_per_100g, protein_g: selected.protein_g, carbs_g: selected.carbs_g, fat_g: selected.fat_g, created_by: user.id }),
             })
-            if (!res.ok) { setError('Failed to save food item'); setSubmitting(false); return }
+            if (!res.ok) { const body = await res.json().catch(() => ({})); setError(body.error ?? 'Failed to save food item'); setSubmitting(false); return }
             const item: FoodItem = await res.json()
             foodItemId = item.id
         }

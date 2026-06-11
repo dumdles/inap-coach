@@ -69,6 +69,28 @@ export async function POST(req: NextRequest) {
     if (rounds != null && (rounds < 0 || rounds > 100))
         return NextResponse.json({ error: 'rounds must be 0–100' }, { status: 400 })
 
+    // Enforce daily manual workout cap; Polar-synced entries bypass this
+    if (!polar_exercise_id) {
+        // Compute the SGT calendar-day boundaries for the workout's logged_at time
+        const SGT_OFFSET_MS = 8 * 60 * 60 * 1000
+        const targetMs = logged_at ? new Date(logged_at).getTime() : Date.now()
+        const sgtEpoch = targetMs + SGT_OFFSET_MS
+        const dayStartUTC = new Date(Math.floor(sgtEpoch / 86400000) * 86400000 - SGT_OFFSET_MS)
+        const dayEndUTC = new Date(dayStartUTC.getTime() + 86400000)
+
+        const { count, error: countError } = await supabaseAdmin
+            .from('workout_logs')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('source', 'manual')
+            .gte('logged_at', dayStartUTC.toISOString())
+            .lt('logged_at', dayEndUTC.toISOString())
+
+        if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
+        if ((count ?? 0) >= 10)
+            return NextResponse.json({ error: 'Daily workout limit reached (10 per day).' }, { status: 429 })
+    }
+
     const payload: Record<string, unknown> = {
         user_id: userId,
         template_id: templateId ?? null,
