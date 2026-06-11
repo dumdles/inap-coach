@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai'
+import { streamText, convertToModelMessages, stepCountIs, smoothStream, type UIMessage } from 'ai'
 import { verifyAuth } from '@/app/api/_lib/auth'
 import { supabaseAdmin } from '@/app/api/cron/_lib'
 import { chatModel } from '@/app/api/_lib/ai'
@@ -54,6 +54,10 @@ export async function POST(req: NextRequest) {
         stopWhen: stepCountIs(6),
         temperature: 0.5,
         maxOutputTokens: 1200,
+        // Re-chunk the token stream so text arrives one line at a time with a
+        // short beat between lines. Note: a paragraph with no newline is one
+        // "line" — switch chunking to 'word' for the classic token ticker.
+        experimental_transform: smoothStream({ chunking: 'line', delayInMs: 90 }),
     })
 
     return result.toUIMessageStreamResponse({

@@ -8,6 +8,8 @@ import remarkGfm from 'remark-gfm'
 import { useAuth } from '@/app/context/auth-context'
 import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Shimmer } from '@/components/ui/shimmer'
+import { DissolveInput, type DissolveInputHandle } from '@/components/coach/dissolve-input'
 import { toast } from 'sonner'
 import {
     Sparkles, SendHorizontal, Plus, History, Trash2, Check, Loader2,
@@ -140,14 +142,8 @@ function TypingIndicator() {
             <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Sparkles size={13} className="text-primary" />
             </div>
-            <div className="rounded-2xl rounded-tl-md bg-card border border-border px-4 py-3.5 flex items-center gap-1">
-                {[0, 1, 2].map(i => (
-                    <span
-                        key={i}
-                        className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce"
-                        style={{ animationDelay: `${i * 0.15}s` }}
-                    />
-                ))}
+            <div className="rounded-2xl rounded-tl-md bg-card border border-border px-4 py-3 text-[13px]">
+                <Shimmer>Generating response…</Shimmer>
             </div>
         </div>
     )
@@ -192,6 +188,7 @@ export default function CoachPage() {
     const [historyOpen, setHistoryOpen] = useState(false)
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
     const suggestionsForRef = useRef<string | null>(null)
+    const dissolveRef = useRef<DissolveInputHandle>(null)
 
     const token = session?.access_token
 
@@ -264,6 +261,9 @@ export default function CoachPage() {
         const trimmed = text.trim()
         if (!trimmed || busy) return
         setChips([])
+        // Dissolve the typed text out of the input (no-op for chip sends,
+        // where the input is already empty).
+        if (text === input) dissolveRef.current?.dissolve(trimmed)
         setInput('')
         const sessionId = await ensureSession(trimmed)
         if (!sessionId) return
@@ -429,21 +429,13 @@ export default function CoachPage() {
                     onSubmit={e => { e.preventDefault(); handleSend(input) }}
                     className="flex items-end gap-2"
                 >
-                    <textarea
+                    <DissolveInput
+                        ref={dissolveRef}
                         value={input}
-                        onChange={e => setInput(e.target.value)}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault()
-                                handleSend(input)
-                            }
-                        }}
-                        rows={1}
+                        onChange={setInput}
+                        onEnter={() => handleSend(input)}
                         placeholder="Ask your coach…"
-                        className="flex-1 resize-none rounded-2xl border-[1.5px] border-input bg-card px-4 py-3 text-[14px] text-foreground
-                                   placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15
-                                   transition-all max-h-32"
-                        style={{ minHeight: 48 }}
+                        className="flex-1"
                     />
                     <button
                         type="submit"
