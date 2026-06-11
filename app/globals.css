@@ -73,6 +73,11 @@
 }
 
 :root {
+  /* Make native controls (datetime-local pickers, number spinners, selects,
+     scrollbars) render in light mode — overridden to dark by .dark below.
+     Without this the native date/time text + picker icons stay dark-on-dark. */
+  color-scheme: light;
+
   --primary-foreground: #FFFFFF;
 
   /* Brand Colors */
@@ -180,6 +185,10 @@
 }
 
 .dark {
+    /* Native controls (date/time pickers, spinners, selects) adopt the
+       browser's dark styling so their text and icons stay legible. */
+    color-scheme: dark;
+
     /* Brand */
     --primary:       #2684FF;
     --primary-light: rgba(38, 132, 255, 0.15);

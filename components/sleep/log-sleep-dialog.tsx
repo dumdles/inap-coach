@@ -50,7 +50,7 @@ function durationLabel(min: number): string {
 }
 
 export function LogSleepDialog({ open, onOpenChange, onLogged, editing }: Props) {
-    const { user } = useAuth()
+    const { user, session } = useAuth()
 
     const [sleepStart, setSleepStart] = useState(defaultBedtime())
     const [sleepEnd, setSleepEnd] = useState(defaultWake())
@@ -100,9 +100,14 @@ export function LogSleepDialog({ open, onOpenChange, onLogged, editing }: Props)
                 notes: notes.trim() || null,
             }
 
+        // The POST/PATCH routes verify the Bearer token, so the access token
+        // must ride along — without it verifyAuth returns 401 Unauthorized.
         const res = await fetch(url, {
             method,
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session?.access_token}`,
+            },
             body: JSON.stringify(body),
         })
         setSaving(false)
