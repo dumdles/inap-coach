@@ -105,7 +105,8 @@ function Button({
           <polyline points="20 6 9 17 4 12" />
         </svg>
       )}
-      {!isLoading && !isSuccess && prefixIcon}
+      {/* prefixIcon is suppressed with asChild — Slot.Root must receive exactly one child */}
+      {!isLoading && !isSuccess && !asChild && prefixIcon}
       {children}
     </Comp>
   )
