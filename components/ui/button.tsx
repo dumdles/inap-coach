@@ -1,3 +1,5 @@
+'use client'
+
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Slot } from "radix-ui"
@@ -61,10 +63,27 @@ function Button({
     /** Icon rendered before the label — hidden when isLoading or isSuccess is active */
     prefixIcon?: React.ReactNode
   }) {
-  const Comp = asChild ? Slot.Root : "button"
+  // asChild path: Slot.Root calls React.Children.only() and throws if it
+  // receives an array (even one containing only falsy values). Render the
+  // child alone — no conditional siblings — so Slot always gets exactly one
+  // React element.
+  if (asChild) {
+    return (
+      <Slot.Root
+        data-slot="button"
+        data-variant={variant}
+        data-size={size}
+        className={cn(buttonVariants({ variant, size, className }))}
+        disabled={disabled || isLoading}
+        {...props}
+      >
+        {children}
+      </Slot.Root>
+    )
+  }
 
   return (
-    <Comp
+    <button
       data-slot="button"
       data-variant={variant}
       data-size={size}
@@ -107,7 +126,7 @@ function Button({
       )}
       {!isLoading && !isSuccess && prefixIcon}
       {children}
-    </Comp>
+    </button>
   )
 }
 
