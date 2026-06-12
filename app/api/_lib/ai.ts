@@ -57,11 +57,18 @@ export async function generateStructured<SCHEMA extends z.ZodType>(opts: {
 // Gemini 3.5 Flash has confirmed vision support on OpenRouter
 export const VISION_MODEL = 'google/gemini-3.5-flash'
 
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
+
 type VisionContentPart =
     | { type: 'text'; text: string }
     | { type: 'image_url'; image_url: { url: string } }
 
 type VisionMessage = { role: 'system' | 'user' | 'assistant'; content: string | VisionContentPart[] }
+
+type CallOptions = {
+    temperature?: number
+    response_format?: { type: string }
+}
 
 /**
  * Calls OpenRouter with a vision-capable model for multimodal image+text inputs.

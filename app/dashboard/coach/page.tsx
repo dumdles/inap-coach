@@ -513,7 +513,7 @@ export default function CoachPage() {
                         value={input}
                         onChange={setInput}
                         onEnter={() => handleSend(input)}
-                        placeholder={limitReached ? 'Daily limit reached — back tomorrow' : 'Ask your coach…'}
+                        placeholder={limitReached ? 'Daily limit reached' : 'Ask your coach…'}
                         className="flex-1"
                         disabled={limitReached}
                     />
