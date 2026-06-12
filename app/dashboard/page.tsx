@@ -663,13 +663,14 @@ export default function DashboardPage() {
                                         : 'Nothing logged yet'}
                                 </p>
                             </div>
-                            <button
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => setLogMealOpen(true)}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-primary text-primary px-4 py-1.5 text-[12px] font-semibold hover:bg-primary/5 transition-colors"
+                                prefixIcon={<PlusIcon className="size-3.5" />}
                             >
-                                <PlusIcon className="w-3.5 h-3.5" />
                                 Log a meal
-                            </button>
+                            </Button>
                         </div>
 
                         {/* Meal rows */}
@@ -686,12 +687,12 @@ export default function DashboardPage() {
                                     <div className="text-[13px] font-semibold text-foreground">No meals logged today</div>
                                     <p className="text-[12px] text-muted-foreground mt-0.5">Start tracking to see your daily intake.</p>
                                 </div>
-                                <button
+                                <Button
+                                    size="sm"
                                     onClick={() => setLogMealOpen(true)}
-                                    className="rounded-full bg-primary px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-primary/90 transition-colors"
                                 >
                                     Log your first meal
-                                </button>
+                                </Button>
                             </div>
                         ) : (
                             MEAL_ORDER

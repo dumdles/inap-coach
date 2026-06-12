@@ -5,32 +5,32 @@ import { Slot } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all duration-150 outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 active:scale-[0.97] active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-transparent bg-clip-padding text-sm font-semibold whitespace-nowrap transition-all duration-150 outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 active:scale-[0.97] active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default:
-          "bg-primary dark:bg-primary-dark text-white hover:bg-primary-dark focus-visible:ring-primary/30 border-primary",
+          "bg-primary text-white hover:bg-primary/90 focus-visible:ring-primary/30",
         primary:
-          "bg-primary dark:bg-primary-dark text-white hover:bg-primary-dark dark:hover:bg-primary-light focus-visible:ring-primary/30 ",
+          "bg-primary text-white hover:bg-primary/90 focus-visible:ring-primary/30",
         outline:
-          "border border-gray-300 dark:border-gray-600 text-primary dark:text-gray-300 bg-none hover:bg-primary-light hover:border-primary focus-visible:ring-primary/30",
+          "border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:ring-ring/30",
         secondary:
-          "bg-primary-light text-primary hover:bg-primary hover:text-white border border-primary-light focus-visible:ring-primary/30",
+          "bg-muted text-foreground hover:bg-muted/80 focus-visible:ring-ring/30",
         ghost:
-          "text-gray-600 hover:bg-gray-100 focus-visible:ring-primary/30",
+          "text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/30",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
         danger:
-          "bg-danger text-white hover:bg-danger-dark focus-visible:ring-danger/30",
+          "bg-danger text-white hover:bg-danger/90 focus-visible:ring-danger/30",
         success:
-          "bg-success text-white hover:bg-success-dark focus-visible:ring-success/30",
+          "bg-success text-white hover:bg-success/90 focus-visible:ring-success/30",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        sm:   "h-8 px-3 text-xs",
-        md:   "h-10 px-4 text-sm",
-        lg:   "h-11 px-5 text-base",
+        sm:   "h-8 px-3 text-[12px]",
+        md:   "h-10 px-4 text-[13px]",
+        lg:   "h-11 px-5 text-sm",
         xl:   "h-12 px-7 text-base",
         icon: "h-10 w-10",
       },
@@ -49,6 +49,7 @@ function Button({
   asChild = false,
   isLoading = false,
   isSuccess = false,
+  prefixIcon,
   children,
   disabled,
   ...props
@@ -57,6 +58,8 @@ function Button({
     asChild?: boolean
     isLoading?: boolean
     isSuccess?: boolean
+    /** Icon rendered before the label — hidden when isLoading or isSuccess is active */
+    prefixIcon?: React.ReactNode
   }) {
   const Comp = asChild ? Slot.Root : "button"
 
@@ -102,6 +105,7 @@ function Button({
           <polyline points="20 6 9 17 4 12" />
         </svg>
       )}
+      {!isLoading && !isSuccess && prefixIcon}
       {children}
     </Comp>
   )

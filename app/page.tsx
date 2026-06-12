@@ -294,30 +294,173 @@ function WorkoutMockup() {
   )
 }
 
-// ── Terminal typewriter hero headline ─────────────────────
-const HERO_TEXT = 'Your performance command centre'
-const GRADIENT_START = 17 // 'Your performance ' → 17 chars
+// ── iPhone 17 Pro (Black Titanium) phone frame ───────────────────────────────
+function PhoneFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      position: 'relative',
+      // Black Titanium chassis — dark charcoal with a subtle top-left lighting gradient
+      background: 'linear-gradient(170deg, #2C2C2E 0%, #1C1C1E 45%, #111113 100%)',
+      borderRadius: 54,
+      padding: '13px 11px',
+      boxShadow: [
+        'inset 0 1px 0 rgba(255,255,255,0.13)',   // top chamfer highlight
+        'inset 0 -1px 0 rgba(255,255,255,0.04)',  // bottom chamfer
+        '0 0 0 1px rgba(0,0,0,0.75)',             // outer border
+        '0 0 0 2.5px rgba(255,255,255,0.03)',     // anti-aliasing halo
+        '0 56px 120px rgba(0,0,0,0.75)',          // ground shadow
+        '0 20px 48px rgba(0,0,0,0.45)',
+        '0 8px 64px rgba(38,132,255,0.08)',       // blue screen light bounce
+      ].join(', '),
+      width: 308,
+    }}>
+      {/* Action button — left, near top */}
+      <div style={{
+        position: 'absolute', left: -4, top: 112, width: 4, height: 30,
+        background: 'linear-gradient(90deg, #0A0A0C, #2A2A2C)',
+        borderRadius: '3px 0 0 3px',
+      }} />
+      {/* Volume up — left */}
+      <div style={{
+        position: 'absolute', left: -4, top: 156, width: 4, height: 54,
+        background: 'linear-gradient(90deg, #0A0A0C, #2A2A2C)',
+        borderRadius: '3px 0 0 3px',
+      }} />
+      {/* Volume down — left */}
+      <div style={{
+        position: 'absolute', left: -4, top: 224, width: 4, height: 54,
+        background: 'linear-gradient(90deg, #0A0A0C, #2A2A2C)',
+        borderRadius: '3px 0 0 3px',
+      }} />
+      {/* Sleep/Wake — right */}
+      <div style={{
+        position: 'absolute', right: -4, top: 162, width: 4, height: 72,
+        background: 'linear-gradient(270deg, #0A0A0C, #2A2A2C)',
+        borderRadius: '0 3px 3px 0',
+      }} />
+      {/* Camera Control — right, lower (introduced iPhone 16+) */}
+      <div style={{
+        position: 'absolute', right: -4, top: 266, width: 4, height: 46,
+        background: 'linear-gradient(270deg, #0A0A0C, #2A2A2C)',
+        borderRadius: '0 3px 3px 0',
+      }} />
+
+      {/* Screen */}
+      <div style={{ background: '#000', borderRadius: 43, overflow: 'hidden' }}>
+        {/* Status bar — Dynamic Island + time + status icons */}
+        <div style={{
+          position: 'relative', height: 54,
+          background: '#060D1A',
+          display: 'flex', alignItems: 'flex-end',
+          padding: '0 18px 10px', boxSizing: 'border-box',
+        }}>
+          {/* Dynamic Island — black pill anchored to the top of the screen */}
+          <div style={{
+            position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+            width: 100, height: 34,
+            background: '#000',
+            borderBottomLeftRadius: 22, borderBottomRightRadius: 22,
+          }} />
+          {/* 9:41 */}
+          <span style={{
+            fontFamily: 'Satoshi, sans-serif', fontSize: 13, fontWeight: 700,
+            color: 'rgba(245,247,250,0.92)', letterSpacing: '-0.02em',
+          }}>9:41</span>
+          {/* Status icons */}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+            {/* Signal bars */}
+            <div style={{ display: 'flex', gap: 1.5, alignItems: 'flex-end' }}>
+              {[4, 7, 10, 13].map((h, i) => (
+                <div key={i} style={{ width: 2.5, height: h, background: 'rgba(245,247,250,0.85)', borderRadius: 1 }} />
+              ))}
+            </div>
+            {/* Wi-Fi */}
+            <svg width="14" height="10" viewBox="0 0 14 10" fill="none">
+              <circle cx="7" cy="9" r="1.4" fill="rgba(245,247,250,0.85)" />
+              <path d="M3.8 6.3C4.9 5.2 5.9 4.8 7 4.8s2.1.4 3.2 1.5" stroke="rgba(245,247,250,0.85)" strokeWidth="1.3" strokeLinecap="round" />
+              <path d="M1.5 4.3C3 2.8 4.9 2 7 2s4 .8 5.5 2.3" stroke="rgba(245,247,250,0.4)" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+            {/* Battery */}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{
+                width: 22, height: 11,
+                border: '1.5px solid rgba(245,247,250,0.5)',
+                borderRadius: 3, padding: '1.5px',
+                boxSizing: 'border-box', display: 'flex',
+              }}>
+                <div style={{ width: '75%', background: '#57D9A3', borderRadius: 1.5 }} />
+              </div>
+              <div style={{ width: 2, height: 5, background: 'rgba(245,247,250,0.4)', marginLeft: 0.5 }} />
+            </div>
+          </div>
+        </div>
+
+        {/* App content */}
+        {children}
+
+        {/* Home indicator */}
+        <div style={{
+          height: 32, background: '#060D1A',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{ width: 108, height: 5, background: 'rgba(255,255,255,0.22)', borderRadius: 3 }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Terminal typewriter hero headline with cycling phrases ────────────────────
+const HERO_STATIC = 'Your performance'
+const HERO_PHRASES = [
+  'command centre',
+  'decoded',
+  'unlocked',
+  'analysed with insights',
+  'starts here',
+]
 
 function HeroHeadline() {
-  const [count, setCount] = useState(0)
+  const [phraseIdx, setPhraseIdx] = useState(0)
+  const [charCount, setCharCount] = useState(0)
+  const [phase, setPhase] = useState<'idle' | 'typing' | 'deleting'>('idle')
 
+  // Kick off typing after a short settle delay
   useEffect(() => {
-    // Small pause before typing begins so the container animation settles first
-    const start = setTimeout(() => {
-      const iv = setInterval(() => {
-        setCount(c => {
-          if (c >= HERO_TEXT.length) { clearInterval(iv); return c }
-          return c + 1
-        })
-      }, 48)
-      return () => clearInterval(iv)
-    }, 700)
-    return () => clearTimeout(start)
+    const t = setTimeout(() => setPhase('typing'), 500)
+    return () => clearTimeout(t)
   }, [])
 
-  const typed    = HERO_TEXT.slice(0, count)
-  const normal   = typed.slice(0, GRADIENT_START)
-  const gradient = count > GRADIENT_START ? typed.slice(GRADIENT_START) : ''
+  useEffect(() => {
+    if (phase === 'idle') return
+    const phrase = HERO_PHRASES[phraseIdx]
+    let t: ReturnType<typeof setTimeout>
+
+    if (phase === 'typing') {
+      if (charCount < phrase.length) {
+        // Type next character
+        t = setTimeout(() => setCharCount(c => c + 1), 55)
+      } else {
+        // Finished typing — hold 5 s then start deleting
+        t = setTimeout(() => setPhase('deleting'), 5000)
+      }
+    } else {
+      if (charCount > 0) {
+        // Delete a character — faster than typing
+        t = setTimeout(() => setCharCount(c => c - 1), 32)
+      } else {
+        // Finished deleting — advance to next phrase after a short pause
+        t = setTimeout(() => {
+          setPhraseIdx(i => (i + 1) % HERO_PHRASES.length)
+          setPhase('typing')
+        }, 180)
+      }
+    }
+
+    return () => clearTimeout(t)
+  }, [phase, charCount, phraseIdx])
+
+  const currentPhrase = HERO_PHRASES[phraseIdx].slice(0, charCount)
 
   return (
     <h1
@@ -331,25 +474,29 @@ function HeroHeadline() {
         color: '#F5F7FA',
         marginBottom: 32,
         textAlign: 'center',
-        // Reserve vertical space so the layout doesn't jump as text grows
-        minHeight: '1.15em',
+        // Fixed two-line height prevents layout jump between phrases
+        minHeight: '2.15em',
       }}
     >
-      {/* Terminal prompt character — steady, not blinking */}
+      {/* Terminal prompt — steady, non-blinking */}
       <span style={{ color: '#2684FF', fontWeight: 700, marginRight: 12, userSelect: 'none' }}>{'>'}</span>
-      {normal}
-      {gradient && (
-        <span style={{
-          background: 'linear-gradient(90deg, #2684FF, #6B9FFF)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-        }}>
-          {gradient}
-        </span>
-      )}
-      {/* Block cursor — blinks the whole time */}
-      <span className="terminal-cursor" />
+      {HERO_STATIC}
+      {/* Force cycling phrase onto its own line */}
+      <br />
+      <span style={{ display: 'inline-block' }}>
+        {currentPhrase && (
+          <span style={{
+            background: 'linear-gradient(90deg, #2684FF, #6B9FFF)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}>
+            {currentPhrase}
+          </span>
+        )}
+        {/* Block cursor — blinks the whole time */}
+        <span className="terminal-cursor" />
+      </span>
     </h1>
   )
 }
@@ -598,6 +745,8 @@ function FeatureCard({ number, title, description, tags, delay }: FeatureCardPro
 // ── Main page ─────────────────────────────────────────────
 export default function LandingPage() {
   useScrollReveal()
+  const [activityTab, setActivityTab] = useState<'workouts' | 'wing'>('workouts')
+  const [activeStep, setActiveStep] = useState(0)
 
   // Paint the overscroll area (rubber-band on macOS / pull-to-refresh on mobile)
   // the same dark colour as the page so white never bleeds through.
@@ -609,6 +758,12 @@ export default function LandingPage() {
       document.documentElement.style.background = ''
       document.body.style.background = ''
     }
+  }, [])
+
+  // Cycle the highlighted "How it works" step every 3 s
+  useEffect(() => {
+    const t = setInterval(() => setActiveStep(s => (s + 1) % 3), 3000)
+    return () => clearInterval(t)
   }, [])
 
   const BG = '#060D1A'
@@ -625,6 +780,14 @@ export default function LandingPage() {
 
   return (
     <div style={{ background: BG, color: TEXT, minHeight: '100vh', overflowX: 'hidden' }}>
+
+      {/* Progress-bar keyframe for the "How it works" step cycling */}
+      <style>{`
+        @keyframes stepProgress {
+          from { transform: scaleX(0); }
+          to   { transform: scaleX(1); }
+        }
+      `}</style>
 
       {/* ── NAV ─────────────────────────────────────────── */}
       <nav style={{
@@ -763,6 +926,97 @@ export default function LandingPage() {
         </div>
       </div>
 
+      {/* ── HOW IT WORKS ──────────────────────────────────── */}
+      <section style={{ padding: '80px 32px', maxWidth: 1100, margin: '0 auto' }}>
+        <div data-reveal style={{ textAlign: 'center', marginBottom: 56 }}>
+          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', color: 'rgba(76,154,255,0.7)', textTransform: 'uppercase', marginBottom: 12 }}>How it works</div>
+          <h2 style={{ fontFamily: 'Satoshi, sans-serif', fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 800, letterSpacing: '-0.03em', color: TEXT, lineHeight: 1.1 }}>
+            Three steps. Every day.
+          </h2>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
+          {[
+            {
+              n: '01',
+              title: 'Log in 30 seconds',
+              body: 'Snap a photo, search your meal, or browse pre-loaded cookhouse templates. Logging takes less time than it takes to eat.',
+              icon: '📸',
+              delay: 0,
+            },
+            {
+              n: '02',
+              title: 'AI coaches you overnight',
+              body: 'Every 24 hours, Gemini analyses your nutrition, workouts, and recovery — and writes a personalised brief tailored to your next training day.',
+              icon: '✦',
+              delay: 2,
+            },
+            {
+              n: '03',
+              title: 'Your wing climbs the board',
+              body: 'Every meal logged, every session tracked, every IPPT result — it all rolls into your wing\'s live score. The leaderboard updates in real time.',
+              icon: '🏆',
+              delay: 4,
+            },
+          ].map(({ n, title, body, icon, delay }, i) => {
+            const isActive = i === activeStep
+            return (
+              <div
+                key={n}
+                data-reveal
+                data-delay={String(delay)}
+                style={{
+                  padding: '32px 28px',
+                  background: isActive ? 'rgba(38,132,255,0.08)' : 'transparent',
+                  border: `1px solid ${isActive ? 'rgba(38,132,255,0.45)' : 'rgba(38,132,255,0.1)'}`,
+                  borderRadius: 20,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxShadow: isActive ? '0 0 32px rgba(38,132,255,0.1)' : 'none',
+                  transition: 'background 0.55s ease, border-color 0.55s ease, box-shadow 0.55s ease',
+                }}
+              >
+                <div style={{
+                  fontSize: 28, marginBottom: 16,
+                  opacity: isActive ? 1 : 0.4,
+                  transition: 'opacity 0.55s ease',
+                }}>{icon}</div>
+                <div style={{
+                  fontFamily: 'Satoshi, sans-serif', fontSize: 12, fontWeight: 700,
+                  letterSpacing: '0.08em', marginBottom: 8,
+                  color: isActive ? 'rgba(38,132,255,0.85)' : 'rgba(38,132,255,0.35)',
+                  transition: 'color 0.55s ease',
+                }}>{n}</div>
+                <div style={{
+                  fontFamily: 'Satoshi, sans-serif', fontSize: 18, fontWeight: 700,
+                  letterSpacing: '-0.01em', marginBottom: 10, lineHeight: 1.3,
+                  color: isActive ? '#F5F7FA' : 'rgba(245,247,250,0.4)',
+                  transition: 'color 0.55s ease',
+                }}>{title}</div>
+                <div style={{
+                  fontFamily: 'DM Sans, sans-serif', fontSize: 14, lineHeight: 1.75,
+                  color: isActive ? 'rgba(165,173,186,0.85)' : 'rgba(165,173,186,0.38)',
+                  transition: 'color 0.55s ease',
+                }}>{body}</div>
+                {/* Progress bar — fills over 3 s while this step is active */}
+                <div style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  height: 2, background: 'rgba(38,132,255,0.1)',
+                }}>
+                  {isActive && (
+                    <div style={{
+                      height: '100%', width: '100%',
+                      background: 'linear-gradient(90deg, #2684FF, #4C9AFF)',
+                      transformOrigin: 'left',
+                      animation: 'stepProgress 3s linear forwards',
+                    }} />
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
       {/* ── FEATURES GRID ─────────────────────────────────── */}
       <section style={{ padding: '80px 32px', maxWidth: 1100, margin: '0 auto' }}>
         <div data-reveal style={{ marginBottom: 48 }}>
@@ -889,43 +1143,77 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── WORKOUT SPOTLIGHT ─────────────────────────────── */}
+      {/* ── ACTIVITY & COMPETITION (tabbed) ───────────────── */}
       <section style={{ padding: '80px 32px', maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 64, alignItems: 'center' }}>
-          <div data-reveal>
-            <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', color: 'rgba(76,154,255,0.7)', textTransform: 'uppercase', marginBottom: 16 }}>Workouts</div>
-            <h2 style={{ fontFamily: 'Satoshi, sans-serif', fontSize: 'clamp(28px, 3.5vw, 38px)', fontWeight: 800, letterSpacing: '-0.03em', color: TEXT, lineHeight: 1.1, marginBottom: 20 }}>
-              Every rep. Every march. Every swim.
-            </h2>
-            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 15, color: TEXT_DIM, lineHeight: 1.75, marginBottom: 24 }}>
-              Log manually or connect your Polar device for automatic sync. GPS tracks are visualised on interactive maps. Every session contributes to your wing&apos;s competition score.
-            </p>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              {['Polar Flow sync', 'GPS route maps', 'Sets & reps'].map((tag, i) => (
-                <span key={tag} data-reveal data-delay={String(i + 2)} style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, fontWeight: 500, color: 'rgba(76,154,255,0.8)', background: 'rgba(38,132,255,0.08)', padding: '4px 12px', borderRadius: 99, border: '1px solid rgba(38,132,255,0.15)' }}>{tag}</span>
-              ))}
+        {/* Header + tab pills */}
+        <div data-reveal style={{ marginBottom: 48 }}>
+          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', color: 'rgba(76,154,255,0.7)', textTransform: 'uppercase', marginBottom: 16 }}>Activity & Competition</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {([
+              { id: 'workouts', label: 'Workouts' },
+              { id: 'wing',     label: 'Wing Standing' },
+            ] as const).map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActivityTab(tab.id)}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif', fontSize: 13, fontWeight: 600,
+                  padding: '7px 18px', borderRadius: 99, cursor: 'pointer',
+                  border: `1px solid ${activityTab === tab.id ? 'rgba(38,132,255,0.5)' : 'rgba(38,132,255,0.15)'}`,
+                  background: activityTab === tab.id ? 'rgba(38,132,255,0.12)' : 'transparent',
+                  color: activityTab === tab.id ? '#4C9AFF' : 'rgba(165,173,186,0.6)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tab: Workouts */}
+        {activityTab === 'workouts' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 64, alignItems: 'center' }}>
+            <div data-reveal>
+              <h2 style={{ fontFamily: 'Satoshi, sans-serif', fontSize: 'clamp(28px, 3.5vw, 38px)', fontWeight: 800, letterSpacing: '-0.03em', color: TEXT, lineHeight: 1.1, marginBottom: 20 }}>
+                Every rep. Every march. Every swim.
+              </h2>
+              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 15, color: TEXT_DIM, lineHeight: 1.75, marginBottom: 24 }}>
+                Log manually or connect your Polar device for automatic sync. GPS tracks are visualised on interactive maps. Every session contributes to your wing&apos;s competition score.
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {['Polar Flow sync', 'GPS route maps', 'Sets & reps'].map(tag => (
+                  <span key={tag} style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, fontWeight: 500, color: 'rgba(76,154,255,0.8)', background: 'rgba(38,132,255,0.08)', padding: '4px 12px', borderRadius: 99, border: '1px solid rgba(38,132,255,0.15)' }}>{tag}</span>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <WorkoutMockup />
             </div>
           </div>
-          <div data-reveal-card data-delay="3" style={{ display: 'flex', justifyContent: 'center' }}>
-            <WorkoutMockup />
-          </div>
-        </div>
-      </section>
+        )}
 
-      {/* ── WING COMPETITION SPOTLIGHT ────────────────────── */}
-      <section style={{ padding: '80px 32px', maxWidth: 1100, margin: '0 auto' }}>
-        <div data-reveal style={{ textAlign: 'center', marginBottom: 48 }}>
-          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', color: 'rgba(76,154,255,0.7)', textTransform: 'uppercase', marginBottom: 12 }}>Wing Competition</div>
-          <h2 style={{ fontFamily: 'Satoshi, sans-serif', fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 800, letterSpacing: '-0.03em', color: TEXT, lineHeight: 1.1, maxWidth: 560, margin: '0 auto 16px' }}>
-            Your wing&apos;s honour is on the line.
-          </h2>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 15, color: TEXT_DIM, maxWidth: 460, margin: '0 auto' }}>
-            Points from IPPT scores, workout logs, and nutrition adherence roll up into a live wing leaderboard. Every meal you log matters.
-          </p>
-        </div>
-        <div data-reveal-card data-delay="2" style={{ maxWidth: 520, margin: '0 auto' }}>
-          <LeaderboardMockup />
-        </div>
+        {/* Tab: Wing Standing */}
+        {activityTab === 'wing' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 64, alignItems: 'center' }}>
+            <div data-reveal>
+              <h2 style={{ fontFamily: 'Satoshi, sans-serif', fontSize: 'clamp(28px, 3.5vw, 38px)', fontWeight: 800, letterSpacing: '-0.03em', color: TEXT, lineHeight: 1.1, marginBottom: 20 }}>
+                Your wing&apos;s honour is on the line.
+              </h2>
+              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 15, color: TEXT_DIM, lineHeight: 1.75, marginBottom: 24 }}>
+                Points from IPPT scores, workout logs, and nutrition adherence roll into a live wing leaderboard. Every meal you log matters to your wing.
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {['Live rankings', 'IPPT points', 'Nutrition adherence'].map(tag => (
+                  <span key={tag} style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, fontWeight: 500, color: 'rgba(76,154,255,0.8)', background: 'rgba(38,132,255,0.08)', padding: '4px 12px', borderRadius: 99, border: '1px solid rgba(38,132,255,0.15)' }}>{tag}</span>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <LeaderboardMockup />
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ── CTA SECTION ───────────────────────────────────── */}
@@ -973,6 +1261,39 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── STICKY MOBILE CTA ─────────────────────────────── */}
+      {/* Hidden on lg+ screens; always visible on mobile */}
+      {/* display:flex must be a class, not an inline style — inline style would override lg:hidden's display:none */}
+      <div className="lg:hidden flex" style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200,
+        padding: '12px 16px calc(12px + env(safe-area-inset-bottom, 0px))',
+        background: 'rgba(6,13,26,0.96)',
+        backdropFilter: 'blur(16px)',
+        borderTop: '1px solid rgba(38,132,255,0.15)',
+        gap: 10,
+      }}>
+        <Link href="/signup" style={{
+          flex: 1, fontFamily: 'DM Sans, sans-serif', fontSize: 15, fontWeight: 700,
+          color: '#FFFFFF', background: '#0052CC',
+          padding: '13px 0', borderRadius: 12, textDecoration: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          boxShadow: '0 0 20px rgba(0,82,204,0.35)',
+        }}>
+          Begin mission <span style={{ fontSize: 16 }}>→</span>
+        </Link>
+        <Link href="/login" style={{
+          fontFamily: 'DM Sans, sans-serif', fontSize: 14, fontWeight: 500,
+          color: 'rgba(165,173,186,0.8)',
+          padding: '13px 20px', borderRadius: 12, textDecoration: 'none',
+          border: '1px solid rgba(38,132,255,0.2)',
+          display: 'flex', alignItems: 'center',
+        }}>
+          Sign in
+        </Link>
+      </div>
+      {/* Spacer so footer isn't hidden behind the sticky bar on mobile */}
+      <div className="lg:hidden" style={{ height: 80 }} />
 
       {/* ── FOOTER ────────────────────────────────────────── */}
       <footer style={{

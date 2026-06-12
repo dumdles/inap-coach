@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 
 export default function NotFound() {
     return (
@@ -25,21 +26,16 @@ export default function NotFound() {
                 </p>
 
                 <div className="flex items-center justify-center gap-3 pt-2">
-                    <Link
-                        href="/dashboard"
-                        className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
-                    >
-                        <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                    <Button asChild size="lg" prefixIcon={
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
                         </svg>
-                        Go to Dashboard
-                    </Link>
-                    <Link
-                        href="/"
-                        className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                    >
-                        Home
-                    </Link>
+                    }>
+                        <Link href="/dashboard">Go to Dashboard</Link>
+                    </Button>
+                    <Button asChild variant="outline" size="lg">
+                        <Link href="/">Home</Link>
+                    </Button>
                 </div>
             </div>
         </div>

@@ -758,9 +758,10 @@ export default function FriendsPage() {
                 </h1>
                 <div className="flex items-center gap-3">
                     <PeriodToggle value={period} onChange={setPeriod} />
-                    <button
+                    <Button
+                        size="sm"
                         onClick={() => setAddOpen(true)}
-                        className="relative inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+                        className="relative"
                     >
                         Add friend
                         {pendingReceived.length > 0 && (
@@ -768,7 +769,7 @@ export default function FriendsPage() {
                                 {pendingReceived.length}
                             </span>
                         )}
-                    </button>
+                    </Button>
                 </div>
             </div>
 

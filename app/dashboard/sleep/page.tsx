@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/app/context/auth-context'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 import {
     Dialog, DialogContent, DialogTitle,
 } from '@/components/ui/dialog'
@@ -1184,21 +1185,23 @@ function SleepLogDetailDialog({
                         </>
                     ) : (
                         <>
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => setConfirmDelete(true)}
-                                className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-danger transition-colors"
+                                className="text-muted-foreground hover:text-danger"
+                                prefixIcon={<Trash2Icon className="size-3.5" />}
                             >
-                                <Trash2Icon className="w-3.5 h-3.5" />
                                 Delete
-                            </button>
+                            </Button>
                             {log.source === 'manual' && (
-                                <button
+                                <Button
+                                    size="sm"
                                     onClick={() => { onEdit(log); onOpenChange(false) }}
-                                    className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-primary/90 transition-colors"
+                                    prefixIcon={<PencilIcon className="size-3.5" />}
                                 >
-                                    <PencilIcon className="w-3.5 h-3.5" />
                                     Edit
-                                </button>
+                                </Button>
                             )}
                         </>
                     )}
@@ -1256,14 +1259,10 @@ function SettingsPopover({
                 </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-1">
-                <button onClick={onClose} className="text-[12px] text-muted-foreground hover:text-foreground px-3 py-1.5">Cancel</button>
-                <button
-                    onClick={save}
-                    disabled={saving}
-                    className="text-[12px] font-semibold rounded-full bg-primary text-white px-3.5 py-1.5 hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
+                <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+                <Button size="sm" onClick={save} disabled={saving}>
                     {saving ? 'Saving…' : 'Save'}
-                </button>
+                </Button>
             </div>
         </div>
     )
@@ -1363,14 +1362,15 @@ export default function SleepPage() {
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <div className="relative">
-                        <button
+                        <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => setSettingsOpen(o => !o)}
-                            className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-[12px] font-semibold text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                             title="Sleep targets"
+                            prefixIcon={<SettingsIcon className="size-3.5" />}
                         >
-                            <SettingsIcon className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">Settings</span>
-                        </button>
+                        </Button>
                         {settingsOpen && (
                             <>
                                 <div className="fixed inset-0 z-30" onClick={() => setSettingsOpen(false)} />
@@ -1380,13 +1380,12 @@ export default function SleepPage() {
                             </>
                         )}
                     </div>
-                    <button
+                    <Button
                         onClick={() => setLogDialogOpen(true)}
-                        className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-white hover:bg-primary/90 transition-colors"
+                        prefixIcon={<PlusIcon className="size-3.5" />}
                     >
-                        <PlusIcon className="w-3.5 h-3.5" />
                         Log sleep
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -1453,21 +1452,23 @@ export default function SleepPage() {
 
             {/* Sync buttons */}
             <div className="flex items-center gap-2 flex-wrap">
-                <button
+                <Button
+                    variant="outline"
+                    size="sm"
                     onClick={syncPolar}
                     disabled={polarSyncing}
-                    className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3.5 py-1.5 text-[12px] font-semibold text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                    prefixIcon={<RefreshCwIcon className={cn('size-3', polarSyncing && 'animate-spin')} />}
                 >
-                    <RefreshCwIcon className={cn('w-3 h-3', polarSyncing && 'animate-spin')} />
                     {polarSyncing ? 'Syncing Polar…' : 'Sync Polar sleep'}
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setImportDialogOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3.5 py-1.5 text-[12px] font-semibold text-foreground hover:bg-accent transition-colors"
+                    prefixIcon={<AppleIcon className="size-3" />}
                 >
-                    <AppleIcon className="w-3 h-3" />
                     Import Apple Health
-                </button>
+                </Button>
             </div>
 
             {/* Sleep School + Recent Nights — stacked on mobile, side-by-side on lg */}
@@ -1511,12 +1512,9 @@ export default function SleepPage() {
                                 <div className="text-[13px] font-semibold text-foreground">No sleep logged yet</div>
                                 <p className="text-[12px] text-muted-foreground mt-0.5">Log a night manually, sync your Polar, or import from Apple Health.</p>
                             </div>
-                            <button
-                                onClick={() => setLogDialogOpen(true)}
-                                className="rounded-full bg-primary px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-primary/90 transition-colors"
-                            >
+                            <Button size="sm" onClick={() => setLogDialogOpen(true)}>
                                 Log last night
-                            </button>
+                            </Button>
                         </div>
                     ) : (
                         pagedLogs.map(log => {

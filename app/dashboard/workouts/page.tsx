@@ -933,21 +933,20 @@ export default function WorkoutsPage() {
                     <p className="text-sm text-muted-foreground">Exercise logs from Polar and manual entries.</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
+                    <Button
+                        variant="outline"
                         onClick={() => syncPolar(true)}
                         disabled={polarLoading}
-                        className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                        prefixIcon={<RefreshCwIcon className={cn("size-3.5", polarLoading && "animate-spin")} />}
                     >
-                        <RefreshCwIcon className={cn("w-3.5 h-3.5", polarLoading && "animate-spin")} />
                         Refresh
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={() => setLoggerOpen(true)}
-                        className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+                        prefixIcon={<PlusIcon className="size-3.5" />}
                     >
-                        <PlusIcon className="w-3.5 h-3.5" />
                         Log exercise
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -1030,13 +1029,15 @@ export default function WorkoutsPage() {
                         <div className="text-[13px] font-semibold text-foreground">Connect your Polar watch</div>
                         <p className="text-[12px] text-muted-foreground mt-0.5">Sync exercises automatically from Polar Flow.</p>
                     </div>
-                    <button
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-shrink-0"
                         onClick={() => { if (user?.id) window.location.href = `/api/auth/polar?userId=${user.id}` }}
                         disabled={!user?.id}
-                        className="rounded-full border border-border bg-background px-4 py-1.5 text-[12px] font-semibold text-foreground hover:bg-accent transition-colors flex-shrink-0 disabled:opacity-50"
                     >
                         Connect
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -1111,12 +1112,9 @@ export default function WorkoutsPage() {
                                 </p>
                             </div>
                             {logs.length === 0 && (
-                                <button
-                                    onClick={() => setLoggerOpen(true)}
-                                    className="rounded-full bg-primary px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-primary/90 transition-colors"
-                                >
+                                <Button size="sm" onClick={() => setLoggerOpen(true)}>
                                     Log your first session
-                                </button>
+                                </Button>
                             )}
                         </div>
                     ) : (

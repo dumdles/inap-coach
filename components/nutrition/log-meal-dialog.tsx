@@ -8,11 +8,36 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/app/context/auth-context'
 import { detectMealType } from '@/lib/tdee'
 import { cn, fmt } from '@/lib/utils'
+import { ErrorReveal } from '@/components/ui/error-reveal'
+import { SuccessCheck } from '@/components/ui/success-check'
+import { Shimmer } from '@/components/ui/shimmer'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
-type Stage = 'pick' | 'custom' | 'details'
+type Stage = 'pick' | 'custom' | 'details' | 'scan'
+
+type ScanIngredient = {
+    name: string
+    estimated_grams: number
+    calories_per_100g: number
+    protein_g: number
+    carbs_g: number
+    fat_g: number
+}
+
+type ScanDish = {
+    name: string
+    total_grams: number
+    calories_per_100g: number
+    protein_g: number
+    carbs_g: number
+    fat_g: number
+    confidence: 'high' | 'medium' | 'low'
+    confidence_note: string | null
+    ingredients: ScanIngredient[]
+}
 
 type FoodItem = {
     id: string
@@ -25,6 +50,12 @@ type FoodItem = {
 }
 
 type SearchResult = FoodItem & { source?: 'db' }
+
+const CONFIDENCE_INFO: Record<ScanDish['confidence'], { title: string; body: string }> = {
+    high:   { title: 'High confidence',   body: 'AI clearly identified this food and its macro profile should be accurate.' },
+    medium: { title: 'Medium confidence', body: 'Food recognised, but portion size, sauce, or preparation may affect accuracy.' },
+    low:    { title: 'Low confidence',    body: 'Difficult to identify clearly — review the macro estimates before logging.' },
+}
 
 export type DailyTotals = { calories: number; protein: number; carbs: number; fat: number }
 export type UserTargets = { calories: number; protein: number }
@@ -98,6 +129,16 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
     const [suggestedQty, setSuggestedQty] = useState<number | null>(null)
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const [scanResults, setScanResults] = useState<ScanDish[]>([])
+    const [scanning, setScanning] = useState(false)
+    const [scanError, setScanError] = useState<string | null>(null)
+    const [scanPreview, setScanPreview] = useState<string | null>(null)
+    const [expandedDishes, setExpandedDishes] = useState<Set<number>>(new Set())
+    // Ingredients from the last scan dish selected — displayed in the details stage chip
+    const [selectedDishIngredients, setSelectedDishIngredients] = useState<ScanIngredient[] | null>(null)
+    const [logged, setLogged] = useState(false)
 
     // Fetch templates from DB once on first open
     useEffect(() => {
@@ -200,6 +241,13 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         setEstimateError(null)
         setEstimateSuccess(false)
         setSuggestedQty(null)
+        setScanResults([])
+        setScanning(false)
+        setScanError(null)
+        setScanPreview(null)
+        setExpandedDishes(new Set())
+        setSelectedDishIngredients(null)
+        setLogged(false)
     }
 
     useEffect(() => { if (!open) reset() }, [open])
@@ -229,6 +277,66 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         setSelected(item)
         setQuery('')
         setResults([])
+        setStage('details')
+    }
+
+    async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0]
+        if (!file) return
+        // Reset so the same photo can be re-selected if needed
+        e.target.value = ''
+        setStage('scan')
+        setScanning(true)
+        setScanError(null)
+        setScanResults([])
+        try {
+            // Read as data URL — gives us both the preview and the base64 payload in one pass
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader()
+                reader.onload = () => resolve(reader.result as string)
+                reader.onerror = reject
+                reader.readAsDataURL(file)
+            })
+            setScanPreview(dataUrl)
+            const base64 = dataUrl.split(',')[1]
+            const mimeType = file.type || 'image/jpeg'
+            const res = await fetch('/api/food-vision', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageBase64: base64, mimeType }),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                if (data.detail) console.error('[food-vision]', data.detail)
+                throw new Error(data.error ?? `HTTP ${res.status}`)
+            }
+            setScanResults(data.dishes ?? [])
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : ''
+            // Network errors (fetch failed before reaching the server) get a dedicated message
+            setScanError(
+                !msg || msg === 'Failed to fetch' || msg.startsWith('NetworkError')
+                    ? 'No internet connection — check your signal and try again.'
+                    : msg
+            )
+        } finally {
+            setScanning(false)
+        }
+    }
+
+    function selectScanDish(dish: ScanDish) {
+        // Pre-fill with the dish's server-computed weighted-average macros and total grams
+        setSelected({
+            name: dish.name,
+            calories_per_100g: dish.calories_per_100g,
+            protein_g: dish.protein_g,
+            carbs_g: dish.carbs_g,
+            fat_g: dish.fat_g,
+            is_cookhouse_item: false,
+        })
+        setQuantity(String(dish.total_grams))
+        setSuggestedQty(dish.total_grams)
+        setSelectedDishIngredients(dish.ingredients.length > 1 ? dish.ingredients : null)
         setStage('details')
     }
 
@@ -287,7 +395,8 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         setSubmitting(false)
         if (insertError) { setError(insertError.message); return }
         onLogged?.()
-        onOpenChange(false)
+        setLogged(true)
+        setTimeout(() => onOpenChange(false), 900)
     }
 
     const quantityNum = parseFloat(quantity) || 0
@@ -330,8 +439,19 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                         {stage === 'pick' && 'Log a meal'}
                         {stage === 'custom' && 'Add custom food'}
                         {stage === 'details' && (selected?.name ?? 'Meal details')}
+                        {stage === 'scan' && (scanning ? 'Scanning food…' : 'Scan results')}
                     </DialogTitle>
                 </DialogHeader>
+
+                {/* Hidden file input — triggered by both the pick-stage scan button and the scan-stage "scan again" button */}
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handlePhotoSelected}
+                />
 
                 {/* ── Stage: food picker ── */}
                 {stage === 'pick' && (
@@ -368,9 +488,8 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                         {query ? (
                             <div className="px-5 pb-4 flex-1 overflow-y-auto">
                                 {searching && (
-                                    <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                                        <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                                        Searching…
+                                    <div className="py-4">
+                                        <Shimmer>Searching…</Shimmer>
                                     </div>
                                 )}
                                 {!searching && results.length > 0 && (
@@ -408,6 +527,20 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                         ) : (
                             /* Template browser */
                             <div className="flex flex-col flex-1 min-h-0 overflow-hidden scrollbar-hide">
+                                {/* Camera scan button */}
+                                <div className="px-5 pb-3 flex-shrink-0">
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-dashed border-border bg-muted/30 hover:bg-muted/60 hover:border-primary/40 transition-colors text-sm text-muted-foreground hover:text-foreground"
+                                    >
+                                        <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                            <circle cx="12" cy="13" r="4" />
+                                        </svg>
+                                        Scan food with camera
+                                    </button>
+                                </div>
+
                                 {/* Category pills */}
                                 <div className="px-5 pb-2 flex gap-2 overflow-x-auto scrollbar-none flex-shrink-0">
                                     {templateCategories.map(cat => (
@@ -519,16 +652,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                                     </>
                                 )}
                             </button>
-                            {/* Inline error below button — shown when AI fails or doesn't recognise the food */}
-                            {estimateError && (
-                                <div className="flex items-start gap-2 mt-2 px-1">
-                                    <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-warning mt-0.5 flex-shrink-0">
-                                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                        <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-                                    </svg>
-                                    <p className="text-[12px] text-warning leading-relaxed">{estimateError}</p>
-                                </div>
-                            )}
+                            <ErrorReveal message={estimateError} variant="warning" className="mt-2 px-1" />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             {([
@@ -584,7 +708,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                             </div>
                         </button>
 
-                        {error && <p className="text-sm text-destructive">{error}</p>}
+                        <ErrorReveal message={error} />
                         <Button
                             className="w-full"
                             disabled={!customValid || submitting}
@@ -598,7 +722,8 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                 {/* ── Stage: meal details ── */}
                 {stage === 'details' && selected && (
                     <div className="px-6 pt-4 pb-6 space-y-5 overflow-y-auto flex-1">
-                        <BackButton onClick={() => { setSelected(null); setStage('pick') }} />
+                        {/* Go back to scan results if they came from there, otherwise back to pick */}
+                        <BackButton onClick={() => { setSelected(null); setStage(scanResults.length > 0 ? 'scan' : 'pick') }} />
 
                         {/* Selected food chip */}
                         <div className="bg-muted/50 border border-border rounded-xl px-4 py-3">
@@ -606,6 +731,12 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                             <div className="text-[11px] text-muted-foreground mt-0.5">
                                 Per 100g — {selected.calories_per_100g} kcal · {selected.protein_g}g P · {selected.carbs_g}g C · {selected.fat_g}g F
                             </div>
+                            {selectedDishIngredients && selectedDishIngredients.length > 1 && (
+                                <div className="text-[10px] text-muted-foreground/60 mt-1.5 leading-relaxed">
+                                    {selectedDishIngredients.slice(0, 3).map(ing => ing.name).join(', ')}
+                                    {selectedDishIngredients.length > 3 && ` +${selectedDishIngredients.length - 3} more`}
+                                </div>
+                            )}
                         </div>
 
                         {/* Quantity */}
@@ -723,17 +854,192 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                             />
                         </div>
 
-                        {error && <p className="text-sm text-destructive">{error}</p>}
-
+                        <ErrorReveal message={error} />
                         <Button
                             className="w-full"
-                            disabled={!selected || quantityNum <= 0 || submitting}
+                            disabled={!selected || quantityNum <= 0 || submitting || logged}
                             onClick={handleSubmit}
                         >
                             {submitting ? 'Logging…' : 'Log meal'}
                         </Button>
                     </div>
                 )}
+                {/* ── Stage: scan results ── */}
+                {stage === 'scan' && (
+                    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                        {scanning ? (
+                            /* Loading state — show photo preview + shimmer text */
+                            <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 py-8">
+                                {scanPreview && (
+                                    <img src={scanPreview} alt="Food photo" className="w-full max-h-64 object-contain rounded-xl border border-border bg-muted/20" />
+                                )}
+                                <Shimmer>Analysing your food…</Shimmer>
+                            </div>
+                        ) : (
+                            <div className="px-5 pt-4 pb-5 flex flex-col gap-3 flex-1 overflow-y-auto">
+                                <BackButton onClick={() => { setStage('pick'); setScanResults([]); setScanError(null); setScanPreview(null) }} />
+
+                                {/* Photo thumbnail */}
+                                {scanPreview && (
+                                    <img src={scanPreview} alt="Scanned food" className="w-full max-h-64 object-contain rounded-xl border border-border bg-muted/20" />
+                                )}
+
+                                {scanError ? (
+                                    <div className="flex flex-col items-center gap-3 py-4 text-center">
+                                        <ErrorReveal message={scanError} hint="Try a clearer photo, or add the food manually below." />
+                                        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                                            Try again
+                                        </Button>
+                                    </div>
+                                ) : scanResults.length === 0 ? (
+                                    <div className="flex flex-col items-center gap-3 py-4 text-center">
+                                        <p className="text-sm text-muted-foreground">No food detected. Try a clearer photo with good lighting.</p>
+                                        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                                            Scan another photo
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p className="text-xs text-muted-foreground">
+                                            {scanResults.length} dish{scanResults.length !== 1 ? 'es' : ''} detected — tap one to log it
+                                        </p>
+
+                                        <div className="space-y-2">
+                                            {scanResults.map((dish, i) => (
+                                                // div instead of button so nested PopoverTrigger + expand buttons are valid HTML
+                                                <div
+                                                    key={i}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onClick={() => selectScanDish(dish)}
+                                                    onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && selectScanDish(dish)}
+                                                    className="w-full px-3 py-3 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-accent/40 transition-colors text-left cursor-pointer"
+                                                >
+                                                    {/* Dish header row: name + macros summary + confidence badge */}
+                                                    <div className="flex items-start gap-2">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-sm font-medium text-foreground">{dish.name}</div>
+                                                            <div className="text-[11px] text-muted-foreground mt-0.5">
+                                                                ~{dish.total_grams}g &middot; {Math.round(dish.calories_per_100g * dish.total_grams / 100)} kcal &middot; {(dish.protein_g * dish.total_grams / 100).toFixed(1)}g protein
+                                                            </div>
+                                                        </div>
+                                                        {/* Confidence badge — tap to see explanation popover */}
+                                                        <Popover>
+                                                            <PopoverTrigger asChild>
+                                                                <button
+                                                                    onClick={e => e.stopPropagation()}
+                                                                    className={cn(
+                                                                        'text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 capitalize cursor-pointer mt-0.5',
+                                                                        dish.confidence === 'high'
+                                                                            ? 'bg-success/10 text-success hover:bg-success/20'
+                                                                            : dish.confidence === 'medium'
+                                                                            ? 'bg-warning/10 text-warning hover:bg-warning/20'
+                                                                            : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                                                                    )}
+                                                                >
+                                                                    {dish.confidence}
+                                                                </button>
+                                                            </PopoverTrigger>
+                                                            <PopoverContent side="top" className="w-60 p-3 rounded-2xl">
+                                                                <div className="space-y-1.5">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={cn(
+                                                                            'text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize',
+                                                                            dish.confidence === 'high'
+                                                                                ? 'bg-success/10 text-success'
+                                                                                : dish.confidence === 'medium'
+                                                                                ? 'bg-warning/10 text-warning'
+                                                                                : 'bg-muted/60 text-muted-foreground'
+                                                                        )}>
+                                                                            {dish.confidence}
+                                                                        </span>
+                                                                        <span className="text-sm font-medium text-foreground">
+                                                                            {CONFIDENCE_INFO[dish.confidence].title}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-xs text-muted-foreground leading-relaxed">
+                                                                        {CONFIDENCE_INFO[dish.confidence].body}
+                                                                    </p>
+                                                                    {dish.confidence_note && (
+                                                                        <p className="text-xs text-muted-foreground/70 italic border-t border-border pt-1.5 mt-1 leading-relaxed">
+                                                                            {dish.confidence_note}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </PopoverContent>
+                                                        </Popover>
+                                                    </div>
+
+                                                    {/* Ingredient toggle — only shown for multi-component dishes */}
+                                                    {dish.ingredients.length > 1 && (
+                                                        <button
+                                                            onClick={e => {
+                                                                e.stopPropagation()
+                                                                setExpandedDishes(prev => {
+                                                                    const next = new Set(prev)
+                                                                    if (next.has(i)) next.delete(i); else next.add(i)
+                                                                    return next
+                                                                })
+                                                            }}
+                                                            className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                                                        >
+                                                            <svg
+                                                                viewBox="0 0 24 24" width={11} height={11} fill="none"
+                                                                stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+                                                                style={{ transform: expandedDishes.has(i) ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }}
+                                                            >
+                                                                <path d="M6 9l6 6 6-6" />
+                                                            </svg>
+                                                            {dish.ingredients.length} ingredient{dish.ingredients.length !== 1 ? 's' : ''}
+                                                        </button>
+                                                    )}
+
+                                                    {/* Expanded ingredient list */}
+                                                    {expandedDishes.has(i) && (
+                                                        <div className="mt-2 space-y-1 pl-3 border-l-2 border-border/50">
+                                                            {dish.ingredients.map((ing, j) => (
+                                                                <div key={j} className="text-[11px] text-muted-foreground flex justify-between gap-2">
+                                                                    <span className="truncate">{ing.name}</span>
+                                                                    <span className="flex-shrink-0 tabular-nums text-muted-foreground/60">{ing.estimated_grams}g</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="mt-1 w-full flex items-center justify-center gap-2 h-9 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
+                                        >
+                                            <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                                <circle cx="12" cy="13" r="4" />
+                                            </svg>
+                                            Scan another photo
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Success overlay — fades in over the whole dialog when a meal is logged.
+                    backdrop-blur-sm blurs the content below; the dialog closes after 900ms. */}
+                {logged && (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-background/80 backdrop-blur-sm t-overlay-in">
+                        <div className="w-16 h-16 rounded-full bg-success/15 flex items-center justify-center">
+                            <SuccessCheck playing size={32} />
+                        </div>
+                        <div className="text-center px-6">
+                            <p className="text-base font-semibold text-success">Logged!</p>
+                            <p className="text-sm text-muted-foreground mt-1 truncate">{selected?.name}</p>
+                        </div>
+                    </div>
+                )}
+
             </DialogContent>
         </Dialog>
     )

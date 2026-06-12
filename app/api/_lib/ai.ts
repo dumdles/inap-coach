@@ -51,3 +51,45 @@ export async function generateStructured<SCHEMA extends z.ZodType>(opts: {
     })
     return result.output as z.infer<SCHEMA>
 }
+
+// ─── Vision (multimodal) ─────────────────────────────────────────────────────
+
+// Gemini 3.5 Flash has confirmed vision support on OpenRouter
+export const VISION_MODEL = 'google/gemini-3.5-flash'
+
+type VisionContentPart =
+    | { type: 'text'; text: string }
+    | { type: 'image_url'; image_url: { url: string } }
+
+type VisionMessage = { role: 'system' | 'user' | 'assistant'; content: string | VisionContentPart[] }
+
+/**
+ * Calls OpenRouter with a vision-capable model for multimodal image+text inputs.
+ * Uses VISION_MODEL directly (no fallback — vision support is model-specific).
+ */
+export async function callOpenRouterVision(messages: VisionMessage[], options: CallOptions = {}): Promise<string> {
+    const { temperature = 0.2, response_format } = options
+
+    const res = await fetch(OPENROUTER_URL, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'fitrep',
+        },
+        body: JSON.stringify({
+            model: VISION_MODEL,
+            messages,
+            temperature,
+            ...(response_format ? { response_format } : {}),
+        }),
+    })
+    if (!res.ok) {
+        const body = await res.text().catch(() => '(no body)')
+        throw Object.assign(new Error(`OpenRouter ${res.status}: ${body}`), { status: res.status })
+    }
+    const json = await res.json()
+    let content: string = json.choices[0].message.content
+    content = content.replace(/^```json?\n?([\s\S]*?)\n?```$/m, '$1').trim()
+    return content
+}

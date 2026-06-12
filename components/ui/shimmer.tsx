@@ -5,7 +5,7 @@
 // stay in sync, hence children is a plain string.
 export function Shimmer({ children, className }: { children: string; className?: string }) {
     return (
-        <span className={`t-shimmer ${className ?? ''}`} data-text={children}>
+        <span className={`t-shimmer${className ? ` ${className}` : ''}`} data-text={children}>
             {children}
         </span>
     )
