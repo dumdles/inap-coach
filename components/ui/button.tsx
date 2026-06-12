@@ -68,14 +68,17 @@ function Button({
   // child alone — no conditional siblings — so Slot always gets exactly one
   // React element.
   if (asChild) {
+    // Slot.Root is typed as SlotProps (HTMLAttributes<HTMLElement>) — it does
+    // not accept button-specific attributes like `disabled`. Cast props to the
+    // narrower type so TypeScript is satisfied; the child element handles its
+    // own disabled behaviour.
     return (
       <Slot.Root
         data-slot="button"
         data-variant={variant}
         data-size={size}
         className={cn(buttonVariants({ variant, size, className }))}
-        disabled={disabled || isLoading}
-        {...props}
+        {...(props as React.HTMLAttributes<HTMLElement>)}
       >
         {children}
       </Slot.Root>
