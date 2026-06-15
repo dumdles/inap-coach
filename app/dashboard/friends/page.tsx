@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { AchievementBadgeSm } from '@/components/achievements/achievement-badge'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type RankedUser = {
@@ -20,6 +21,8 @@ type RankedUser = {
     streak: number
     mealsToday: number
     position: number
+    badgeCount: number
+    topBadgeId: string | null
 }
 
 type WingStanding = {
@@ -142,6 +145,13 @@ function RankingCard({
                                 You&apos;re ahead of {ahead} cadet{ahead !== 1 ? 's' : ''} for the {label}.
                             </div>
                         )}
+                        {user.badgeCount > 0 && (
+                            <div className="flex items-center gap-1.5 text-white/50 text-xs mt-2">
+                                <span>🏅</span>
+                                <span>{user.badgeCount} badge{user.badgeCount !== 1 ? 's' : ''} earned</span>
+                                {user.topBadgeId && <AchievementBadgeSm achievementId={user.topBadgeId} className="ml-0.5" />}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -164,9 +174,14 @@ function Podium({ top3, currentUserId, clickableIds }: { top3: RankedUser[]; cur
                     const inner = (
                         <>
                             <Avatar name={u.full_name} size="lg" className={isFirst ? 'ring-2 ring-primary ring-offset-2 ring-offset-card' : ''} />
-                            <span className="text-xs font-medium text-foreground text-center leading-tight">
-                                {u.full_name.split(' ')[0]}
-                            </span>
+                            <div className="flex flex-col items-center gap-1">
+                                <span className="text-xs font-medium text-foreground text-center leading-tight">
+                                    {u.full_name.split(' ')[0]}
+                                </span>
+                                {u.topBadgeId && (
+                                    <AchievementBadgeSm achievementId={u.topBadgeId} className="w-5 h-5 text-[10px]" />
+                                )}
+                            </div>
                             <div
                                 className={cn(
                                     'w-full rounded-xl flex flex-col items-center justify-center pt-4 pb-3 gap-0.5',
@@ -218,6 +233,7 @@ function LeaderboardList({ users, currentUserId, clickableIds }: { users: Ranked
                                 {u.streak}
                             </span>
                         )}
+                        {u.topBadgeId && <AchievementBadgeSm achievementId={u.topBadgeId} />}
                         <span className="text-sm font-bold text-foreground tabular-nums">{u.score.toLocaleString()}</span>
                     </>
                 )
@@ -599,6 +615,20 @@ export default function FriendsPage() {
     const me = leaderboard.find(u => u.id === user?.id)
     const top3 = leaderboard.slice(0, 3)
     const noMealYet = me && me.mealsToday === 0
+
+    // Unlock leaderboard-position achievements when the wing tab finishes loading
+    useEffect(() => {
+        if (!me || !user || tab !== 'wing' || loadingBoard) return
+        const toUnlock: string[] = []
+        if (me.position <= 3) toUnlock.push('top_3_wing')
+        if (me.position === 1) toUnlock.push('rank_1_wing')
+        if (toUnlock.length === 0) return
+        fetch('/api/achievements', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id, achievementIds: toUnlock }),
+        })
+    }, [me?.position, tab, loadingBoard, user])
 
     return (
         <div className="px-4 md:px-8 py-8 md:py-10">

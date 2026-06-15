@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { computeScore, computeStreak } from '@/lib/scoring'
+import { ACHIEVEMENT_MAP, RARITY_ORDER } from '@/lib/achievements'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -124,12 +125,35 @@ export async function GET(req: NextRequest) {
         }
     }
 
+    // Fetch badge data — gracefully skipped if the table doesn't exist yet
+    const badgesByUser: Record<string, { count: number; topBadgeId: string | null }> = {}
+    for (const u of users) badgesByUser[u.id] = { count: 0, topBadgeId: null }
+
+    const { data: allBadges, error: badgesErr } = await supabaseAdmin
+        .from('user_achievements')
+        .select('user_id, achievement_id')
+        .in('user_id', userIds)
+
+    if (!badgesErr) {
+        for (const b of allBadges ?? []) {
+            if (!badgesByUser[b.user_id]) continue
+            badgesByUser[b.user_id].count++
+            const a = ACHIEVEMENT_MAP[b.achievement_id]
+            const curTopId = badgesByUser[b.user_id].topBadgeId
+            const curRarity = curTopId ? (RARITY_ORDER[ACHIEVEMENT_MAP[curTopId]?.rarity ?? 'common'] ?? 0) : 0
+            if (a && RARITY_ORDER[a.rarity] > curRarity) {
+                badgesByUser[b.user_id].topBadgeId = b.achievement_id
+            }
+        }
+    }
+
     const ranked = users
         .map(u => {
             const streak = computeStreak(allDaysByUser[u.id])
             const score = computeScore(mealsByUserDay[u.id], streak, workoutKcalByUserDay[u.id], sleepByUserDay[u.id])
             const mealsToday = mealsByUserDay[u.id][new Date().toISOString().slice(0, 10)] ?? 0
-            return { ...u, score, streak, mealsToday }
+            const { count: badgeCount, topBadgeId } = badgesByUser[u.id] ?? { count: 0, topBadgeId: null }
+            return { ...u, score, streak, mealsToday, badgeCount, topBadgeId }
         })
         .sort((a, b) => b.score - a.score)
         .map((u, i) => ({ ...u, position: i + 1 }))
