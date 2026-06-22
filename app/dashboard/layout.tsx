@@ -775,7 +775,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [unread, setUnread] = useUnreadCount(user?.id ?? '')
     const { primary, overflow, primaryHrefs, setPrimary } = useNavTabs()
 
+    // Settings and the AI coach manage their own internal scroll region (a
+    // fixed-height shell with one scrollable pane inside), instead of letting
+    // the whole page scroll like every other dashboard route. Without this,
+    // mobile Safari's dynamic viewport units leave a sliver of scrollable
+    // space below the coach's input field instead of pinning it to the nav.
     const isSettings = pathname.startsWith('/dashboard/settings')
+    const isCoach = pathname.startsWith('/dashboard/coach')
+    const fixedShell = isSettings || isCoach
 
     useEffect(() => {
         if (!isLoading && !user) router.replace('/login')
@@ -803,7 +810,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const sidebarW = expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_COLLAPSED_W
     const contentMargin = sidebarW + SIDEBAR_MARGIN * 2
 
-    if (isSettings) {
+    if (fixedShell) {
         return (
             <FabProvider>
                 <div className="bg-background">

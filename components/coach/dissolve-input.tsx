@@ -90,7 +90,7 @@ function makeEase(ease: string): (t: number) => number {
 // modes are set in globals.css.
 const measureCtx: { current: CanvasRenderingContext2D | null } = { current: null }
 
-function buildGlowLayers(wrapWidth: number, text: string): string {
+function buildGlowLayers(wrapWidth: number, text: string, font: string): string {
     const padLeft = 16 // matches the textarea's px-4
     const spread = readNum('--glow-spread', 1.5)
     if (!measureCtx.current) {
@@ -98,7 +98,7 @@ function buildGlowLayers(wrapWidth: number, text: string): string {
     }
     const ctx = measureCtx.current
     if (!ctx) return ''
-    ctx.font = '400 14px "DM Sans", sans-serif' // matches the textarea font
+    ctx.font = font
     const isDark = document.documentElement.classList.contains('dark')
     const rgb = isDark ? '255,255,255' : '0,0,0'
     const layers: string[] = []
@@ -167,7 +167,11 @@ export const DissolveInput = forwardRef<DissolveInputHandle, Props>(function Dis
         // Single-line snapshot of the sent text (newlines collapse — the
         // mirror is just a visual stand-in for the fly-up).
         mirror.textContent = text.replace(/\s+/g, ' ')
-        const bg = buildGlowLayers(wrap.clientWidth || 280, mirror.textContent)
+        // Read the textarea's live computed font rather than hardcoding it —
+        // our global mobile rule bumps it to 16px below `sm` (to stop iOS
+        // Safari's zoom-on-focus), so the glow's word measurements must too.
+        const font = textareaRef.current ? getComputedStyle(textareaRef.current).font : '400 14px "DM Sans", sans-serif'
+        const bg = buildGlowLayers(wrap.clientWidth || 280, mirror.textContent, font)
         // Everything below is inline styles only: the parent re-renders
         // (clearing its input state) while this plays, and React rewrites
         // className on the wrap — inline styles on these layers survive.

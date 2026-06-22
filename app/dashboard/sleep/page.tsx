@@ -9,7 +9,7 @@ import {
     Dialog, DialogContent, DialogTitle,
 } from '@/components/ui/dialog'
 import {
-    Pagination, PaginationContent, PaginationItem,
+    Pagination, PaginationContent, PaginationItem, PaginationEllipsis, getPaginationRange,
 } from '@/components/ui/pagination'
 import { LogSleepDialog, SleepLog as LogSleepDialogLog } from '@/components/sleep/log-sleep-dialog'
 import { AppleHealthImportDialog } from '@/components/sleep/apple-health-import-dialog'
@@ -1610,47 +1610,69 @@ export default function SleepPage() {
                         })
                     )}
                 </div>
-                {totalHistoryPages > 1 && (
-                    <Pagination className="mt-3">
-                        <PaginationContent>
-                            <PaginationItem>
-                                <button
-                                    onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
-                                    disabled={historyPage === 1}
-                                    className="flex h-9 items-center gap-1 px-3 rounded-md text-[13px] font-medium text-foreground hover:bg-accent transition-colors disabled:pointer-events-none disabled:opacity-40"
-                                >
-                                    <ChevronLeftIcon className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Previous</span>
-                                </button>
-                            </PaginationItem>
-                            {Array.from({ length: totalHistoryPages }, (_, i) => i + 1).map(page => (
-                                <PaginationItem key={page}>
-                                    <button
-                                        onClick={() => setHistoryPage(page)}
-                                        className={cn(
-                                            'flex h-9 w-9 items-center justify-center rounded-md text-[13px] font-medium transition-colors',
-                                            page === historyPage
-                                                ? 'bg-primary text-white'
-                                                : 'hover:bg-accent text-foreground'
-                                        )}
-                                    >
-                                        {page}
-                                    </button>
-                                </PaginationItem>
-                            ))}
-                            <PaginationItem>
-                                <button
-                                    onClick={() => setHistoryPage(p => Math.min(totalHistoryPages, p + 1))}
-                                    disabled={historyPage === totalHistoryPages}
-                                    className="flex h-9 items-center gap-1 px-3 rounded-md text-[13px] font-medium text-foreground hover:bg-accent transition-colors disabled:pointer-events-none disabled:opacity-40"
-                                >
-                                    <span className="hidden sm:inline">Next</span>
-                                    <ChevronRightIcon className="w-4 h-4" />
-                                </button>
-                            </PaginationItem>
-                        </PaginationContent>
-                    </Pagination>
-                )}
+                {totalHistoryPages > 1 && (() => {
+                    const prevButton = (
+                        <PaginationItem>
+                            <button
+                                onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                                disabled={historyPage === 1}
+                                className="flex h-9 items-center gap-1 px-3 rounded-md text-[13px] font-medium text-foreground hover:bg-accent transition-colors disabled:pointer-events-none disabled:opacity-40"
+                            >
+                                <ChevronLeftIcon className="w-4 h-4" />
+                                <span className="hidden sm:inline">Previous</span>
+                            </button>
+                        </PaginationItem>
+                    )
+                    const nextButton = (
+                        <PaginationItem>
+                            <button
+                                onClick={() => setHistoryPage(p => Math.min(totalHistoryPages, p + 1))}
+                                disabled={historyPage === totalHistoryPages}
+                                className="flex h-9 items-center gap-1 px-3 rounded-md text-[13px] font-medium text-foreground hover:bg-accent transition-colors disabled:pointer-events-none disabled:opacity-40"
+                            >
+                                <span className="hidden sm:inline">Next</span>
+                                <ChevronRightIcon className="w-4 h-4" />
+                            </button>
+                        </PaginationItem>
+                    )
+                    const pageButton = (page: number) => (
+                        <PaginationItem key={page}>
+                            <button
+                                onClick={() => setHistoryPage(page)}
+                                className={cn(
+                                    'flex h-9 w-9 items-center justify-center rounded-md text-[13px] font-medium transition-colors',
+                                    page === historyPage
+                                        ? 'bg-primary text-white'
+                                        : 'hover:bg-accent text-foreground'
+                                )}
+                            >
+                                {page}
+                            </button>
+                        </PaginationItem>
+                    )
+
+                    return (
+                        <Pagination className="mt-3">
+                            {/* Mobile: truncated to first/last + a window around the current page,
+                                so months of history don't turn into dozens of number buttons. */}
+                            <PaginationContent className="sm:hidden">
+                                {prevButton}
+                                {getPaginationRange(historyPage, totalHistoryPages).map((token, i) =>
+                                    token === 'ellipsis'
+                                        ? <PaginationItem key={`e-${i}`}><PaginationEllipsis /></PaginationItem>
+                                        : pageButton(token)
+                                )}
+                                {nextButton}
+                            </PaginationContent>
+                            {/* Desktop: full list — there's room, and it's already horizontally scrollable as a fallback. */}
+                            <PaginationContent className="hidden sm:flex">
+                                {prevButton}
+                                {Array.from({ length: totalHistoryPages }, (_, i) => i + 1).map(pageButton)}
+                                {nextButton}
+                            </PaginationContent>
+                        </Pagination>
+                    )
+                })()}
                 </div>
             </div>{/* end School + Nights grid */}
 

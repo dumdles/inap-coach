@@ -370,7 +370,7 @@ export default function CoachPage() {
     const firstName = (user?.user_metadata?.full_name as string | undefined)?.trim().split(' ')[0]
 
     return (
-        <div className="flex flex-col h-[calc(100dvh-7rem)] md:h-dvh max-w-3xl mx-auto px-4 sm:px-6">
+        <div className="flex flex-col h-full max-w-3xl mx-auto px-4 sm:px-6">
             {/* Header */}
             <div className="flex items-center justify-between pt-6 pb-4 flex-shrink-0">
                 <div>
