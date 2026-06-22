@@ -120,6 +120,28 @@ function PaginationEllipsis({
   )
 }
 
+export type PaginationToken = number | "ellipsis"
+
+/**
+ * Windows a page list down to first, last, and a sibling range around the
+ * current page — e.g. [1, 'ellipsis', 9, 10, 11, 'ellipsis', 20] — instead of
+ * one button per page. Returns the full range untouched if it already fits
+ * within the window (no ellipses needed).
+ */
+function getPaginationRange(current: number, total: number, siblingCount = 1): PaginationToken[] {
+  if (total <= 1) return [1]
+
+  const left = Math.max(2, current - siblingCount)
+  const right = Math.min(total - 1, current + siblingCount)
+
+  const tokens: PaginationToken[] = [1]
+  if (left > 2) tokens.push("ellipsis")
+  for (let page = left; page <= right; page++) tokens.push(page)
+  if (right < total - 1) tokens.push("ellipsis")
+  tokens.push(total)
+  return tokens
+}
+
 export {
   Pagination,
   PaginationContent,
@@ -128,4 +150,5 @@ export {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
+  getPaginationRange,
 }

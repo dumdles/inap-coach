@@ -275,6 +275,18 @@
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 .pt-safe { padding-top: env(safe-area-inset-top); }
 
+/* iOS Safari zooms the whole page in on focus if a text field's computed
+   font-size is under 16px. Most of our inputs use text-sm/text-[14px], so
+   floor every text-entry field to 16px below the `sm` breakpoint — desktop
+   keeps its smaller, denser type since there's no zoom behavior to fight
+   there. !important is required: Tailwind's text-size utilities are class
+   selectors, which outrank this plain element selector otherwise. */
+@media (max-width: 639.98px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
 /* ── Sleep stage color overrides for dark mode ──────── */
 .dark {
   --sleep-deep:  #3b82f6;   /* blue-500   — lighter for dark bg */
@@ -588,11 +600,19 @@ h1, h2, h3, h4, h5, h6 {
   white-space: pre;
   overflow: hidden;
   z-index: 2;
-  /* Must match the textarea's text metrics for a seamless swap */
+  /* Must match the textarea's text metrics for a seamless swap — including
+     the mobile-only 16px bump below (iOS zoom-on-focus fix), so this stays
+     in lockstep with the textarea's actual rendered size at every breakpoint. */
   padding: 0 16px;
   font-size: 14px;
   line-height: 24px;
   font-family: var(--font-body);
+}
+@media (max-width: 639.98px) {
+  .t-clear-mirror,
+  .t-clear-placeholder {
+    font-size: 16px;
+  }
 }
 /* The mirror rests invisible; during a dissolve, JS drives its
    opacity/transform/filter inline every frame. Inline styles (not
