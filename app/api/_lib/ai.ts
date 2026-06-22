@@ -63,6 +63,14 @@ type VisionContentPart =
 
 type VisionMessage = { role: 'system' | 'user' | 'assistant'; content: string | VisionContentPart[] }
 
+// OpenRouter's OpenAI-compatible chat completions endpoint (used by the raw
+// fetch in callOpenRouterVision, which bypasses the AI SDK for multimodal input).
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
+
+// Options for the raw vision call. `response_format` mirrors OpenRouter's
+// optional JSON-mode payload (omitted by default — some vision models reject it).
+type CallOptions = { temperature?: number; response_format?: Record<string, unknown> }
+
 /**
  * Calls OpenRouter with a vision-capable model for multimodal image+text inputs.
  * Uses VISION_MODEL directly (no fallback — vision support is model-specific).
