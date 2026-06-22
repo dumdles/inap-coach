@@ -106,7 +106,10 @@ function Button({
         </svg>
       )}
       {!isLoading && !isSuccess && prefixIcon}
-      {children}
+      {/* When asChild, the icons above are extra children alongside the slotted
+          element — wrap children in Slottable so Slot knows which child to merge
+          props onto (otherwise Slot.Root sees multiple children and throws). */}
+      {asChild ? <Slot.Slottable>{children}</Slot.Slottable> : children}
     </Comp>
   )
 }

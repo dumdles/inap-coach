@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { cn, fmt } from '@/lib/utils'
+import { useFab } from '@/app/context/fab-context'
+import { UtensilsIcon } from 'lucide-react'
 import Link from 'next/link'
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
@@ -334,6 +336,9 @@ export default function NutritionPage() {
     const { user } = useAuth()
     const [dialogOpen, setDialogOpen] = useState(false)
     const [selectedLog, setSelectedLog] = useState<MealLog | null>(null)
+
+    // Mobile FAB on the nutrition page logs a meal.
+    useFab({ label: 'Log a meal', icon: <UtensilsIcon size={22} />, onClick: () => setDialogOpen(true) })
     const [meals, setMeals] = useState<MealLog[]>([])
     const [profile, setProfile] = useState<UserProfile | null>(null)
     const [loading, setLoading] = useState(true)

@@ -15,6 +15,7 @@ import { LogSleepDialog, SleepLog as LogSleepDialogLog } from '@/components/slee
 import { AppleHealthImportDialog } from '@/components/sleep/apple-health-import-dialog'
 import { TimePicker } from '@/components/ui/time-picker'
 import { recoveryReadiness, sleepDebtHours, type ReadinessLevel } from '@/lib/scoring'
+import { useFab } from '@/app/context/fab-context'
 import {
     MoonIcon, RefreshCwIcon, PlusIcon, HeartIcon, ZapIcon, FootprintsIcon,
     AppleIcon, PencilIcon, Trash2Icon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon,
@@ -1280,6 +1281,9 @@ export default function SleepPage() {
     const [logDialogOpen, setLogDialogOpen] = useState(false)
     const [importDialogOpen, setImportDialogOpen] = useState(false)
     const [editingLog, setEditingLog] = useState<SleepLog | null>(null)
+
+    // Mobile FAB on the sleep page logs sleep (fresh entry, not an edit).
+    useFab({ label: 'Log sleep', icon: <MoonIcon className="w-[22px] h-[22px]" />, onClick: () => { setEditingLog(null); setLogDialogOpen(true) } })
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
     const [expandedLesson, setExpandedLesson] = useState<string | null>(null)
     const [settingsOpen, setSettingsOpen] = useState(false)
