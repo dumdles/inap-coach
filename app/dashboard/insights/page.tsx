@@ -84,7 +84,7 @@ function InsightDetailDialog({ insight, onClose }: { insight: Insight; onClose: 
     const cat = CATEGORY_META[insight.category]
     return (
         <Dialog open onOpenChange={open => { if (!open) onClose() }}>
-            <DialogContent className="max-w-sm">
+            <DialogContent className="sm:max-w-sm">
                 <DialogHeader>
                     <div className="flex items-center gap-3 mb-1">
                         <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center shrink-0">

@@ -521,7 +521,7 @@ function AddFriendDialog({
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="max-w-lg p-0 overflow-hidden">
+            <DialogContent className="sm:max-w-lg p-0 overflow-hidden">
                 <div className="px-6 pt-6 pb-0">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-bold">Add friends</DialogTitle>

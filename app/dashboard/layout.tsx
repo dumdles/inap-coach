@@ -9,12 +9,15 @@ import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { isInstructor } from '@/lib/scoring'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { BottomSheet } from '@/components/ui/bottom-sheet'
+import { FabProvider, useFabEntry } from '@/app/context/fab-context'
 import { useTheme } from '@/app/context/theme-context'
 import type { GoalMode } from '@/app/context/theme-context'
 import {
     Home, Utensils, Dumbbell, Moon, TrendingUp,
     Trophy, Brain, LayoutGrid, Bell, Settings, LogOut,
     ChevronLeft, ChevronRight, Check, SportShoe, MoreHorizontal, Calculator, Sparkles,
+    Pencil, Plus,
 } from 'lucide-react'
 
 // ── Notification types ─────────────────────────────────────
@@ -27,36 +30,29 @@ type Notification = {
     created_at: string
 }
 
-// ── Notification Panel ─────────────────────────────────────
-function NotificationPanel({ userId, anchorRef, onClose }: {
-    userId: string
-    anchorRef: React.RefObject<HTMLElement | null>
-    onClose: () => void
-}) {
+function notifTimeAgo(iso: string) {
+    const diff = Date.now() - new Date(iso).getTime()
+    const m = Math.floor(diff / 60000)
+    if (m < 1) return 'just now'
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    return `${Math.floor(h / 24)}d ago`
+}
+
+// ── Notification list ──────────────────────────────────────
+// Shared notification chrome (header + scrollable list + "View all" footer).
+// Reused by the desktop anchored popover (NotificationPanel) and the mobile
+// bottom sheet (MobileBell) so both stay in sync. Fetches its own data.
+function NotificationList({ userId, onClose }: { userId: string; onClose: () => void }) {
     const [items, setItems] = useState<Notification[]>([])
     const [loading, setLoading] = useState(true)
-    const panelRef = useRef<HTMLDivElement>(null)
-    const [coords, setCoords] = useState<{ top: number; left: number } | null>(null)
-
-    useEffect(() => {
-        if (anchorRef.current) {
-            const r = anchorRef.current.getBoundingClientRect()
-            const PANEL_W = 320
-            const GAP = 8
-            const vw = window.innerWidth
-            // Right-align if anchoring near the right edge would overflow
-            const rawLeft = r.left
-            const left = rawLeft + PANEL_W + GAP > vw
-                ? Math.max(GAP, r.right - PANEL_W)
-                : rawLeft
-            setCoords({ top: r.bottom + GAP, left })
-        }
-    }, [anchorRef])
 
     useEffect(() => {
         fetch(`/api/notifications?userId=${userId}`)
             .then(r => r.json())
             .then(data => { setItems(data ?? []); setLoading(false) })
+            .catch(() => setLoading(false))
     }, [userId])
 
     async function markAllRead() {
@@ -64,35 +60,10 @@ function NotificationPanel({ userId, anchorRef, onClose }: {
         setItems(prev => prev.map(n => ({ ...n, read: true })))
     }
 
-    useEffect(() => {
-        function handleClick(e: MouseEvent) {
-            if (panelRef.current && !panelRef.current.contains(e.target as Node) &&
-                anchorRef.current && !anchorRef.current.contains(e.target as Node)) {
-                onClose()
-            }
-        }
-        document.addEventListener('mousedown', handleClick)
-        return () => document.removeEventListener('mousedown', handleClick)
-    }, [onClose, anchorRef])
-
-    function timeAgo(iso: string) {
-        const diff = Date.now() - new Date(iso).getTime()
-        const m = Math.floor(diff / 60000)
-        if (m < 1) return 'just now'
-        if (m < 60) return `${m}m ago`
-        const h = Math.floor(m / 60)
-        if (h < 24) return `${h}h ago`
-        return `${Math.floor(h / 24)}d ago`
-    }
-
     const unread = items.filter(n => !n.read).length
 
-    const panel = (
-        <div
-            ref={panelRef}
-            className="fixed z-[200] bg-popover border border-border rounded-2xl shadow-lg overflow-hidden flex flex-col"
-            style={{ width: 320, maxHeight: 440, top: coords?.top ?? 0, left: coords?.left ?? 0 }}
-        >
+    return (
+        <>
             <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
                 <span className="text-sm font-semibold text-foreground">Notifications</span>
                 {unread > 0 && (
@@ -104,7 +75,7 @@ function NotificationPanel({ userId, anchorRef, onClose }: {
                     </button>
                 )}
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="overflow-y-auto max-h-[55vh]">
                 {loading && (
                     <div className="flex items-center justify-center py-8">
                         <div className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -131,7 +102,7 @@ function NotificationPanel({ userId, anchorRef, onClose }: {
                             <div className={cn('flex-1 min-w-0', n.read && 'pl-4')}>
                                 <div className="text-[13px] font-medium text-foreground leading-snug">{n.title}</div>
                                 {n.body && <div className="text-[12px] text-muted-foreground mt-0.5 leading-snug line-clamp-2">{n.body}</div>}
-                                <div className="text-[11px] text-muted-foreground/60 mt-1">{timeAgo(n.created_at)}</div>
+                                <div className="text-[11px] text-muted-foreground/60 mt-1">{notifTimeAgo(n.created_at)}</div>
                             </div>
                         </div>
                     </div>
@@ -145,11 +116,57 @@ function NotificationPanel({ userId, anchorRef, onClose }: {
                 View all notifications
                 <svg viewBox="0 0 24 24" width={12} height={12} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
             </a>
-        </div>
+        </>
     )
+}
+
+// ── Desktop notification popover ───────────────────────────
+// Anchored popover used by the sidebar bell. (Mobile uses a bottom sheet.)
+function NotificationPanel({ userId, anchorRef, onClose }: {
+    userId: string
+    anchorRef: React.RefObject<HTMLElement | null>
+    onClose: () => void
+}) {
+    const panelRef = useRef<HTMLDivElement>(null)
+    const [coords, setCoords] = useState<{ top: number; left: number } | null>(null)
+
+    useEffect(() => {
+        if (anchorRef.current) {
+            const r = anchorRef.current.getBoundingClientRect()
+            const PANEL_W = 320
+            const GAP = 8
+            const vw = window.innerWidth
+            // Right-align if anchoring near the right edge would overflow
+            const rawLeft = r.left
+            const left = rawLeft + PANEL_W + GAP > vw
+                ? Math.max(GAP, r.right - PANEL_W)
+                : rawLeft
+            setCoords({ top: r.bottom + GAP, left })
+        }
+    }, [anchorRef])
+
+    useEffect(() => {
+        function handleClick(e: MouseEvent) {
+            if (panelRef.current && !panelRef.current.contains(e.target as Node) &&
+                anchorRef.current && !anchorRef.current.contains(e.target as Node)) {
+                onClose()
+            }
+        }
+        document.addEventListener('mousedown', handleClick)
+        return () => document.removeEventListener('mousedown', handleClick)
+    }, [onClose, anchorRef])
 
     if (typeof document === 'undefined' || !coords) return null
-    return createPortal(panel, document.body)
+    return createPortal(
+        <div
+            ref={panelRef}
+            className="fixed z-[200] bg-popover border border-border rounded-2xl shadow-lg overflow-hidden flex flex-col"
+            style={{ width: 320, top: coords.top, left: coords.left }}
+        >
+            <NotificationList userId={userId} onClose={onClose} />
+        </div>,
+        document.body
+    )
 }
 
 // ── Shared unread count (one fetch, visibility-aware, 5 min poll) ──
@@ -233,24 +250,67 @@ const INSTRUCTOR_NAV = [
     { href: '/dashboard/wing', label: 'My Wing', Icon: () => <LayoutGrid size={18} />, iconClassName: 'group-hover:scale-110' },
 ]
 
-// First 4 tabs appear in the mobile bottom bar; the rest go in the "More" sheet
-const PRIMARY_NAV = BASE_NAV.slice(0, 4)
-const OVERFLOW_NAV = BASE_NAV.slice(4)
+type NavItem = (typeof BASE_NAV)[number]
+
+// Default mobile bottom-bar tabs. Cadets can customise these (see useNavTabs);
+// AI Coach ships in the bar by default in place of Sleep.
+const DEFAULT_PRIMARY_HREFS = ['/dashboard', '/dashboard/nutrition', '/dashboard/workouts', '/dashboard/coach']
+const NAV_TABS_KEY = 'fitrep:nav-tabs'
+
+// Resolve a list of hrefs into BASE_NAV items, in canonical nav order.
+function resolveTabs(hrefs: string[]): NavItem[] {
+    return BASE_NAV.filter(item => hrefs.includes(item.href))
+}
+
+// Reads/writes the cadet's chosen bottom-bar tabs from localStorage (per-device).
+// Returns the resolved primary (bar) + overflow ("More" sheet) item lists.
+function useNavTabs() {
+    const [primaryHrefs, setPrimaryHrefs] = useState<string[]>(DEFAULT_PRIMARY_HREFS)
+
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(NAV_TABS_KEY)
+            if (!raw) return
+            const parsed = JSON.parse(raw)
+            // Validate: exactly 4 known hrefs, else fall back to the default.
+            const valid = Array.isArray(parsed)
+                && parsed.length === 4
+                && parsed.every((h: unknown) => BASE_NAV.some(n => n.href === h))
+            if (valid) setPrimaryHrefs(parsed)
+        } catch { /* ignore malformed storage */ }
+    }, [])
+
+    const setPrimary = useCallback((hrefs: string[]) => {
+        setPrimaryHrefs(hrefs)
+        try { localStorage.setItem(NAV_TABS_KEY, JSON.stringify(hrefs)) } catch { /* ignore */ }
+    }, [])
+
+    const primary = resolveTabs(primaryHrefs)            // tabs shown in the bottom bar
+    const overflow = BASE_NAV.filter(n => !primaryHrefs.includes(n.href)) // rest → "More"
+
+    return { primaryHrefs, primary, overflow, setPrimary }
+}
 
 const SIDEBAR_EXPANDED_W = 220
 const SIDEBAR_COLLAPSED_W = 64
 const SIDEBAR_MARGIN = 12
 
 // ── Mobile bell (floating top-right) ──────────────────────
+// Opens notifications as a bottom sheet. While already on the full notifications
+// page the bell is inert — tapping it does nothing (no sheet re-trigger).
 function MobileBell({ userId, unread, setUnread }: { userId: string; unread: number; setUnread: (n: number | ((prev: number) => number)) => void }) {
     const [open, setOpen] = useState(false)
-    const buttonRef = useRef<HTMLButtonElement>(null)
+    const pathname = usePathname()
+    const onNotifPage = pathname.startsWith('/dashboard/notifications')
 
     return (
         <div className="fixed top-4 right-4 z-50 md:hidden">
             <button
-                ref={buttonRef}
-                onClick={() => { setOpen(o => !o); setTimeout(() => setUnread(0), 2000) }}
+                onClick={() => {
+                    if (onNotifPage) return
+                    setOpen(true)
+                    setTimeout(() => setUnread(0), 2000)
+                }}
                 className="w-10 h-10 rounded-full bg-card border border-border shadow-md flex items-center justify-center relative text-foreground hover:bg-accent transition-colors"
             >
                 <Bell size={18} />
@@ -260,60 +320,119 @@ function MobileBell({ userId, unread, setUnread }: { userId: string; unread: num
                     </span>
                 )}
             </button>
-            {open && (
-                <NotificationPanel userId={userId} anchorRef={buttonRef} onClose={() => setOpen(false)} />
-            )}
+            <BottomSheet open={open} onClose={() => setOpen(false)}>
+                <NotificationList userId={userId} onClose={() => setOpen(false)} />
+            </BottomSheet>
         </div>
     )
 }
 
 // ── More sheet (overflow nav for mobile) ──────────────────
-function MobileMoreSheet({ open, onClose, pathname, profile }: {
+function MobileMoreSheet({ open, onClose, pathname, profile, overflow, primaryHrefs, setPrimary }: {
     open: boolean
     onClose: () => void
     pathname: string
     profile: { rank?: string; full_name?: string; wing?: string } | null
+    overflow: NavItem[]
+    primaryHrefs: string[]
+    setPrimary: (hrefs: string[]) => void
 }) {
-    const { user, signOut } = useAuth()
+    const { signOut } = useAuth()
     const router = useRouter()
-    // Keep the sheet mounted during the close animation, then unmount
-    const [rendered, setRendered] = useState(false)
-    useEffect(() => { if (open) setRendered(true) }, [open])
+    // Customise mode lets the cadet pick which 4 tabs sit in the bottom bar.
+    const [editing, setEditing] = useState(false)
+    // Local draft of the selected bar tabs while editing (committed on "Done").
+    const [draft, setDraft] = useState<string[]>(primaryHrefs)
 
+    // Reset the draft whenever the sheet (re)opens or the saved set changes.
+    useEffect(() => { if (open) { setEditing(false); setDraft(primaryHrefs) } }, [open, primaryHrefs])
+
+    // Instructors get an extra "My Wing" tab pinned in the overflow grid.
     const overflowNav = [
-        ...OVERFLOW_NAV,
+        ...overflow,
         ...(profile?.rank && isInstructor(profile.rank) ? INSTRUCTOR_NAV : []),
     ]
 
-    if (!rendered || typeof document === 'undefined') return null
+    function toggleDraft(href: string) {
+        setDraft(prev => {
+            if (prev.includes(href)) return prev.filter(h => h !== href)
+            if (prev.length >= 4) return prev // cap at 4 — must deselect one first
+            return [...prev, href]
+        })
+    }
 
-    return createPortal(
-        <div
-            className="fixed inset-0 z-[60] md:hidden"
-            onTransitionEnd={() => { if (!open) setRendered(false) }}
-        >
-            {/* Backdrop */}
-            <div
-                className={cn(
-                    'absolute inset-0 bg-black/50 transition-opacity duration-300',
-                    open ? 'opacity-100' : 'opacity-0'
-                )}
-                onClick={onClose}
-            />
+    function saveCustomisation() {
+        // Persist in canonical order so the bar order is stable.
+        setPrimary(BASE_NAV.filter(n => draft.includes(n.href)).map(n => n.href))
+        setEditing(false)
+    }
 
-            {/* Sheet */}
-            <div
-                className={cn(
-                    'absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl shadow-2xl transition-transform duration-300 ease-out',
-                    open ? 'translate-y-0' : 'translate-y-full'
+    return (
+        <BottomSheet open={open} onClose={onClose} contentClassName="px-2 pt-1 pb-3">
+            {/* Header — title + customise toggle */}
+            <div className="flex items-center justify-between px-3 pb-2">
+                <span className="text-[13px] font-semibold text-foreground">
+                    {editing ? 'Choose 4 bar tabs' : 'More'}
+                </span>
+                {editing ? (
+                    <button
+                        onClick={saveCustomisation}
+                        disabled={draft.length !== 4}
+                        className={cn(
+                            'flex items-center gap-1 text-[12px] font-semibold transition-colors',
+                            draft.length === 4 ? 'text-primary hover:text-primary/80' : 'text-muted-foreground/50 cursor-not-allowed'
+                        )}
+                    >
+                        <Check size={14} /> Done ({draft.length}/4)
+                    </button>
+                ) : (
+                    <button
+                        onClick={() => setEditing(true)}
+                        className="flex items-center gap-1 text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        <Pencil size={13} /> Customise
+                    </button>
                 )}
-            >
-                {/* Drag handle */}
-                <div className="flex justify-center pt-3 pb-1">
-                    <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
+            </div>
+
+            {editing ? (
+                /* ── Customise editor: pick which tabs live in the bottom bar ── */
+                <div className="px-1">
+                    <div className="grid grid-cols-4 gap-1">
+                        {BASE_NAV.map(({ href, label, Icon }) => {
+                            const selected = draft.includes(href)
+                            const full = draft.length >= 4 && !selected
+                            return (
+                                <button
+                                    key={href}
+                                    onClick={() => toggleDraft(href)}
+                                    disabled={full}
+                                    className={cn(
+                                        'relative flex flex-col items-center gap-1.5 py-3.5 rounded-2xl text-[11px] font-semibold tracking-[0.02em] transition-colors duration-150',
+                                        selected
+                                            ? 'bg-primary/10 text-primary ring-1 ring-primary/40'
+                                            : full
+                                                ? 'text-foreground/25 cursor-not-allowed'
+                                                : 'text-foreground/60 hover:bg-muted hover:text-foreground'
+                                    )}
+                                >
+                                    {selected && (
+                                        <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary text-white flex items-center justify-center">
+                                            <Check size={10} strokeWidth={3} />
+                                        </span>
+                                    )}
+                                    <Icon />
+                                    <span>{label}</span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground/70 text-center mt-2 px-4">
+                        Pick exactly 4 tabs for the bottom bar. The rest stay here in More.
+                    </p>
                 </div>
-
-                <div className="px-2 pt-2 pb-3">
+            ) : (
+                <>
                     {/* Overflow nav grid */}
                     <div className="grid grid-cols-4 gap-1">
                         {overflowNav.map(({ href, label, Icon }) => {
@@ -364,25 +483,25 @@ function MobileMoreSheet({ open, onClose, pathname, profile }: {
                         <LogOut size={18} />
                         Sign out
                     </button>
-                </div>
-
-                {/* Safe area spacer */}
-                <div style={{ height: 'env(safe-area-inset-bottom)' }} />
-            </div>
-        </div>,
-        document.body
+                </>
+            )}
+        </BottomSheet>
     )
 }
 
 // ── Mobile bottom nav ──────────────────────────────────────
-function MobileBottomNav({ pathname, profile }: {
+function MobileBottomNav({ pathname, profile, primary, overflow, primaryHrefs, setPrimary }: {
     pathname: string
     profile: { rank?: string } | null
+    primary: NavItem[]
+    overflow: NavItem[]
+    primaryHrefs: string[]
+    setPrimary: (hrefs: string[]) => void
 }) {
     const [moreOpen, setMoreOpen] = useState(false)
 
     // "More" tab appears active when the current page is in the overflow set
-    const overflowActive = [...OVERFLOW_NAV, ...INSTRUCTOR_NAV].some(
+    const overflowActive = [...overflow, ...INSTRUCTOR_NAV].some(
         ({ href }) => pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
     )
 
@@ -404,7 +523,7 @@ function MobileBottomNav({ pathname, profile }: {
                     gap: '2px',
                 }}
             >
-                {PRIMARY_NAV.map(({ href, label, Icon }) => {
+                {primary.map(({ href, label, Icon }) => {
                     const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
                     return (
                         <Link
@@ -445,8 +564,42 @@ function MobileBottomNav({ pathname, profile }: {
                 onClose={() => setMoreOpen(false)}
                 pathname={pathname}
                 profile={profile}
+                overflow={overflow}
+                primaryHrefs={primaryHrefs}
+                setPrimary={setPrimary}
             />
         </>
+    )
+}
+
+// ── Contextual FAB (mobile, floating above the nav) ────────
+// Renders the action the current page registered via useFab() — e.g. log a meal
+// on the dashboard, log sleep on the sleep page, log a workout on workouts.
+// Pages own their own log dialogs; the FAB only triggers them. Hidden on routes
+// that register no action.
+function MobileFab() {
+    const entry = useFabEntry()
+    if (!entry) return null
+
+    return (
+        <button
+            onClick={entry.trigger}
+            aria-label={entry.label}
+            className="fixed right-4 z-50 md:hidden w-14 h-14 rounded-[1.25rem] bg-primary text-white flex items-center justify-center transition-transform active:scale-95 hover:scale-105"
+            style={{
+                // Sit above the floating nav pill with a comfortable gap.
+                bottom: 'calc(env(safe-area-inset-bottom) + 104px)',
+                boxShadow: '0 8px 24px rgba(9,30,66,0.28), 0 2px 6px rgba(9,30,66,0.18)',
+            }}
+        >
+            {/* Page glyph + a small "+" badge to signal an "add/log" action */}
+            <span className="relative">
+                {entry.icon}
+                <span className="absolute -bottom-1.5 -right-1.5 w-4 h-4 rounded-full bg-white text-primary flex items-center justify-center">
+                    <Plus size={11} strokeWidth={3} />
+                </span>
+            </span>
+        </button>
     )
 }
 
@@ -620,6 +773,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [profile, setProfile] = useState<{ rank?: string; full_name?: string; wing?: string } | null>(null)
     const { setGoalMode } = useTheme()
     const [unread, setUnread] = useUnreadCount(user?.id ?? '')
+    const { primary, overflow, primaryHrefs, setPrimary } = useNavTabs()
 
     const isSettings = pathname.startsWith('/dashboard/settings')
 
@@ -651,33 +805,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (isSettings) {
         return (
-            <div className="bg-background">
-                <style>{`@media (min-width: 768px) { .dash-content { margin-left: ${contentMargin}px; } }`}</style>
-                <div className="hidden md:block">
-                    <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} unread={unread} setUnread={setUnread} />
+            <FabProvider>
+                <div className="bg-background">
+                    <style>{`@media (min-width: 768px) { .dash-content { margin-left: ${contentMargin}px; } }`}</style>
+                    <div className="hidden md:block">
+                        <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} unread={unread} setUnread={setUnread} />
+                    </div>
+                    <div className="dash-content h-screen overflow-hidden animate-in fade-in duration-200 pb-28 md:pb-0" style={{ animationFillMode: 'both' }}>
+                        {children}
+                    </div>
+                    <MobileBell userId={user.id} unread={unread} setUnread={setUnread} />
+                    <MobileFab />
+                    <MobileBottomNav pathname={pathname} profile={profile} primary={primary} overflow={overflow} primaryHrefs={primaryHrefs} setPrimary={setPrimary} />
                 </div>
-                <div className="dash-content h-screen overflow-hidden animate-in fade-in duration-200 pb-28 md:pb-0" style={{ animationFillMode: 'both' }}>
-                    {children}
-                </div>
-                <MobileBell userId={user.id} unread={unread} setUnread={setUnread} />
-                <MobileBottomNav pathname={pathname} profile={profile} />
-            </div>
+            </FabProvider>
         )
     }
 
     return (
-        <div className="min-h-screen bg-background">
-            <style>{`@media (min-width: 768px) { .dash-content { margin-left: ${contentMargin}px; transition: margin-left 300ms ease; } }`}</style>
-            <div className="hidden md:block">
-                <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} unread={unread} setUnread={setUnread} />
-            </div>
-            <main className="dash-content min-h-screen overflow-y-auto pb-28 md:pb-0">
-                <div className="animate-in fade-in duration-200" style={{ animationFillMode: 'both' }}>
-                    {children}
+        <FabProvider>
+            <div className="min-h-screen bg-background">
+                <style>{`@media (min-width: 768px) { .dash-content { margin-left: ${contentMargin}px; transition: margin-left 300ms ease; } }`}</style>
+                <div className="hidden md:block">
+                    <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} unread={unread} setUnread={setUnread} />
                 </div>
-            </main>
-            <MobileBell userId={user.id} unread={unread} setUnread={setUnread} />
-            <MobileBottomNav pathname={pathname} profile={profile} />
-        </div>
+                <main className="dash-content min-h-screen overflow-y-auto pb-28 md:pb-0">
+                    <div className="animate-in fade-in duration-200" style={{ animationFillMode: 'both' }}>
+                        {children}
+                    </div>
+                </main>
+                <MobileBell userId={user.id} unread={unread} setUnread={setUnread} />
+                <MobileFab />
+                <MobileBottomNav pathname={pathname} profile={profile} primary={primary} overflow={overflow} primaryHrefs={primaryHrefs} setPrimary={setPrimary} />
+            </div>
+        </FabProvider>
     )
 }

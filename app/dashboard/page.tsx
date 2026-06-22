@@ -8,8 +8,9 @@ import { LogMealDialog } from '@/components/nutrition/log-meal-dialog'
 import { LogIPPTDialog } from '@/components/ippt/log-ippt-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { useFab } from '@/app/context/fab-context'
 import {
-    PlusIcon, MoonIcon, DumbbellIcon, ChevronRightIcon, FlameIcon,
+    PlusIcon, MoonIcon, DumbbellIcon, ChevronRightIcon, FlameIcon, UtensilsIcon,
 } from 'lucide-react'
 import router from 'next/router'
 import { Button } from '@/components/ui/button'
@@ -363,6 +364,9 @@ function ActivityCard({
 export default function DashboardPage() {
     const { user } = useAuth()
     const [logMealOpen, setLogMealOpen] = useState(false)
+
+    // Mobile FAB on the dashboard logs a meal.
+    useFab({ label: 'Log a meal', icon: <UtensilsIcon size={22} />, onClick: () => setLogMealOpen(true) })
 
     const [profile, setProfile]               = useState<UserProfile | null>(null)
     const [meals, setMeals]                   = useState<MealLog[]>([])

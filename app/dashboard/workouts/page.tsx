@@ -4,6 +4,7 @@ import * as React from "react"
 import { useAuth } from "@/app/context/auth-context"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
+import { useFab } from "@/app/context/fab-context"
 import {
     DumbbellIcon, FlameIcon, ClockIcon, HeartIcon, PlusIcon,
     FootprintsIcon, ZapIcon, BikeIcon, WavesIcon, TimerIcon,
@@ -775,6 +776,9 @@ export default function WorkoutsPage() {
     const [loggerOpen, setLoggerOpen] = React.useState(false)
     const [editLog, setEditLog] = React.useState<WorkoutLog | null>(null)
     const [confirmDeleteId, setConfirmDeleteId] = React.useState<string | null>(null)
+
+    // Mobile FAB on the workouts page logs a workout (fresh entry, not an edit).
+    useFab({ label: 'Log a workout', icon: <DumbbellIcon className="w-[22px] h-[22px]" />, onClick: () => { setEditLog(null); setLoggerOpen(true) } })
     const [activeFilter, setActiveFilter] = React.useState<CategoryKey>("all")
     const [activePeriod, setActivePeriod] = React.useState<PeriodKey>("30d")
     const [detailId, setDetailId] = React.useState<string | null>(null)

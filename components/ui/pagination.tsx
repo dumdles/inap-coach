@@ -10,7 +10,9 @@ function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
       role="navigation"
       aria-label="pagination"
       data-slot="pagination"
-      className={cn("mx-auto flex w-full justify-center", className)}
+      // overflow-x-auto: a long page list (e.g. months of history) scrolls
+      // within the nav instead of pushing the whole page wider than the viewport.
+      className={cn("mx-auto flex w-full max-w-full justify-center overflow-x-auto scrollbar-hide", className)}
       {...props}
     />
   )
@@ -23,7 +25,7 @@ function PaginationContent({
   return (
     <ul
       data-slot="pagination-content"
-      className={cn("flex items-center gap-1", className)}
+      className={cn("flex items-center gap-1 flex-nowrap", className)}
       {...props}
     />
   )

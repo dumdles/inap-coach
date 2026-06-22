@@ -78,6 +78,47 @@ function MacroStat({ label, value, unit, highlight }: { label: string; value: nu
     )
 }
 
+// A single food row shared by the search results and the cookhouse template
+// list — name takes emphasis on the left, total kcal on the right, and the
+// per-100g macro breakdown sits below in a quieter, smaller grey line.
+function FoodListItem({
+    name,
+    calories,
+    protein,
+    carbs,
+    fat,
+    badge,
+    onClick,
+}: {
+    name: string
+    calories: number
+    protein: number
+    carbs: number
+    fat: number
+    badge?: React.ReactNode
+    onClick: () => void
+}) {
+    return (
+        <button
+            onClick={onClick}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-accent/40 transition-colors text-left"
+        >
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-semibold text-foreground truncate">{name}</span>
+                    {badge}
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                    {protein}g P · {carbs}g C · {fat}g F <span className="text-muted-foreground/60">per 100g</span>
+                </div>
+            </div>
+            <div className="text-sm font-bold text-foreground shrink-0 tabular-nums">
+                {calories}<span className="text-[10px] font-normal text-muted-foreground ml-0.5">kcal</span>
+            </div>
+        </button>
+    )
+}
+
 function BackButton({ onClick }: { onClick: () => void }) {
     return (
         <button
@@ -431,7 +472,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg gap-0 p-0 overflow-hidden flex flex-col max-h-[90vh]">
+            <DialogContent swipeToDismiss className="sm:max-w-lg gap-0 p-0 overflow-hidden flex flex-col max-h-[90vh]">
 
                 {/* ── Header ── */}
                 <DialogHeader className="px-6 pt-5 pb-4 border-b border-border flex-shrink-0">
@@ -443,12 +484,13 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                     </DialogTitle>
                 </DialogHeader>
 
-                {/* Hidden file input — triggered by both the pick-stage scan button and the scan-stage "scan again" button */}
+                {/* Hidden file input — triggered by both the pick-stage scan button and the scan-stage "scan again" button.
+                    No `capture` attribute: on mobile this opens the native picker with both
+                    "Take Photo" and "Photo Library" options, instead of forcing the camera. */}
                 <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     className="hidden"
                     onChange={handlePhotoSelected}
                 />
@@ -493,25 +535,22 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                                     </div>
                                 )}
                                 {!searching && results.length > 0 && (
-                                    <div className="space-y-1">
+                                    <div className="space-y-2">
                                         {results.map(item => (
-                                            <button
+                                            <FoodListItem
                                                 key={item.id}
-                                                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-accent text-left transition-colors"
-                                                onClick={() => selectSearchResult(item)}
-                                            >
-                                                <div className="min-w-0">
-                                                    <div className="text-sm font-medium text-foreground truncate">{item.name}</div>
-                                                    <div className="text-[11px] text-muted-foreground">
-                                                        {item.calories_per_100g} kcal · {item.protein_g}g P · {item.carbs_g}g C · {item.fat_g}g F per 100g
-                                                    </div>
-                                                </div>
-                                                {item.is_cookhouse_item && (
-                                                    <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full ml-2 shrink-0">
+                                                name={item.name}
+                                                calories={item.calories_per_100g}
+                                                protein={item.protein_g}
+                                                carbs={item.carbs_g}
+                                                fat={item.fat_g}
+                                                badge={item.is_cookhouse_item && (
+                                                    <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
                                                         Cookhouse
                                                     </span>
                                                 )}
-                                            </button>
+                                                onClick={() => selectSearchResult(item)}
+                                            />
                                         ))}
                                     </div>
                                 )}
@@ -527,7 +566,8 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                         ) : (
                             /* Template browser */
                             <div className="flex flex-col flex-1 min-h-0 overflow-hidden scrollbar-hide">
-                                {/* Camera scan button */}
+                                {/* Camera scan / photo upload button — the file input has no `capture`
+                                    attribute, so mobile shows a picker with both options. */}
                                 <div className="px-5 pb-3 flex-shrink-0">
                                     <button
                                         onClick={() => fileInputRef.current?.click()}
@@ -537,7 +577,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                                             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                                             <circle cx="12" cy="13" r="4" />
                                         </svg>
-                                        Scan food with camera
+                                        Scan or upload a food photo
                                     </button>
                                 </div>
 
@@ -559,30 +599,19 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
                                     ))}
                                 </div>
 
-                                {/* Template grid */}
+                                {/* Template list */}
                                 <div className="flex-1 overflow-y-auto px-5 pb-4 pt-2">
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <div className="space-y-2">
                                         {visibleTemplates.map(t => (
-                                            <button
+                                            <FoodListItem
                                                 key={t.name}
+                                                name={t.name}
+                                                calories={t.calories_per_100g}
+                                                protein={t.protein_g}
+                                                carbs={t.carbs_g}
+                                                fat={t.fat_g}
                                                 onClick={() => selectTemplate(t)}
-                                                className={cn(
-                                                    'relative flex flex-col gap-1 p-3 rounded-xl border border-border bg-card text-left',
-                                                    'hover:border-primary/50 hover:bg-accent/50 transition-colors',
-                                                    'active:scale-[0.97]'
-                                                )}
-                                            >
-                                                <span className="text-[12px] font-semibold text-foreground leading-tight line-clamp-2">
-                                                    {t.name}
-                                                </span>
-                                                <span className="text-[11px] font-bold text-primary mt-auto">
-                                                    {t.calories_per_100g} kcal
-                                                </span>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    {t.protein_g}g P · {t.carbs_g}g C · {t.fat_g}g F
-                                                </span>
-                                                <span className="text-[9px] text-muted-foreground/60">per 100g</span>
-                                            </button>
+                                            />
                                         ))}
                                     </div>
                                 </div>

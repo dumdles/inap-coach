@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
+import { useFab } from '@/app/context/fab-context'
+import { ScaleIcon } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -208,6 +210,9 @@ export default function ProgressPage() {
     const [showLogModal, setShowLogModal] = useState(false)
     const [editLog, setEditLog] = useState<WeightLog | null>(null)
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+
+    // Mobile FAB on the progress page logs a weight check-in (fresh entry).
+    useFab({ label: 'Log a check-in', icon: <ScaleIcon size={22} />, onClick: () => { setEditLog(null); setShowLogModal(true) } })
     const [range, setRange] = useState<30 | 60 | 90>(90)
 
     const fetchData = useCallback(async () => {
