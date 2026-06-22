@@ -57,19 +57,18 @@ export async function generateStructured<SCHEMA extends z.ZodType>(opts: {
 // Gemini 3.5 Flash has confirmed vision support on OpenRouter
 export const VISION_MODEL = 'google/gemini-3.5-flash'
 
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
+
 type VisionContentPart =
     | { type: 'text'; text: string }
     | { type: 'image_url'; image_url: { url: string } }
 
 type VisionMessage = { role: 'system' | 'user' | 'assistant'; content: string | VisionContentPart[] }
 
-// OpenRouter's OpenAI-compatible chat completions endpoint (used by the raw
-// fetch in callOpenRouterVision, which bypasses the AI SDK for multimodal input).
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-
-// Options for the raw vision call. `response_format` mirrors OpenRouter's
-// optional JSON-mode payload (omitted by default — some vision models reject it).
-type CallOptions = { temperature?: number; response_format?: Record<string, unknown> }
+type CallOptions = {
+    temperature?: number
+    response_format?: { type: string }
+}
 
 /**
  * Calls OpenRouter with a vision-capable model for multimodal image+text inputs.

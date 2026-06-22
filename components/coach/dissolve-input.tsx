@@ -242,6 +242,7 @@ export const DissolveInput = forwardRef<DissolveInputHandle, Props>(function Dis
         <div
             ref={wrapRef}
             className={`t-clear rounded-2xl ${value ? 'has-value' : ''} ${className ?? ''}`}
+            style={{ position: 'relative' }}
         >
             {/* No native placeholder — the .t-clear-placeholder layer plays
                 that role so it can fly back in during the dissolve. */}
@@ -270,7 +271,16 @@ export const DissolveInput = forwardRef<DissolveInputHandle, Props>(function Dis
                 style={{ minHeight: BASE_HEIGHT, maxHeight: MAX_HEIGHT, boxSizing: 'border-box' }}
             />
             <div ref={mirrorRef} className="t-clear-mirror" aria-hidden="true" />
-            <div ref={fakePhRef} className="t-clear-placeholder" aria-hidden="true">{placeholder}</div>
+            <div
+                ref={fakePhRef}
+                className="t-clear-placeholder"
+                aria-hidden="true"
+                style={{
+                    position: 'absolute', top: 0, left: 0, right: 0,
+                    height: BASE_HEIGHT, display: 'flex', alignItems: 'center',
+                    padding: '0 16px', pointerEvents: 'none', zIndex: 2,
+                }}
+            >{placeholder}</div>
             <div ref={glowRef} className="t-clear-glow" aria-hidden="true" />
             {/* Clear-all — pinned to the first line's right so it stays put as
                 the field grows. Hidden while empty. */}
