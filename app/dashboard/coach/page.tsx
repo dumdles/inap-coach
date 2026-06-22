@@ -163,13 +163,16 @@ function SuggestionChips({ chips, onPick, disabled }: {
 }) {
     if (!chips.length) return null
     return (
-        <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-bottom-1 duration-300">
+        // Single scrollable row on mobile (so 2-3 wordy suggestions don't wrap
+        // into a second line and eat into the chat bubble area); wraps normally
+        // once there's enough width to spare on larger screens.
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible animate-in fade-in slide-in-from-bottom-1 duration-300">
             {chips.map(chip => (
                 <button
                     key={chip}
                     onClick={() => onPick(chip)}
                     disabled={disabled}
-                    className="px-3.5 py-2 rounded-full border border-primary/25 bg-primary/5 text-primary text-[13px] font-medium
+                    className="shrink-0 whitespace-nowrap px-3.5 py-2 rounded-full border border-primary/25 bg-primary/5 text-primary text-[13px] font-medium
                                hover:bg-primary/10 hover:border-primary/40 active:scale-[0.98] transition-all disabled:opacity-50"
                 >
                     {chip}
@@ -494,7 +497,7 @@ export default function CoachPage() {
             </div>
 
             {/* Follow-up chips + input */}
-            <div className="flex-shrink-0 space-y-2.5 pb-4 pt-1">
+            <div className="flex-shrink-0 space-y-2 pt-1">
                 {status === 'ready' && messages.length > 0 && (
                     <SuggestionChips chips={chips} onPick={handleSend} disabled={busy} />
                 )}
