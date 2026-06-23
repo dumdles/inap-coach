@@ -818,7 +818,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <div className="hidden md:block">
                         <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} unread={unread} setUnread={setUnread} />
                     </div>
-                    <div className="dash-content h-screen overflow-hidden animate-in fade-in duration-200 pb-28 md:pb-0" style={{ animationFillMode: 'both' }}>
+                    {/* `h-screen` (static 100vh) is taller than what's actually on-screen
+                        whenever Safari's address bar is showing — the flex-1 message pane
+                        soaks up that phantom height, shoving the input/chips footer below
+                        the real viewport. `--app-vh` (set in viewport-height-sync.tsx) tracks
+                        the live visible height instead. */}
+                    <div className="dash-content overflow-hidden animate-in fade-in duration-200 pb-28 md:pb-0" style={{ animationFillMode: 'both', height: 'var(--app-vh, 100vh)' }}>
                         {children}
                     </div>
                     <MobileBell userId={user.id} unread={unread} setUnread={setUnread} />

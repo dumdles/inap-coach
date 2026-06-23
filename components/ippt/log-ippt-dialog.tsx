@@ -153,7 +153,7 @@ export function LogIPPTDialog({ open, onClose, userId, prefillDate, onSaved }: P
 
     return (
         <Dialog open={open} onOpenChange={o => { if (!o) onClose() }}>
-            <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-md max-h-[calc(var(--app-vh,100vh)*0.9)] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="text-[17px]">Log IPPT Result</DialogTitle>
                     <p className="text-[13px] text-muted-foreground mt-0.5">Record your station scores from the official score sheet.</p>
