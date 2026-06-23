@@ -124,7 +124,7 @@ export function LogSleepDialog({ open, onOpenChange, onLogged, editing }: Props)
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-md max-h-[calc(var(--app-vh,100vh)*0.9)] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{editing ? 'Edit sleep' : 'Log sleep'}</DialogTitle>
                 </DialogHeader>
