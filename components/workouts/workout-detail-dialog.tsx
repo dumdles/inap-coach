@@ -75,7 +75,7 @@ export function WorkoutDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
-            <DialogContent className="sm:max-w-md max-h-[calc(var(--app-vh,100vh)*0.9)] overflow-y-auto">
+            <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>
                         {loading ? "Loading…" : (detail?.name ?? "Workout")}

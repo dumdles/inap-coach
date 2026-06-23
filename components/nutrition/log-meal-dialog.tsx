@@ -472,7 +472,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent swipeToDismiss className="sm:max-w-lg gap-0 p-0 overflow-hidden flex flex-col max-h-[calc(var(--app-vh,100vh)*0.9)]">
+            <DialogContent swipeToDismiss className="sm:max-w-lg gap-0 p-0 overflow-hidden flex flex-col max-h-[90vh]">
 
                 {/* ── Header ── */}
                 <DialogHeader className="px-6 pt-5 pb-4 border-b border-border flex-shrink-0">
