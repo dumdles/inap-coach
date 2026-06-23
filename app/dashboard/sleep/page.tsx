@@ -1048,7 +1048,7 @@ function SleepLogDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent swipeToDismiss className="sm:max-w-md w-full p-0 overflow-hidden gap-0 max-h-[calc(var(--app-vh,100vh)*0.9)] flex flex-col">
+            <DialogContent swipeToDismiss className="sm:max-w-md w-full p-0 overflow-hidden gap-0 max-h-[90vh] flex flex-col">
                 {/* Sticky header */}
                 <div className="px-5 pt-5 pb-4 border-b border-border flex-shrink-0">
                     <div className="flex items-start justify-between gap-3 pr-8">

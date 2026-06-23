@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { AuthProvider } from "@/app/context/auth-context"
 import { ThemeProvider } from "@/app/context/theme-context";
 import { Toaster } from "@/components/ui/sonner";
-import { ViewportHeightSync } from "@/components/ui/viewport-height-sync";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -46,7 +45,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://api.fontshare.com" />
         <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,800&display=swap" />
       </head>
-      <body className="min-h-full flex flex-col"><ViewportHeightSync /><ThemeProvider><AuthProvider>{children}<Toaster /></AuthProvider></ThemeProvider></body>
+      <body className="min-h-full flex flex-col"><ThemeProvider><AuthProvider>{children}<Toaster /></AuthProvider></ThemeProvider></body>
     </html>
   );
 }
