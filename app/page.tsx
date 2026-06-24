@@ -1042,7 +1042,7 @@ export default function LandingPage() {
             number="03" delay={4}
             title="AI Coaching"
             description="Gemini-powered daily briefs that analyse your week and deliver personalised coaching suggestions."
-            tags={['Gemini 2.0 Flash', '24h refresh', 'Personalised']}
+            tags={['Gemini 3.5 Flash', '24h refresh', 'Personalised']}
           />
           <FeatureCard
             number="04" delay={6}
@@ -1102,7 +1102,7 @@ export default function LandingPage() {
             </p>
             <div style={{ background: 'rgba(38,132,255,0.06)', border: `1px solid ${BORDER}`, borderRadius: 12, padding: '16px 20px' }}>
               <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: 'rgba(76,154,255,0.8)', marginBottom: 6, fontWeight: 600 }}>Powered by</div>
-              <div style={{ fontFamily: 'Satoshi, sans-serif', fontSize: 16, fontWeight: 700, color: TEXT }}>Gemini 2.0 Flash → Llama 3.3 fallback</div>
+              <div style={{ fontFamily: 'Satoshi, sans-serif', fontSize: 16, fontWeight: 700, color: TEXT }}>Gemini 3.5 Flash → Llama 3.3 fallback</div>
               <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: TEXT_DIM, marginTop: 4 }}>Always on. Always analysing.</div>
             </div>
           </div>
