@@ -19,7 +19,15 @@
 
 -- ── 1. Role column ──────────────────────────────────────────────────────────
 alter table public.users
-    add column if not exists role text not null default 'cadet'
+    add column if not exists role text not null default 'cadet';
+
+-- Some databases already had a users.role column with an older check
+-- constraint (which "add column if not exists" silently keeps). Replace it so
+-- 'superadmin' is allowed. If this fails, existing rows hold other values —
+-- inspect with: select role, count(*) from public.users group by role;
+alter table public.users alter column role set default 'cadet';
+alter table public.users drop constraint if exists users_role_check;
+alter table public.users add constraint users_role_check
     check (role in ('cadet', 'instructor', 'superadmin'));
 
 -- Backfill: anyone who currently has instructor access (via rank) keeps it.
