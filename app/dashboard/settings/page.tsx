@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { InputField } from '@/components/ui/input-field'
 import { Label } from '@/components/ui/label'
 import { DatePicker } from '@/components/ui/date-picker'
+import { InstructorAccessCard } from '@/components/settings/instructor-access-card'
 import {
     Select,
     SelectContent,
@@ -586,6 +587,8 @@ export default function SettingsPage() {
                     <InputField label="Email" value={user?.email ?? ''} disabled />
                 </div>
             </SCard>
+            {/* Shown only for instructor ranks — uses the *saved* rank, since the API verifies against the DB. */}
+            <InstructorAccessCard savedRank={orig.rank} className="bg-card border border-border rounded-xl p-4 text-card-foreground sm:p-6" />
             <SCard>
                 <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-col gap-1">

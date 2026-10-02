@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import { isInstructor } from '@/lib/scoring'
+import { hasInstructorAccess, isSuperadmin } from '@/lib/roles'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { BottomSheet } from '@/components/ui/bottom-sheet'
 import { FabProvider, useFabEntry } from '@/app/context/fab-context'
@@ -15,7 +15,7 @@ import { useTheme } from '@/app/context/theme-context'
 import type { GoalMode } from '@/app/context/theme-context'
 import {
     Home, Utensils, Dumbbell, Moon, TrendingUp,
-    Trophy, Brain, LayoutGrid, Bell, Settings, LogOut,
+    Trophy, Brain, LayoutGrid, ShieldCheck, Bell, Settings, LogOut,
     ChevronLeft, ChevronRight, Check, SportShoe, MoreHorizontal, Calculator, Sparkles,
     Pencil, Plus,
 } from 'lucide-react'
@@ -250,6 +250,21 @@ const INSTRUCTOR_NAV = [
     { href: '/dashboard/wing', label: 'My Wing', Icon: () => <LayoutGrid size={18} />, iconClassName: 'group-hover:scale-110' },
 ]
 
+// Superadmins (app owner / Comd OCS) additionally get the app-wide Admin console.
+const ADMIN_NAV = [
+    { href: '/dashboard/admin', label: 'Admin', Icon: () => <ShieldCheck size={18} />, iconClassName: 'group-hover:scale-110' },
+]
+
+// Extra nav items unlocked by users.role (see lib/roles.ts). Role is read from
+// the DB, and every privileged API re-checks it server-side — hiding nav items
+// is a convenience, not the security boundary.
+function roleNav(role?: string) {
+    return [
+        ...(hasInstructorAccess(role) ? INSTRUCTOR_NAV : []),
+        ...(isSuperadmin(role) ? ADMIN_NAV : []),
+    ]
+}
+
 type NavItem = (typeof BASE_NAV)[number]
 
 // Default mobile bottom-bar tabs. Cadets can customise these (see useNavTabs);
@@ -332,7 +347,7 @@ function MobileMoreSheet({ open, onClose, pathname, profile, overflow, primaryHr
     open: boolean
     onClose: () => void
     pathname: string
-    profile: { rank?: string; full_name?: string; wing?: string } | null
+    profile: { rank?: string; full_name?: string; wing?: string; role?: string } | null
     overflow: NavItem[]
     primaryHrefs: string[]
     setPrimary: (hrefs: string[]) => void
@@ -347,11 +362,8 @@ function MobileMoreSheet({ open, onClose, pathname, profile, overflow, primaryHr
     // Reset the draft whenever the sheet (re)opens or the saved set changes.
     useEffect(() => { if (open) { setEditing(false); setDraft(primaryHrefs) } }, [open, primaryHrefs])
 
-    // Instructors get an extra "My Wing" tab pinned in the overflow grid.
-    const overflowNav = [
-        ...overflow,
-        ...(profile?.rank && isInstructor(profile.rank) ? INSTRUCTOR_NAV : []),
-    ]
+    // Instructors get an extra "My Wing" tab (and superadmins "Admin") pinned in the overflow grid.
+    const overflowNav = [...overflow, ...roleNav(profile?.role)]
 
     function toggleDraft(href: string) {
         setDraft(prev => {
@@ -492,7 +504,7 @@ function MobileMoreSheet({ open, onClose, pathname, profile, overflow, primaryHr
 // ── Mobile bottom nav ──────────────────────────────────────
 function MobileBottomNav({ pathname, profile, primary, overflow, primaryHrefs, setPrimary }: {
     pathname: string
-    profile: { rank?: string } | null
+    profile: { rank?: string; role?: string } | null
     primary: NavItem[]
     overflow: NavItem[]
     primaryHrefs: string[]
@@ -501,7 +513,7 @@ function MobileBottomNav({ pathname, profile, primary, overflow, primaryHrefs, s
     const [moreOpen, setMoreOpen] = useState(false)
 
     // "More" tab appears active when the current page is in the overflow set
-    const overflowActive = [...overflow, ...INSTRUCTOR_NAV].some(
+    const overflowActive = [...overflow, ...INSTRUCTOR_NAV, ...ADMIN_NAV].some(
         ({ href }) => pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
     )
 
@@ -607,7 +619,7 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
     expanded: boolean
     onToggle: () => void
     pathname: string
-    profile: { rank?: string; full_name?: string; wing?: string } | null
+    profile: { rank?: string; full_name?: string; wing?: string; role?: string } | null
     userId: string
     unread: number
     setUnread: (n: number | ((prev: number) => number)) => void
@@ -692,10 +704,10 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
             {/* Main nav */}
             <nav className={cn('flex flex-col gap-0.5 flex-1 overflow-y-auto overflow-x-hidden', expanded ? 'px-2.5' : 'px-2')}>
                 {BASE_NAV.map(item => <NavItem key={item.href} {...item} />)}
-                {profile?.rank && isInstructor(profile.rank) && (
+                {hasInstructorAccess(profile?.role) && (
                     <>
                         <div className={cn('mx-1 border-t border-sidebar-border my-1.5', !expanded && 'mx-0')} />
-                        {INSTRUCTOR_NAV.map(item => <NavItem key={item.href} {...item} />)}
+                        {roleNav(profile?.role).map(item => <NavItem key={item.href} {...item} />)}
                     </>
                 )}
                 <div className={cn('mx-1 border-t border-sidebar-border my-1.5', !expanded && 'mx-0')} />
@@ -770,7 +782,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const router = useRouter()
     const pathname = usePathname()
     const [expanded, setExpanded] = useState(true)
-    const [profile, setProfile] = useState<{ rank?: string; full_name?: string; wing?: string } | null>(null)
+    const [profile, setProfile] = useState<{ rank?: string; full_name?: string; wing?: string; role?: string } | null>(null)
     const { setGoalMode } = useTheme()
     const [unread, setUnread] = useUnreadCount(user?.id ?? '')
     const { primary, overflow, primaryHrefs, setPrimary } = useNavTabs()
@@ -790,7 +802,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     useEffect(() => {
         if (!user) return
-        supabase.from('users').select('rank, full_name, wing, goal_mode').eq('id', user.id).single()
+        supabase.from('users').select('rank, full_name, wing, goal_mode, role').eq('id', user.id).single()
             .then(({ data }) => {
                 if (data) {
                     setProfile(data)

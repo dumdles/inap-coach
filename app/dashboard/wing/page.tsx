@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import { isInstructor } from '@/lib/scoring'
+import { hasInstructorAccess } from '@/lib/roles'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useRouter } from 'next/navigation'
 import gsap from 'gsap'
@@ -535,7 +535,7 @@ function EngagementScatter({ cadets }: { cadets: CadetRow[] }) {
 export default function WingPage() {
     const { user } = useAuth()
     const router = useRouter()
-    const [profile, setProfile] = useState<{ rank: string; wing: string } | null>(null)
+    const [profile, setProfile] = useState<{ rank: string; wing: string; role: string } | null>(null)
     const [cadets, setCadets] = useState<CadetRow[]>([])
     const [period, setPeriod] = useState<'week' | 'month'>('week')
     const [loading, setLoading] = useState(true)
@@ -551,11 +551,11 @@ export default function WingPage() {
 
     useEffect(() => {
         if (!user) return
-        supabase.from('users').select('rank, wing').eq('id', user.id).single()
+        supabase.from('users').select('rank, wing, role').eq('id', user.id).single()
             .then(({ data }) => {
                 if (!data) return
                 setProfile(data)
-                if (!isInstructor(data.rank)) router.replace('/dashboard')
+                if (!hasInstructorAccess(data.role)) router.replace('/dashboard')
             })
         // Fetch all wings from the reference table (not distinct user values, so the list is always complete)
         supabase.from('ocs_wings').select('name').order('name').then(({ data }) => {
@@ -592,12 +592,14 @@ export default function WingPage() {
         if (!user) return
         setAdminWorking(true)
         try {
-            const body: Record<string, string> = { requesterId: user.id, cadetId, action }
+            const body: Record<string, string> = { cadetId, action }
             if (action === 'transfer_wing') body.newWing = transferWing
             if (action === 'assign_section') body.newSection = transferSection
+            // The server identifies the instructor from this token (not from the body).
+            const { data: { session } } = await supabase.auth.getSession()
             const res = await fetch('/api/cadet-admin', {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
                 body: JSON.stringify(body),
             })
             if (!res.ok) throw new Error((await res.json()).error ?? 'Failed')
@@ -647,7 +649,7 @@ export default function WingPage() {
     const complianceRate = filtered.length ? Math.round((loggingToday / filtered.length) * 100) : 0
     const topStreaker    = filtered.reduce((best, c) => c.streak > (best?.streak ?? 0) ? c : best, filtered[0])
 
-    if (!profile || !isInstructor(profile.rank)) return null
+    if (!profile || !hasInstructorAccess(profile.role)) return null
 
     return (
         <div className="px-4 md:px-8 py-8 md:py-10 max-w-5xl mx-auto">

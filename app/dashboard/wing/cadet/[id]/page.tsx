@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/app/context/auth-context'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -85,7 +86,11 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
         if (!user) return
         async function load() {
             try {
-                const res = await fetch(`/api/cadet?cadetId=${cadetId}&requesterId=${user!.id}`)
+                // Requester is identified server-side from the Bearer token.
+                const { data: { session } } = await supabase.auth.getSession()
+                const res = await fetch(`/api/cadet?cadetId=${cadetId}`, {
+                    headers: { 'Authorization': `Bearer ${session?.access_token}` },
+                })
                 if (res.status === 403) { router.replace('/dashboard'); return }
                 const json = await res.json()
                 if (json?.error) { setError(json.error) } else { setData(json) }

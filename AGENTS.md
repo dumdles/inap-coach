@@ -33,6 +33,7 @@ app/
   api/                    # Route handlers (Next.js App Router)
     _lib/                 # ai.ts (AI SDK helpers), auth.ts (verifyAuth), coach-prompt/data/tools.ts (AI coach chat)
     auth/                 # Supabase auth + Polar OAuth callbacks
+    admin/                # Superadmin-only: app-wide overview, role changes
     cadet/                # Cadet profile
     chat/                 # AI coach chat: streaming route, sessions, suggestion chips
     cron/                 # Scheduled jobs (Vercel Cron) — macro alerts, weekly recap, leaderboard
@@ -50,6 +51,7 @@ app/
     auth-context.tsx      # useAuth() — current user session
     theme-context.tsx     # Dark/light mode
   dashboard/
+    admin/                # Superadmin console (overview, instructor verification, staff)
     coach/                # AI coach chat (useChat streaming UI + suggestion chips)
     friends/              # Friend management
     insights/             # AI insights page
@@ -90,6 +92,14 @@ docs/
 ## Authentication
 
 `useAuth()` from `app/context/auth-context.tsx` returns `{ user, loading }`. `user.id` is the Supabase UUID used as the FK across all tables. Server-side API routes use `supabaseAdmin` (service role key) from `app/api/cron/_lib.ts` or created inline — never the anon client.
+
+## Roles & access
+
+`users.role` is `cadet` (default) | `instructor` | `superadmin` — see `lib/roles.ts` and `docs/roles_migration.sql`.
+- **Rank never grants access.** Instructor-eligible ranks (`isInstructorRank` in `lib/scoring.ts`) can only *request* access from Settings → Profile; a superadmin approves it in the Admin console (`app/dashboard/admin`, `app/api/instructor-requests`).
+- A DB trigger blocks the browser client from changing `role`; only service-role API routes can. Signup always inserts `role: 'cadet'`.
+- Privileged API routes must call `requireRole(req, [...])` from `app/api/_lib/roles.ts` — never trust a `userId`/`requesterId` sent by the client.
+- Superadmin is granted only via SQL (bootstrap line at the bottom of the migration).
 
 ## Database patterns
 

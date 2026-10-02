@@ -20,6 +20,7 @@ const TYPE_ICON: Record<string, string> = {
     ippt_reminder:       '🏃',
     leaderboard_movement:'📈',
     nutrition_tip:       '💡',
+    instructor_request:  '🛡️',
     info:                'ℹ️',
 }
 
