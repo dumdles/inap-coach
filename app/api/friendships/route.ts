@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth } from '@/app/api/_lib/auth'
+import { isUuid } from '@/app/api/_lib/access'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,11 +9,14 @@ const supabaseAdmin = createClient(
     { auth: { autoRefreshToken: false, persistSession: false } },
 )
 
-// GET /api/friendships?userId=<uuid>
-// Returns { friends: [...], pending_sent: [...], pending_received: [...] }
+// All handlers act as the signed-in user (Bearer token) — never a userId from the client.
+
+// GET /api/friendships
+// Returns { friends: [...], pending_sent: [...], pending_received: [...] } for the caller
 export async function GET(req: NextRequest) {
-    const userId = req.nextUrl.searchParams.get('userId')
-    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+    const userId = auth.user.id
 
     const { data, error } = await supabaseAdmin
         .from('friendships')
@@ -41,11 +46,18 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/friendships — send request
-// Body: { requesterId, addresseeId }
+// Body: { addresseeId } — the requester is the caller
 export async function POST(req: NextRequest) {
-    const { requesterId, addresseeId } = await req.json()
-    if (!requesterId || !addresseeId)
-        return NextResponse.json({ error: 'requesterId and addresseeId required' }, { status: 400 })
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+    const requesterId = auth.user.id
+
+    const { addresseeId } = await req.json().catch(() => ({}))
+    // addresseeId goes into a PostgREST filter below, so it must be a real UUID
+    if (!isUuid(addresseeId))
+        return NextResponse.json({ error: 'valid addresseeId required' }, { status: 400 })
+    if (addresseeId === requesterId)
+        return NextResponse.json({ error: 'You cannot add yourself' }, { status: 400 })
 
     // Check for existing relationship in either direction
     const { data: existing } = await supabaseAdmin
@@ -75,34 +87,45 @@ export async function POST(req: NextRequest) {
 
 // PATCH /api/friendships — accept or reject
 // Body: { friendshipId, action: 'accept' | 'reject' }
+// Only the *addressee* of a pending request can accept or reject it.
 export async function PATCH(req: NextRequest) {
-    const { friendshipId, action } = await req.json()
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
+    const { friendshipId, action } = await req.json().catch(() => ({}))
     if (!friendshipId || !['accept', 'reject'].includes(action))
         return NextResponse.json({ error: 'friendshipId and action required' }, { status: 400 })
 
-    if (action === 'reject') {
-        const { error } = await supabaseAdmin
-            .from('friendships')
-            .delete()
-            .eq('id', friendshipId)
-        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-        return NextResponse.json({ ok: true })
-    }
-
-    const { error } = await supabaseAdmin
-        .from('friendships')
-        .update({ status: 'accepted' })
+    const query = action === 'reject'
+        ? supabaseAdmin.from('friendships').delete()
+        : supabaseAdmin.from('friendships').update({ status: 'accepted' })
+    const { data, error } = await query
         .eq('id', friendshipId)
+        .eq('addressee_id', auth.user.id)
+        .eq('status', 'pending')
+        .select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (!data?.length) return NextResponse.json({ error: 'Request not found' }, { status: 404 })
     return NextResponse.json({ ok: true })
 }
 
-// DELETE /api/friendships?id=<uuid> — unfriend
+// DELETE /api/friendships?id=<uuid> — unfriend or cancel a sent request.
+// Either side of the friendship may delete it; nobody else can.
 export async function DELETE(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const id = req.nextUrl.searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
-    const { error } = await supabaseAdmin.from('friendships').delete().eq('id', id)
+    const me = auth.user.id
+    const { data, error } = await supabaseAdmin
+        .from('friendships')
+        .delete()
+        .eq('id', id)
+        .or(`requester_id.eq.${me},addressee_id.eq.${me}`)
+        .select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (!data?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json({ ok: true })
 }

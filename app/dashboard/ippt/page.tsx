@@ -9,6 +9,7 @@ import { LogIPPTDialog, AwardBadge, secondsToRunTime, AWARD_META, type IPPTResul
 import {
     LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid,
 } from 'recharts'
+import { authFetch } from '@/lib/auth-fetch'
 
 function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -115,7 +116,7 @@ export default function IPPTPage() {
     const fetchResults = useCallback(async () => {
         if (!user) return
         setLoading(true)
-        const res = await fetch(`/api/ippt-results?userId=${user.id}`)
+        const res = await authFetch('/api/ippt-results')
         const data = await res.json()
         setResults(Array.isArray(data) ? data : [])
         setLoading(false)
@@ -124,7 +125,7 @@ export default function IPPTPage() {
     useEffect(() => { fetchResults() }, [fetchResults])
 
     const handleDelete = async (id: string) => {
-        await fetch(`/api/ippt-results/${id}?userId=${user!.id}`, { method: 'DELETE' })
+        await authFetch(`/api/ippt-results/${id}`, { method: 'DELETE' })
         setResults(prev => prev.filter(r => r.id !== id))
     }
 

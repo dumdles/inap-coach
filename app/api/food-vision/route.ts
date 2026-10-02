@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth } from '@/app/api/_lib/auth'
 import { callOpenRouterVision } from '../_lib/ai'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -129,7 +130,11 @@ If no food is visible in the image, return { "dishes": [] }.`
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 
+// Signed-in users only — each call spends AI credits.
 export async function POST(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     if (!process.env.OPENROUTER_API_KEY) {
         return NextResponse.json({ error: 'AI unavailable' }, { status: 503 })
     }

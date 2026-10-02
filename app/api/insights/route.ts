@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth } from '@/app/api/_lib/auth'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/app/api/cron/_lib'
 import { generateStructured } from '@/app/api/_lib/ai'
@@ -142,9 +143,12 @@ scores coincide with better sleep duration. Surface these as "recovery" or "perf
 insights when supported by the data.`
 }
 
+// GET /api/insights[?refresh=1] — AI insights for the caller
 export async function GET(req: NextRequest) {
-    const userId = req.nextUrl.searchParams.get('userId')
-    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
+    // Caller comes from the Bearer token — never from a userId the client sends
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+    const userId = auth.user.id
 
     const forceRefresh = req.nextUrl.searchParams.get('refresh') === '1'
 

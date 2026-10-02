@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { canViewUser } from '@/app/api/_lib/access'
+import { verifyAuth } from '@/app/api/_lib/auth'
 import { fetchPolar } from '@/lib/polar'
 
 const supabaseAdmin = createClient(
@@ -8,13 +10,14 @@ const supabaseAdmin = createClient(
     { auth: { autoRefreshToken: false, persistSession: false } },
 )
 
-// GET /api/workout-logs/[id]?userId=<uuid>
+// GET /api/workout-logs/[id]
 // Returns the workout with tags and GPS track. GPX is served from the DB cache where
 // available; if it's missing but has_route is true, it's fetched from Polar and cached.
+// Visible to the owner and anyone allowed to view them (see _lib/access canViewUser).
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
     const { id } = await params
-    const userId = req.nextUrl.searchParams.get('userId')
-    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
 
     const { data: log, error } = await supabaseAdmin
         .from('workout_logs')
@@ -23,6 +26,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         .single()
 
     if (error || !log) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    // 404 rather than 403 so workout ids can't be probed
+    if (!(await canViewUser(auth.user.id, log.user_id))) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     // Fetch tagged users
     const { data: tags } = await supabaseAdmin

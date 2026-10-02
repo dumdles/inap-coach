@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { DatePicker } from '@/components/ui/date-picker'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { authFetch } from '@/lib/auth-fetch'
 
 export type IPPTResult = {
     id: string
@@ -118,11 +119,10 @@ export function LogIPPTDialog({ open, onClose, userId, prefillDate, onSaved }: P
         setSaving(true)
         try {
             const run_time_seconds = form.run_time ? runTimeToSeconds(form.run_time) : null
-            const res = await fetch('/api/ippt-results', {
+            const res = await authFetch('/api/ippt-results', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId,
                     test_date:        form.test_date,
                     pushup_reps:      form.pushup_reps  ? Number(form.pushup_reps)  : null,
                     situp_reps:       form.situp_reps   ? Number(form.situp_reps)   : null,

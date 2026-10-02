@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/app/context/auth-context'
 import { cn } from '@/lib/utils'
+import { authFetch } from '@/lib/auth-fetch'
 
 type Notification = {
     id: string
@@ -120,7 +121,7 @@ export default function NotificationsPage() {
 
     const load = useCallback(async () => {
         if (!user) return
-        const res = await fetch(`/api/notifications?userId=${user.id}&limit=100`)
+        const res = await authFetch('/api/notifications?limit=100')
         const data = await res.json()
         setItems(data ?? [])
         setLoading(false)
@@ -131,14 +132,14 @@ export default function NotificationsPage() {
     async function markAllRead() {
         if (!user) return
         setMarkingAll(true)
-        await fetch(`/api/notifications?userId=${user.id}`, { method: 'PATCH' })
+        await authFetch('/api/notifications', { method: 'PATCH' })
         setItems(prev => prev.map(n => ({ ...n, read: true })))
         setMarkingAll(false)
     }
 
     async function markOneRead(id: string) {
         setItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-        await fetch(`/api/notifications/${id}`, { method: 'PATCH' })
+        await authFetch(`/api/notifications/${id}`, { method: 'PATCH' })
     }
 
     const unread = items.filter(n => !n.read).length

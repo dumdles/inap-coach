@@ -40,6 +40,7 @@ import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
     ScatterChart, Scatter, ZAxis, ReferenceLine,
 } from 'recharts'
+import { authFetch } from '@/lib/auth-fetch'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -566,8 +567,8 @@ export default function WingPage() {
     const fetchCadets = useCallback(async () => {
         if (!user || !profile) return
         setLoading(true)
-        const res = await fetch(
-            `/api/leaderboard?scope=wing&wing=${encodeURIComponent(profile.wing)}&period=${period}&userId=${user.id}`,
+        const res = await authFetch(
+            `/api/leaderboard?scope=wing&wing=${encodeURIComponent(profile.wing)}&period=${period}`,
         )
         const data = await res.json()
         setCadets(Array.isArray(data) ? data : [])
@@ -597,7 +598,7 @@ export default function WingPage() {
             if (action === 'assign_section') body.newSection = transferSection
             // The server identifies the instructor from this token (not from the body).
             const { data: { session } } = await supabase.auth.getSession()
-            const res = await fetch('/api/cadet-admin', {
+            const res = await authFetch('/api/cadet-admin', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
                 body: JSON.stringify(body),

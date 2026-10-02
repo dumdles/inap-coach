@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth } from '@/app/api/_lib/auth'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,10 +8,13 @@ const supabaseAdmin = createClient(
     { auth: { autoRefreshToken: false, persistSession: false } },
 )
 
-// GET /api/users/search?q=<name>&excludeId=<uuid>
+// GET /api/users/search?q=<name> — signed-in users only; excludes the caller
 export async function GET(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const q = req.nextUrl.searchParams.get('q') ?? ''
-    const excludeId = req.nextUrl.searchParams.get('excludeId') ?? ''
+    const excludeId = auth.user.id
 
     if (q.trim().length < 2) return NextResponse.json([])
 
@@ -20,7 +24,7 @@ export async function GET(req: NextRequest) {
         .ilike('full_name', `%${q.trim()}%`)
         .limit(8)
 
-    if (excludeId) query = query.neq('id', excludeId)
+    query = query.neq('id', excludeId)
 
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

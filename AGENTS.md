@@ -99,6 +99,7 @@ docs/
 - **Rank never grants access.** Instructor-eligible ranks (`isInstructorRank` in `lib/scoring.ts`) can only *request* access from Settings → Profile; a superadmin approves it in the Admin console (`app/dashboard/admin`, `app/api/instructor-requests`).
 - A DB trigger blocks the browser client from changing `role`; only service-role API routes can. Signup always inserts `role: 'cadet'`.
 - Privileged API routes must call `requireRole(req, [...])` from `app/api/_lib/roles.ts` — never trust a `userId`/`requesterId` sent by the client.
+- **Every user-data API route authenticates** with `verifyAuth` / `requireRole`. Client code calls them via `authFetch()` (`lib/auth-fetch.ts`), which attaches the Bearer token. Reads of *another* cadet's data (`?userId=`) go through `canViewUser()` in `app/api/_lib/access.ts` (self, superadmin, same-wing instructor, accepted friend). Intentionally public: `auth/signup`, `food-templates`, and the Polar OAuth callback (protected by the HMAC-signed `state` in `app/api/_lib/polar-state.ts`).
 - Superadmin is granted only via SQL (bootstrap line at the bottom of the migration).
 
 ### Command console (`app/dashboard/admin/`)

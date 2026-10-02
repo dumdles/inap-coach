@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AwardBadge, secondsToRunTime, AWARD_META, type IPPTResult } from '@/components/ippt/log-ippt-dialog'
+import { authFetch } from '@/lib/auth-fetch'
 
 type DayEntry = { calories: number; protein: number; carbs: number; fat: number; calorie_target: number }
 
@@ -88,7 +89,7 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
             try {
                 // Requester is identified server-side from the Bearer token.
                 const { data: { session } } = await supabase.auth.getSession()
-                const res = await fetch(`/api/cadet?cadetId=${cadetId}`, {
+                const res = await authFetch(`/api/cadet?cadetId=${cadetId}`, {
                     headers: { 'Authorization': `Bearer ${session?.access_token}` },
                 })
                 if (res.status === 403) { router.replace('/dashboard'); return }
@@ -107,7 +108,7 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
     useEffect(() => {
         if (activeTab !== 'workouts' || workoutLogs.length > 0) return
         setWorkoutsLoading(true)
-        fetch(`/api/workout-logs?userId=${cadetId}`)
+        authFetch(`/api/workout-logs?userId=${cadetId}`)
             .then(r => r.json())
             .then(d => setWorkoutLogs(Array.isArray(d) ? d : []))
             .finally(() => setWorkoutsLoading(false))
@@ -117,7 +118,7 @@ export default function CadetDetailPage({ params }: { params: Promise<{ id: stri
     useEffect(() => {
         if (activeTab !== 'ippt' || ipptResults.length > 0) return
         setIpptLoading(true)
-        fetch(`/api/ippt-results?userId=${cadetId}`)
+        authFetch(`/api/ippt-results?userId=${cadetId}`)
             .then(r => r.json())
             .then(d => setIpptResults(Array.isArray(d) ? d : []))
             .finally(() => setIpptLoading(false))

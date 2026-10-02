@@ -19,6 +19,7 @@ import {
     ChevronLeft, ChevronRight, Check, SportShoe, MoreHorizontal, Calculator, Sparkles,
     Pencil, Plus,
 } from 'lucide-react'
+import { authFetch } from '@/lib/auth-fetch'
 
 // ── Notification types ─────────────────────────────────────
 type Notification = {
@@ -49,14 +50,14 @@ function NotificationList({ userId, onClose }: { userId: string; onClose: () => 
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        fetch(`/api/notifications?userId=${userId}`)
+        authFetch('/api/notifications')
             .then(r => r.json())
             .then(data => { setItems(data ?? []); setLoading(false) })
             .catch(() => setLoading(false))
     }, [userId])
 
     async function markAllRead() {
-        await fetch(`/api/notifications?userId=${userId}`, { method: 'PATCH' })
+        await authFetch('/api/notifications', { method: 'PATCH' })
         setItems(prev => prev.map(n => ({ ...n, read: true })))
     }
 
@@ -174,7 +175,7 @@ function useUnreadCount(userId: string) {
     const [unread, setUnread] = useState(0)
     const fetch$ = useCallback(() => {
         if (!userId || document.hidden) return
-        fetch(`/api/notifications?userId=${userId}`)
+        authFetch('/api/notifications')
             .then(r => r.json())
             .then((data: Notification[]) => setUnread((data ?? []).filter(n => !n.read).length))
             .catch(() => {})

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { canViewUser } from '@/app/api/_lib/access'
 import { verifyAuth } from '@/app/api/_lib/auth'
 
 const supabaseAdmin = createClient(
@@ -8,12 +9,16 @@ const supabaseAdmin = createClient(
     { auth: { autoRefreshToken: false, persistSession: false } },
 )
 
-// GET /api/workout-logs?userId=<uuid>&category=<str>
+// GET /api/workout-logs[?userId=<uuid>]&category=<str>
 export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl
-    const userId = searchParams.get('userId')
+    // Whose data: ?userId= (defaults to the caller). Viewing someone else needs
+    // permission — same-wing instructor, superadmin or accepted friend (see _lib/access).
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+    const userId = searchParams.get('userId') || auth.user.id
+    if (!(await canViewUser(auth.user.id, userId))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     const category = searchParams.get('category')
-    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
 
     let query = supabaseAdmin
         .from('workout_logs')

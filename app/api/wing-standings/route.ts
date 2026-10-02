@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { computeScore, computeStreak } from '@/lib/scoring'
+import { verifyAuth } from '@/app/api/_lib/auth'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,8 +10,11 @@ const supabaseAdmin = createClient(
 )
 
 // GET /api/wing-standings?period=week|month
-// Returns wings sorted by average score
+// Returns wings sorted by average score (aggregates only). Signed-in users only.
 export async function GET(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const period = req.nextUrl.searchParams.get('period') ?? 'week'
 
     const now = new Date()

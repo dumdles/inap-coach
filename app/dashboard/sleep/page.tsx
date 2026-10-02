@@ -25,6 +25,7 @@ import {
 import {
     BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine,
 } from 'recharts'
+import { authFetch } from '@/lib/auth-fetch'
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -1293,7 +1294,7 @@ export default function SleepPage() {
     const fetchLogs = useCallback(async () => {
         if (!user?.id) return
         setLogsLoading(true)
-        const res = await fetch(`/api/sleep-logs?userId=${user.id}&limit=90`)
+        const res = await authFetch('/api/sleep-logs?limit=90')
         const data = await res.json()
         setLogs(Array.isArray(data) ? data : [])
         setLogsLoading(false)
@@ -1301,7 +1302,7 @@ export default function SleepPage() {
 
     const fetchSettings = useCallback(async () => {
         if (!user?.id) return
-        const res = await fetch(`/api/sleep-logs/settings?userId=${user.id}`)
+        const res = await authFetch('/api/sleep-logs/settings')
         const data = await res.json()
         if (data) setSettings(data)
     }, [user?.id])
@@ -1314,7 +1315,7 @@ export default function SleepPage() {
         if (!user?.id) return
         setPolarSyncing(true)
         try {
-            await fetch(`/api/polar/sleep?userId=${user.id}`)
+            await authFetch('/api/polar/sleep')
             await fetchLogs()
         } finally {
             setPolarSyncing(false)
@@ -1322,16 +1323,16 @@ export default function SleepPage() {
     }, [user?.id, fetchLogs])
 
     async function handleDelete(id: string) {
-        await fetch(`/api/sleep-logs?id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${session?.access_token}` } })
+        await authFetch(`/api/sleep-logs?id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${session?.access_token}` } })
         setLogs(prev => prev.filter(l => l.id !== id))
         setConfirmDeleteId(null)
     }
 
     async function saveSettings(s: SleepSettings) {
-        await fetch('/api/sleep-logs/settings', {
+        await authFetch('/api/sleep-logs/settings', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user?.id, ...s }),
+            body: JSON.stringify(s),
         })
         setSettings(s)
     }

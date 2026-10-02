@@ -12,6 +12,7 @@ import { ErrorReveal } from '@/components/ui/error-reveal'
 import { SuccessCheck } from '@/components/ui/success-check'
 import { Shimmer } from '@/components/ui/shimmer'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { authFetch } from '@/lib/auth-fetch'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -231,7 +232,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         setEstimateError(null)
         setEstimateSuccess(false)
         try {
-            const res = await fetch('/api/food-items/estimate', {
+            const res = await authFetch('/api/food-items/estimate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: custom.name.trim() }),
@@ -300,7 +301,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         setSearching(true)
         debounceRef.current = setTimeout(async () => {
             const q = encodeURIComponent(query.trim())
-            const res = await fetch(`/api/food-items?q=${q}`).catch(() => null)
+            const res = await authFetch(`/api/food-items?q=${q}`).catch(() => null)
             const data: FoodItem[] = res ? await res.json() : []
             setResults((data ?? []).map(i => ({ ...i, source: 'db' as const })))
             setSearching(false)
@@ -341,7 +342,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
             setScanPreview(dataUrl)
             const base64 = dataUrl.split(',')[1]
             const mimeType = file.type || 'image/jpeg'
-            const res = await fetch('/api/food-vision', {
+            const res = await authFetch('/api/food-vision', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ imageBase64: base64, mimeType }),
@@ -384,7 +385,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
     async function createCustomAndProceed() {
         if (!validateCustom()) return
         setSubmitting(true)
-        const res = await fetch('/api/food-items', {
+        const res = await authFetch('/api/food-items', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -416,7 +417,7 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         // Resolve food item ID — template selections don't have one yet
         let foodItemId = 'id' in selected ? selected.id : null
         if (!foodItemId) {
-            const res = await fetch('/api/food-items', {
+            const res = await authFetch('/api/food-items', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: selected.name, calories_per_100g: selected.calories_per_100g, protein_g: selected.protein_g, carbs_g: selected.carbs_g, fat_g: selected.fat_g, created_by: user.id }),

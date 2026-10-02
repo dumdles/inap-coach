@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAuth } from "@/app/api/_lib/auth";
 import { fetchPolar } from "@/lib/polar";
 import { parseDuration } from "@/lib/utils";
 import { supabaseAdmin } from "@/app/api/cron/_lib";
@@ -8,15 +9,15 @@ function normalisePolarName(raw: string): string {
     return raw.toLowerCase().replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase())
 }
 
+// GET /api/polar/exercises — sync the caller's Polar workouts into workout_logs
 export async function GET(request: NextRequest) {
+    const auth = await verifyAuth(request);
+    if (auth.error) return auth.error;
+    const userId = auth.user.id;
+
     try {
         const searchParams = new URL(request.url).searchParams;
-        const userId = searchParams.get("userId");
         const endpoint = searchParams.get("endpoint") || "/exercises";
-
-        if (!userId) {
-            return NextResponse.json({ error: "Missing userId parameter" }, { status: 400 });
-        }
 
         let data: unknown;
         try {

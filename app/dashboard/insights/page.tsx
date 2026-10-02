@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import gsap from 'gsap'
+import { authFetch } from '@/lib/auth-fetch'
 
 const COOLDOWN_MS = 60 * 60 * 1000 // 1 hour between manual refreshes
 const COOLDOWN_KEY = 'insights_last_refresh'
@@ -300,8 +301,8 @@ export default function InsightsPage() {
 
         setError(false)
         try {
-            const url = `/api/insights?userId=${user.id}${refresh ? '&refresh=1' : ''}`
-            const res = await fetch(url)
+            const url = `/api/insights${refresh ? '?refresh=1' : ''}`
+            const res = await authFetch(url)
             if (!res.ok) throw new Error('ai_unavailable')
             const json = await res.json()
             setData(json)

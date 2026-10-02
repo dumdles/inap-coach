@@ -10,6 +10,7 @@ import { ScaleIcon } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { authFetch } from '@/lib/auth-fetch'
 
 type WeightLog = {
     id: string
@@ -219,7 +220,7 @@ export default function ProgressPage() {
         if (!user) return
         const [{ data: prof }, logsRes] = await Promise.all([
             supabase.from('users').select('weight_kg, target_weight_kg, weight_goal_date, goal_mode, height_cm').eq('id', user.id).single(),
-            fetch(`/api/weight-logs?userId=${user.id}&days=${range}`).then(r => r.json()),
+            authFetch(`/api/weight-logs?days=${range}`).then(r => r.json()),
         ])
         setProfile(prof)
         setWeightLogs(Array.isArray(logsRes) ? logsRes : [])
@@ -229,7 +230,7 @@ export default function ProgressPage() {
     useEffect(() => { fetchData() }, [fetchData])
 
     const logWeight = async (weight_kg: number, body_fat_pct: number | null) => {
-        await fetch('/api/weight-logs', {
+        await authFetch('/api/weight-logs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
             body: JSON.stringify({ userId: user?.id, weight_kg, body_fat_pct }),
@@ -240,7 +241,7 @@ export default function ProgressPage() {
 
     const editWeight = async (weight_kg: number, body_fat_pct: number | null) => {
         if (!editLog) return
-        await fetch(`/api/weight-logs?id=${editLog.id}`, {
+        await authFetch(`/api/weight-logs?id=${editLog.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
             body: JSON.stringify({ weight_kg, body_fat_pct }),
@@ -249,7 +250,7 @@ export default function ProgressPage() {
     }
 
     const deleteWeight = async (id: string) => {
-        await fetch(`/api/weight-logs?id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${session?.access_token}` } })
+        await authFetch(`/api/weight-logs?id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${session?.access_token}` } })
         setWeightLogs(prev => prev.filter(l => l.id !== id))
         setDeleteConfirmId(null)
     }

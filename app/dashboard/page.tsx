@@ -15,6 +15,7 @@ import {
 import router from 'next/router'
 import { Button } from '@/components/ui/button'
 import { NumberPopIn } from '@/components/ui/transitions'
+import { authFetch } from '@/lib/auth-fetch'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -406,7 +407,7 @@ export default function DashboardPage() {
         if (!user || !profile?.ippt_date) { setIpptResultLogged(null); return }
         const daysPast = Math.floor((Date.now() - new Date(profile.ippt_date).getTime()) / 86_400_000)
         if (daysPast < 0) { setIpptResultLogged(null); return }  // not yet passed
-        fetch(`/api/ippt-results?userId=${user.id}`)
+        authFetch('/api/ippt-results')
             .then(r => r.json())
             .then((results: { test_date: string }[]) => {
                 const hasResult = results.some(r => r.test_date === profile.ippt_date)
@@ -437,7 +438,7 @@ export default function DashboardPage() {
     // Fetch wing leaderboard once profile (with wing) is loaded
     useEffect(() => {
         if (!user || !profile?.wing) { setLbLoading(false); return }
-        fetch(`/api/leaderboard?scope=wing&wing=${encodeURIComponent(profile.wing)}&userId=${user.id}&period=week`)
+        authFetch(`/api/leaderboard?scope=wing&wing=${encodeURIComponent(profile.wing)}&period=week`)
             .then(r => r.json())
             .then((data: LeaderboardEntry[]) => { setLeaderboard(Array.isArray(data) ? data : []) })
             .finally(() => setLbLoading(false))
@@ -460,7 +461,7 @@ export default function DashboardPage() {
     // Fetch cached AI coach summary — reuses the 24h insights cache, no extra AI cost
     useEffect(() => {
         if (!user) return
-        fetch(`/api/insights?userId=${user.id}`)
+        authFetch('/api/insights')
             .then(r => r.ok ? r.json() : null)
             .then(data => { if (data?.summary) setAiSummary(data.summary) })
             .finally(() => setAiLoading(false))

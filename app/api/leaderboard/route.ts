@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { computeScore, computeStreak } from '@/lib/scoring'
+import { requireRole } from '@/app/api/_lib/roles'
+import { isSuperadmin } from '@/lib/roles'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,15 +19,21 @@ function windowStart(period: string): Date {
     return d
 }
 
-// GET /api/leaderboard?scope=wing|friends&wing=Alpha&period=week|month&userId=<uuid>
+// GET /api/leaderboard?scope=wing|section|friends&wing=Alpha&period=week|month
+// The caller comes from the Bearer token. Wing boards are limited to the
+// caller's own wing (superadmins may pass any ?wing=).
 export async function GET(req: NextRequest) {
+    const auth = await requireRole(req)
+    if (auth.error) return auth.error
+    const userId = auth.requester.id
+
     const { searchParams } = req.nextUrl
     const scope = searchParams.get('scope') ?? 'wing'
-    const wing = searchParams.get('wing')
     const period = searchParams.get('period') ?? 'week'
-    const userId = searchParams.get('userId')
-
-    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
+    const requestedWing = searchParams.get('wing')
+    const wing = isSuperadmin(auth.requester.role) ? (requestedWing ?? auth.requester.wing) : auth.requester.wing
+    if (requestedWing && requestedWing !== wing)
+        return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
     // Resolve user list
     const USER_FIELDS = 'id, full_name, rank, wing, platoon, section, goal_mode'

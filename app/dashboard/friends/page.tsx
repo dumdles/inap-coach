@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import gsap from 'gsap'
+import { authFetch } from '@/lib/auth-fetch'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type RankedUser = {
@@ -483,7 +484,7 @@ function AddFriendDialog({
     useEffect(() => {
         if (!open) { setQuery(''); setSearchResults([]); setSent(new Set()) }
         if (open && currentUserId) {
-            fetch(`/api/users/suggested?userId=${currentUserId}`)
+            authFetch('/api/users/suggested')
                 .then(r => r.json())
                 .then(d => setSuggested(Array.isArray(d) ? d : []))
         }
@@ -494,7 +495,7 @@ function AddFriendDialog({
         if (query.trim().length < 2) { setSearchResults([]); return }
         debounce.current = setTimeout(async () => {
             setSearching(true)
-            const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}&excludeId=${currentUserId}`)
+            const res = await authFetch(`/api/users/search?q=${encodeURIComponent(query)}`)
             const data = await res.json()
             setSearchResults(data)
             setSearching(false)
@@ -502,10 +503,10 @@ function AddFriendDialog({
     }, [query, currentUserId])
 
     const sendRequest = async (addresseeId: string) => {
-        await fetch('/api/friendships', {
+        await authFetch('/api/friendships', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requesterId: currentUserId, addresseeId }),
+            body: JSON.stringify({ addresseeId }),
         })
         setSent(prev => new Set([...prev, addresseeId]))
         onSent()
@@ -684,7 +685,7 @@ export default function FriendsPage() {
 
     const fetchFriends = useCallback(async () => {
         if (!user) return
-        const res = await fetch(`/api/friendships?userId=${user.id}`)
+        const res = await authFetch('/api/friendships')
         const data = await res.json()
         const acceptedFriends: FriendUser[] = data.friends ?? []
         setFriends(acceptedFriends)
@@ -704,8 +705,8 @@ export default function FriendsPage() {
         setLoadingBoard(true)
         const scope = tab === 'wing' ? 'wing' : tab === 'section' ? 'section' : 'friends'
         const wingParam = tab === 'wing' && profile.wing ? `&wing=${encodeURIComponent(profile.wing)}` : ''
-        const res = await fetch(
-            `/api/leaderboard?scope=${scope}&period=${period}&userId=${user.id}${wingParam}`,
+        const res = await authFetch(
+            `/api/leaderboard?scope=${scope}&period=${period}${wingParam}`,
         )
         const data = await res.json()
         setLeaderboard(Array.isArray(data) ? data : [])
@@ -715,13 +716,13 @@ export default function FriendsPage() {
     useEffect(() => { fetchLeaderboard() }, [fetchLeaderboard])
 
     useEffect(() => {
-        fetch(`/api/wing-standings?period=${period}`)
+        authFetch(`/api/wing-standings?period=${period}`)
             .then(r => r.json())
             .then(d => setWingStandings(Array.isArray(d) ? d : []))
     }, [period])
 
     const handleAccept = async (friendshipId: string) => {
-        await fetch('/api/friendships', {
+        await authFetch('/api/friendships', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ friendshipId, action: 'accept' }),
@@ -731,7 +732,7 @@ export default function FriendsPage() {
     }
 
     const handleReject = async (friendshipId: string) => {
-        await fetch('/api/friendships', {
+        await authFetch('/api/friendships', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ friendshipId, action: 'reject' }),
@@ -740,7 +741,7 @@ export default function FriendsPage() {
     }
 
     const handleUnfriend = async (friendshipId: string) => {
-        await fetch(`/api/friendships?id=${friendshipId}`, { method: 'DELETE' })
+        await authFetch(`/api/friendships?id=${friendshipId}`, { method: 'DELETE' })
         fetchFriends()
         fetchLeaderboard()
     }

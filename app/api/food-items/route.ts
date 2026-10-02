@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth } from '@/app/api/_lib/auth'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,8 +8,10 @@ const supabaseAdmin = createClient(
     { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-// GET: search food items
+// GET: search food items (signed-in users)
 export async function GET(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
     const q = req.nextUrl.searchParams.get('q') ?? ''
     const { data, error } = await supabaseAdmin
         .from('food_items')
@@ -20,9 +23,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(data)
 }
 
-// POST: create a custom food item (or return existing match by name)
+// POST: create a custom food item (or return existing match by name).
+// created_by is always the caller (Bearer token).
 export async function POST(req: NextRequest) {
-    const { name, calories_per_100g, protein_g, carbs_g, fat_g, is_cookhouse_item, created_by } = await req.json()
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+    const created_by = auth.user.id
+    const { name, calories_per_100g, protein_g, carbs_g, fat_g, is_cookhouse_item } = await req.json().catch(() => ({}))
 
     if (!name?.trim()) return NextResponse.json({ error: 'name required' }, { status: 400 })
     if (calories_per_100g == null || calories_per_100g < 0 || calories_per_100g > 900)

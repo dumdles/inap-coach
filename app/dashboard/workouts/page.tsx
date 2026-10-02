@@ -22,6 +22,7 @@ import {
 import {
     BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip,
 } from "recharts"
+import { authFetch } from '@/lib/auth-fetch'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -814,7 +815,7 @@ export default function WorkoutsPage() {
     React.useEffect(() => {
         if (!user?.id) return
         let cancelled = false
-        fetch(`/api/auth/polar/status?userId=${user.id}`)
+        authFetch('/api/auth/polar/status')
             .then(r => r.json())
             .then((data: { connected?: boolean }) => {
                 if (cancelled) return
@@ -833,7 +834,7 @@ export default function WorkoutsPage() {
     const fetchLogs = React.useCallback(async () => {
         if (!user?.id) return
         setLogsLoading(true)
-        const data = await fetch(`/api/workout-logs?userId=${user.id}`).then(r => r.json())
+        const data = await authFetch('/api/workout-logs').then(r => r.json())
         setLogs(Array.isArray(data) ? data : [])
         setLogsLoading(false)
     }, [user?.id])
@@ -853,7 +854,7 @@ export default function WorkoutsPage() {
         setPolarLoading(true)
         try {
             // The server route handles the upsert directly — no need to re-POST each exercise
-            const res = await fetch(`/api/polar/exercises?userId=${user.id}`)
+            const res = await authFetch('/api/polar/exercises')
             const data = await res.json()
             if (!data.error) {
                 setIsPolarConnected(true)
@@ -877,7 +878,7 @@ export default function WorkoutsPage() {
         const { data: profile } = await supabase
             .from("users").select("full_name, rank").eq("id", user!.id).single()
         const taggerName = [profile?.rank, profile?.full_name].filter(Boolean).join(" ") || "Someone"
-        await fetch("/api/workout-logs", {
+        await authFetch("/api/workout-logs", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
             body: JSON.stringify({ userId: user?.id, taggerName, ...data }),
@@ -886,7 +887,7 @@ export default function WorkoutsPage() {
     }
 
     async function handleEdit(id: string, data: Record<string, unknown>) {
-        await fetch(`/api/workout-logs?id=${id}`, {
+        await authFetch(`/api/workout-logs?id=${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
             body: JSON.stringify(data),
@@ -895,7 +896,7 @@ export default function WorkoutsPage() {
     }
 
     async function handleDelete(id: string) {
-        await fetch(`/api/workout-logs?id=${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${session?.access_token}` } })
+        await authFetch(`/api/workout-logs?id=${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${session?.access_token}` } })
         setLogs(prev => prev.filter(l => l.id !== id))
         setConfirmDeleteId(null)
     }
@@ -1037,7 +1038,13 @@ export default function WorkoutsPage() {
                         variant="outline"
                         size="sm"
                         className="flex-shrink-0"
-                        onClick={() => { if (user?.id) window.location.href = `/api/auth/polar?userId=${user.id}` }}
+                        onClick={async () => {
+                            // Ask the server for a signed Polar authorize URL, then go there.
+                            // (A plain redirect can't carry the Bearer token — see app/api/auth/polar.)
+                            const res = await authFetch('/api/auth/polar', { method: 'POST' })
+                            const json = await res.json().catch(() => ({}))
+                            if (res.ok && json.url) window.location.href = json.url
+                        }}
                         disabled={!user?.id}
                     >
                         Connect
