@@ -47,12 +47,17 @@ export async function GET(req: NextRequest) {
         if (error) return NextResponse.json({ error: error.message }, { status: 500 })
         users = data ?? []
     } else if (scope === 'section') {
-        const { data: me } = await supabaseAdmin.from('users').select('section').eq('id', userId).single()
-        if (me?.section) {
-            const { data } = await supabaseAdmin
+        // Section numbers repeat in every platoon and wing ("Section 2" exists
+        // everywhere), so a section is only unique within wing + platoon.
+        const { data: me } = await supabaseAdmin.from('users').select('wing, platoon, section').eq('id', userId).single()
+        if (me?.section && me.wing) {
+            let q = supabaseAdmin
                 .from('users')
                 .select(USER_FIELDS)
+                .eq('wing', me.wing)
                 .eq('section', me.section)
+            if (me.platoon) q = q.eq('platoon', me.platoon)
+            const { data } = await q
             users = data ?? []
         }
     } else if (scope === 'friends') {

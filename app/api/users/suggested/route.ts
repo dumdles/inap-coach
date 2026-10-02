@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     const { data: me } = await supabaseAdmin
         .from('users')
-        .select('section, wing')
+        .select('section, platoon, wing')
         .eq('id', userId)
         .single()
 
@@ -36,15 +36,17 @@ export async function GET(req: NextRequest) {
         connectedIds.add(f.addressee_id)
     }
 
-    // Prefer same section first, then same wing
-    const { data: sameSection } = me.section
-        ? await supabaseAdmin
-            .from('users')
-            .select('id, full_name, rank, wing, section')
-            .eq('section', me.section)
-            .neq('id', userId)
-            .limit(10)
-        : { data: [] }
+    // Prefer same section first, then same wing. Section numbers repeat across
+    // platoons and wings, so "same section" means same wing + platoon + section.
+    let sectionQuery = supabaseAdmin
+        .from('users')
+        .select('id, full_name, rank, wing, section')
+        .eq('wing', me.wing)
+        .eq('section', me.section)
+        .neq('id', userId)
+        .limit(10)
+    if (me.platoon) sectionQuery = sectionQuery.eq('platoon', me.platoon)
+    const { data: sameSection } = me.section && me.wing ? await sectionQuery : { data: [] }
 
     const sectionIds = new Set((sameSection ?? []).map((u: { id: string }) => u.id))
 
