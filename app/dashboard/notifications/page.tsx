@@ -22,6 +22,7 @@ const TYPE_ICON: Record<string, string> = {
     leaderboard_movement:'📈',
     nutrition_tip:       '💡',
     instructor_request:  '🛡️',
+    challenge:           '🏁',
     info:                'ℹ️',
 }
 

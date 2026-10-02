@@ -17,7 +17,7 @@ import {
     Home, Utensils, Dumbbell, Moon, TrendingUp,
     Trophy, Brain, LayoutGrid, ShieldCheck, Bell, Settings, LogOut,
     ChevronLeft, ChevronRight, Check, SportShoe, MoreHorizontal, Calculator, Sparkles,
-    Pencil, Plus,
+    Pencil, Plus, Flag,
 } from 'lucide-react'
 import { authFetch } from '@/lib/auth-fetch'
 
@@ -242,6 +242,7 @@ const BASE_NAV = [
     { href: '/dashboard/progress',               label: 'Progress',    Icon: () => <TrendingUp size={18} />,   iconClassName: 'group-hover:-translate-y-0.5' },
     { href: '/dashboard/ippt',                   label: 'IPPT',        Icon: () => <SportShoe size={18} />,    iconClassName: 'group-hover:-translate-y-1' },
     { href: '/dashboard/friends',                label: 'Leaderboard', Icon: () => <Trophy size={18} />,       iconClassName: 'group-hover:scale-110' },
+    { href: '/dashboard/challenges',             label: 'Challenges',  Icon: () => <Flag size={18} />,         iconClassName: 'group-hover:-rotate-6' },
     { href: '/dashboard/insights',               label: 'Insights',    Icon: () => <Brain size={18} />,        iconClassName: 'group-hover:scale-110' },
     { href: '/dashboard/coach',                  label: 'AI Coach',    Icon: () => <Sparkles size={18} />,     iconClassName: 'group-hover:scale-110' },
     { href: '/dashboard/nutrition/calculator',   label: 'Calculator',  Icon: () => <Calculator size={18} />,  iconClassName: 'group-hover:scale-110' },

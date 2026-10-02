@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { computeScore, computeStreak } from '@/lib/scoring'
 import { requireRole } from '@/app/api/_lib/roles'
 import { isSuperadmin } from '@/lib/roles'
+import { challengeBonusSince } from '@/app/api/_lib/challenges'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -138,12 +139,16 @@ export async function GET(req: NextRequest) {
         }
     }
 
+    // Bonus points from challenges won during this period (see lib/challenges.ts)
+    const bonusByUser = await challengeBonusSince(start.toISOString())
+
     const ranked = users
         .map(u => {
             const streak = computeStreak(allDaysByUser[u.id])
-            const score = computeScore(mealsByUserDay[u.id], streak, workoutKcalByUserDay[u.id], sleepByUserDay[u.id])
+            const challengeBonus = bonusByUser.get(u.id) ?? 0
+            const score = computeScore(mealsByUserDay[u.id], streak, workoutKcalByUserDay[u.id], sleepByUserDay[u.id]) + challengeBonus
             const mealsToday = mealsByUserDay[u.id][new Date().toISOString().slice(0, 10)] ?? 0
-            return { ...u, score, streak, mealsToday }
+            return { ...u, score, streak, mealsToday, challengeBonus }
         })
         .sort((a, b) => b.score - a.score)
         .map((u, i) => ({ ...u, position: i + 1 }))

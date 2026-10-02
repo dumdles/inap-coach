@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/app/api/cron/_lib'
 import { verifyAuth } from '@/app/api/_lib/auth'
 import type { Role } from '@/lib/roles'
 
-export type Requester = { id: string; role: Role; wing: string | null; rank: string | null }
+export type Requester = { id: string; role: Role; wing: string | null; rank: string | null; platoon: string | null }
 
 type Ok = { requester: Requester; error?: never }
 type Fail = { requester?: never; error: NextResponse }
@@ -24,7 +24,7 @@ export async function requireRole(req: NextRequest, allowed?: Role[]): Promise<O
 
     const { data } = await supabaseAdmin
         .from('users')
-        .select('id, role, wing, rank')
+        .select('id, role, wing, rank, platoon')
         .eq('id', auth.user.id)
         .single()
     if (!data) return { error: NextResponse.json({ error: 'profile not found' }, { status: 404 }) }

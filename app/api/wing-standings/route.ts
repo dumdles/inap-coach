@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { computeScore, computeStreak } from '@/lib/scoring'
 import { verifyAuth } from '@/app/api/_lib/auth'
+import { challengeBonusSince } from '@/app/api/_lib/challenges'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -58,13 +59,16 @@ export async function GET(req: NextRequest) {
         allDaysByUser[log.user_id]?.add(log.logged_at.slice(0, 10))
     }
 
+    // Challenge bonus points awarded this period count towards each cadet's score
+    const bonusByUser = await challengeBonusSince(start.toISOString())
+
     // Aggregate by wing
     const wingMap: Record<string, { total: number; count: number }> = {}
     for (const u of users) {
         const wing = u.wing
         if (!wing) continue
         const streak = computeStreak(allDaysByUser[u.id])
-        const score = computeScore(mealsByUserDay[u.id], streak)
+        const score = computeScore(mealsByUserDay[u.id], streak) + (bonusByUser.get(u.id) ?? 0)
         wingMap[wing] = wingMap[wing] ?? { total: 0, count: 0 }
         wingMap[wing].total += score
         wingMap[wing].count += 1

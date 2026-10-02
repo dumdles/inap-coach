@@ -1,0 +1,231 @@
+'use client'
+
+// Create-challenge form for instructors (own wing) and superadmins (any wing
+// or all wings). Validation is the same validateChallenge() the API runs, so
+// inline errors here match the server's 400s exactly.
+
+import React, { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
+import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase'
+import { authFetch } from '@/lib/auth-fetch'
+import { cn } from '@/lib/utils'
+import {
+    CHALLENGE_METRICS, METRIC_KEYS, LIMITS, AWARD_SHARES, validateChallenge,
+    type Challenge, type ChallengeInput,
+} from '@/lib/challenges'
+
+const ALL = '__all__'
+
+// DateTimePicker works in local "YYYY-MM-DDTHH:MM"; the app runs on SGT, so
+// pin the offset explicitly before sending to the server.
+const toIso = (v: string) => (v ? `${v}:00+08:00` : '')
+function sgLocal(ms: number) {
+    return new Date(ms + 8 * 3600_000).toISOString().slice(0, 16)
+}
+
+type Form = {
+    title: string; description: string; metric: string
+    format: 'individual' | 'team'; team_level: string
+    scope_wing: string; scope_platoon: string
+    starts_at: string; ends_at: string; bonus_points: string
+}
+
+function initialForm(myWing: string | null, isSuperadmin: boolean): Form {
+    const nextHour = Math.ceil(Date.now() / 3600_000) * 3600_000
+    return {
+        title: '', description: '', metric: 'distance_km', format: 'individual', team_level: 'section',
+        scope_wing: isSuperadmin ? ALL : (myWing ?? ''), scope_platoon: '',
+        starts_at: sgLocal(nextHour), ends_at: sgLocal(nextHour + 7 * 86400_000), bonus_points: '50',
+    }
+}
+
+export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSuperadmin }: {
+    open: boolean; onClose: () => void; onCreated: (c: Challenge) => void
+    myWing: string | null; isSuperadmin: boolean
+}) {
+    const [form, setForm] = useState<Form>(() => initialForm(myWing, isSuperadmin))
+    const [touched, setTouched] = useState<Record<string, boolean>>({})
+    const [wings, setWings] = useState<string[]>([])
+    const [saving, setSaving] = useState(false)
+
+    useEffect(() => {
+        if (!open) return
+        queueMicrotask(() => { setForm(initialForm(myWing, isSuperadmin)); setTouched({}) })
+        if (isSuperadmin) supabase.from('ocs_wings').select('name').order('name').then(({ data }) => setWings((data ?? []).map(w => w.name)))
+    }, [open, myWing, isSuperadmin])
+
+    const payload: ChallengeInput = {
+        title: form.title, description: form.description || null, metric: form.metric,
+        format: form.format, team_level: form.format === 'team' ? form.team_level : null,
+        scope_wing: form.scope_wing === ALL ? null : form.scope_wing || null,
+        scope_platoon: form.scope_platoon.trim() || null,
+        starts_at: toIso(form.starts_at), ends_at: toIso(form.ends_at),
+        bonus_points: form.bonus_points === '' ? NaN : Number(form.bonus_points),
+    }
+    const errors = validateChallenge(payload) // cheap — just recompute every render
+    // Show a field's error once it has been edited (or on submit).
+    const err = (k: string) => (touched[k] || touched.__all ? errors[k] : undefined)
+
+    const set = <K extends keyof Form>(k: K, v: Form[K]) => {
+        setForm(f => ({ ...f, [k]: v }))
+        setTouched(t => ({ ...t, [k]: true }))
+    }
+
+    async function submit() {
+        setTouched({ __all: true })
+        if (Object.keys(errors).length) return
+        setSaving(true)
+        const res = await authFetch('/api/challenges', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        })
+        const json = await res.json().catch(() => ({}))
+        setSaving(false)
+        if (!res.ok) { toast.error(json.error ?? 'Could not create challenge'); return }
+        toast.success('Challenge created — cadets have been notified')
+        onCreated(json)
+        onClose()
+    }
+
+    const inputCls = 'h-10 w-full rounded-xl border border-border bg-background px-3 text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40'
+    const labelCls = 'text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block'
+    const errText = (k: string) => err(k) ? <p className="text-[11px] text-danger mt-1">{err(k)}</p> : null
+    const bonus = Number(form.bonus_points) || 0
+    const groups = [...new Set(METRIC_KEYS.map(k => CHALLENGE_METRICS[k].group))]
+
+    return (
+        <Dialog open={open} onOpenChange={o => { if (!o) onClose() }}>
+            <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="text-[17px]">New challenge</DialogTitle>
+                    <p className="text-[13px] text-muted-foreground mt-0.5">Cadets in scope are enrolled automatically and scored from what they already log.</p>
+                </DialogHeader>
+
+                <div className="space-y-4 mt-2">
+                    <div>
+                        <label className={labelCls}>Title</label>
+                        <input className={cn(inputCls, err('title') && 'border-danger')} value={form.title} maxLength={LIMITS.titleMax}
+                            placeholder="e.g. Hawk Wing 50 km week" onChange={e => set('title', e.target.value)} />
+                        {errText('title')}
+                    </div>
+
+                    <div>
+                        <label className={labelCls}>Description <span className="normal-case font-normal">(optional)</span></label>
+                        <textarea className={cn(inputCls, 'h-20 py-2 resize-none', err('description') && 'border-danger')} value={form.description}
+                            maxLength={LIMITS.descriptionMax} placeholder="What's the goal? Any rules?" onChange={e => set('description', e.target.value)} />
+                        {errText('description')}
+                    </div>
+
+                    <div>
+                        <label className={labelCls}>Measure</label>
+                        <Select value={form.metric} onValueChange={v => set('metric', v)}>
+                            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {groups.map(g => (
+                                    <SelectGroup key={g}>
+                                        <SelectLabel>{g}</SelectLabel>
+                                        {METRIC_KEYS.filter(k => CHALLENGE_METRICS[k].group === g).map(k => (
+                                            <SelectItem key={k} value={k}>{CHALLENGE_METRICS[k].label}</SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <p className="text-[11px] text-muted-foreground mt-1">{CHALLENGE_METRICS[form.metric as keyof typeof CHALLENGE_METRICS]?.hint}</p>
+                        {errText('metric')}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label className={labelCls}>Who competes</label>
+                            <div className="flex bg-muted dark:bg-background rounded-xl p-0.5 gap-0.5">
+                                {(['individual', 'team'] as const).map(f => (
+                                    <button key={f} type="button" onClick={() => set('format', f)}
+                                        className={cn('flex-1 h-9 rounded-[10px] text-[13px] font-medium transition-all',
+                                            form.format === f ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                                        {f === 'individual' ? 'Individuals' : 'Teams'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        {form.format === 'team' && (
+                            <div>
+                                <label className={labelCls}>Teams are</label>
+                                <Select value={form.team_level} onValueChange={v => set('team_level', v)}>
+                                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="section">Sections</SelectItem>
+                                        <SelectItem value="platoon">Platoons</SelectItem>
+                                        <SelectItem value="wing">Wings</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {errText('team_level')}
+                            </div>
+                        )}
+                    </div>
+                    {form.format === 'team' && (
+                        <p className="text-[11px] text-muted-foreground -mt-2">Teams are ranked by their members&apos; average, so team size doesn&apos;t matter and everyone counts.</p>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label className={labelCls}>Wing</label>
+                            {isSuperadmin ? (
+                                <Select value={form.scope_wing} onValueChange={v => set('scope_wing', v)}>
+                                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ALL}>All wings</SelectItem>
+                                        {wings.map(w => <SelectItem key={w} value={w}>{w}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <div className={cn(inputCls, 'flex items-center bg-muted text-muted-foreground')}>{myWing ?? '—'} (your wing)</div>
+                            )}
+                        </div>
+                        <div>
+                            <label className={labelCls}>Platoon <span className="normal-case font-normal">(optional)</span></label>
+                            <input className={cn(inputCls, err('scope_platoon') && 'border-danger')} value={form.scope_platoon} maxLength={10}
+                                placeholder="All platoons" onChange={e => set('scope_platoon', e.target.value)} />
+                            {errText('scope_platoon')}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label className={labelCls}>Starts</label>
+                            <DateTimePicker value={form.starts_at} onChange={v => set('starts_at', v)} error={!!err('starts_at')} minuteStep={15} />
+                            {errText('starts_at')}
+                        </div>
+                        <div>
+                            <label className={labelCls}>Ends</label>
+                            <DateTimePicker value={form.ends_at} onChange={v => set('ends_at', v)} error={!!err('ends_at')} minuteStep={15} />
+                            {errText('ends_at')}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className={labelCls}>Bonus points for the winner</label>
+                        <input type="number" inputMode="numeric" min={LIMITS.bonusMin} max={LIMITS.bonusMax} step={10}
+                            className={cn(inputCls, err('bonus_points') && 'border-danger')} value={form.bonus_points}
+                            onChange={e => set('bonus_points', e.target.value)} />
+                        {errText('bonus_points')}
+                        {!err('bonus_points') && bonus > 0 && (
+                            <p className="text-[11px] text-muted-foreground mt-1">
+                                Added to the wing leaderboard: 1st {Math.round(bonus * AWARD_SHARES[0])} · 2nd {Math.round(bonus * AWARD_SHARES[1])} · 3rd {Math.round(bonus * AWARD_SHARES[2])} pts
+                                {form.format === 'team' && ' (each contributing member)'}
+                            </p>
+                        )}
+                    </div>
+                </div>
+
+                <DialogFooter className="mt-4">
+                    <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+                    <Button onClick={submit} disabled={saving}>{saving ? 'Creating…' : 'Create challenge'}</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}

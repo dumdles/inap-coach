@@ -35,6 +35,7 @@ app/
     auth/                 # Supabase auth + Polar OAuth callbacks
     admin/                # Superadmin-only: analytics (Command console data), staff list, role changes
     cadet/                # Cadet profile
+    challenges/           # Challenges: list/create, detail + live standings, cancel
     chat/                 # AI coach chat: streaming route, sessions, suggestion chips
     cron/                 # Scheduled jobs (Vercel Cron) — macro alerts, weekly recap, leaderboard
     food-items/           # CRUD for food items (custom and cookhouse)
@@ -52,6 +53,7 @@ app/
     theme-context.tsx     # Dark/light mode
   dashboard/
     admin/                # Superadmin Command console — tabs: Overview, Wings, Watchlist, Staff
+    challenges/           # Challenges list, create dialog, detail standings
     coach/                # AI coach chat (useChat streaming UI + suggestion chips)
     friends/              # Friend management
     insights/             # AI insights page
@@ -151,13 +153,18 @@ docs/
 - Daily AI limit: each cadet gets `AI_DAILY_MESSAGE_LIMIT` coach messages per Singapore day. `app/api/_lib/ai-usage.ts` atomically consumes quota via the `increment_ai_usage` Postgres function (table `ai_usage`); `/api/chat` returns 429 `rate_limited` when exhausted. The UI reads `/api/chat/usage` to show remaining messages and disables the input at zero.
 - `scripts/create-test-user.mjs` creates/resets a seeded test cadet (`coach-e2e-test@fitrep.local`) for local E2E testing.
 
+### Challenges (`app/dashboard/challenges/`)
+- Time-boxed competitions created by verified instructors (own wing, optional platoon) or superadmins (any wing / all wings). Migration: `docs/challenges_migration.sql`.
+- Cadets in scope are **auto-enrolled**; scores are computed live from existing logs — no submissions. Metrics (training, nutrition, consistency), formats (individual, or section/platoon/wing teams ranked by members' *average*), validation and payouts all live in `lib/challenges.ts` (pure, unit-testable). Server glue (participants, log fetching, finalize) in `app/api/_lib/challenges.ts`.
+- When a challenge ends it is finalized exactly once (lazily on view/list, and by `/api/cron/challenges`): places 1–3 earn 100/60/30% of its bonus into `challenge_awards`, which the leaderboard and wing standings add to scores (see `SCORING_SYSTEM.md`). Participants are notified on create and finish.
+
 ### Wing / leaderboard (`app/dashboard/wing/`)
 - Cadets compete in wings. Points from IPPT scores, workout logs, nutrition adherence.
 - Scoring logic in `lib/scoring.ts` and `SCORING_SYSTEM.md`.
 
 ### Cron jobs (`app/api/cron/`)
 - All secured with `CRON_SECRET` header check.
-- Jobs: macro-alerts, meal-reminders, ippt-reminders, nutrition-tips, leaderboard-movement, weekly-recap.
+- Jobs: macro-alerts, meal-reminders, ippt-reminders, nutrition-tips, leaderboard-movement, weekly-recap, challenges (pays out ended challenges; also runs lazily when the Challenges page is opened).
 - Scheduled via `vercel.json` cron config.
 
 ## Environment variables
