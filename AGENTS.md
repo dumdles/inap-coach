@@ -33,7 +33,7 @@ app/
   api/                    # Route handlers (Next.js App Router)
     _lib/                 # ai.ts (AI SDK helpers), auth.ts (verifyAuth), coach-prompt/data/tools.ts (AI coach chat)
     auth/                 # Supabase auth + Polar OAuth callbacks
-    admin/                # Superadmin-only: app-wide overview, role changes
+    admin/                # Superadmin-only: analytics (Command console data), staff list, role changes
     cadet/                # Cadet profile
     chat/                 # AI coach chat: streaming route, sessions, suggestion chips
     cron/                 # Scheduled jobs (Vercel Cron) — macro alerts, weekly recap, leaderboard
@@ -51,7 +51,7 @@ app/
     auth-context.tsx      # useAuth() — current user session
     theme-context.tsx     # Dark/light mode
   dashboard/
-    admin/                # Superadmin console (overview, instructor verification, staff)
+    admin/                # Superadmin Command console — tabs: Overview, Wings, Watchlist, Staff
     coach/                # AI coach chat (useChat streaming UI + suggestion chips)
     friends/              # Friend management
     insights/             # AI insights page
@@ -100,6 +100,11 @@ docs/
 - A DB trigger blocks the browser client from changing `role`; only service-role API routes can. Signup always inserts `role: 'cadet'`.
 - Privileged API routes must call `requireRole(req, [...])` from `app/api/_lib/roles.ts` — never trust a `userId`/`requesterId` sent by the client.
 - Superadmin is granted only via SQL (bootstrap line at the bottom of the migration).
+
+### Command console (`app/dashboard/admin/`)
+- Superadmin-only, tabbed (`layout.tsx` holds the role gate, top tab bar and 7d/28d switch). One fetch of `/api/admin/analytics` is shared by all tabs via `components/admin/admin-data.tsx`.
+- All maths lives in `lib/admin-analytics.ts` (pure, no DB): KPIs with deltas vs the previous window, per-wing/daily aggregates, per-cadet watchlist flags (tune in `THRESHOLDS`) and the plain-English "What needs your attention" findings.
+- Charts in `components/admin/charts.tsx` use the fixed `--viz-*` tokens in `globals.css` (colour-blind-validated; not affected by goal-mode theming).
 
 ## Database patterns
 

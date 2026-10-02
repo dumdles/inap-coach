@@ -1,219 +1,120 @@
 'use client'
 
-// ── Admin console (superadmin only) ───────────────────────────────────────────
-// App-wide "god view" for the app owner / Comd OCS:
-//   • Totals across all wings (last 7 days)
-//   • Per-wing engagement table — click through to that wing's cadets is a
-//     follow-up; individual cadet pages already allow superadmins (/api/cadet)
-//   • Instructor verification queue (approve / reject → app/api/instructor-requests)
-//   • Staff list with revoke (→ app/api/admin/role)
-// Access is enforced server-side by requireRole(['superadmin']) on every API
-// this page calls; the client-side redirect is only for UX.
+// ── Admin → Overview ──────────────────────────────────────────────────────────
+// The commander's one-screen read of OCS, top to bottom:
+//   1. What needs attention — plain-English findings, each linking to where to act
+//   2. KPI tiles with deltas vs the previous period
+//   3. Logging trend + what is putting cadets at risk
+//   4. Wing-by-wing heatmap (click a wing to drill in)
+//   5. IPPT readiness and sleep distribution
+// All numbers come from lib/admin-analytics.ts via useAdminData().
 
-import React, { useCallback, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/app/context/auth-context'
-import { supabase } from '@/lib/supabase'
-import { isSuperadmin } from '@/lib/roles'
+import React from 'react'
+import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Button } from '@/components/ui/button'
+import { useAdminData } from '@/components/admin/admin-data'
+import {
+    Panel, StatTile, TrendChart, HeatmapTable, TierBars, BarList, Histogram, SeverityIcon, shortDate,
+} from '@/components/admin/charts'
+import { WING_COLUMNS, wingHref } from '@/components/admin/wing-columns'
 
-type Overview = {
-    windowDays: number
-    totals: {
-        cadets: number; instructors: number; superadmins: number
-        activeCadets: number; activePct: number; meals: number; workouts: number; pendingRequests: number
-    }
-    wings: {
-        wing: string; cadets: number; instructors: number; active: number
-        activePct: number; mealsPerCadetDay: number; workoutsPerCadet: number
-    }[]
-    staff: { id: string; full_name: string | null; rank: string | null; wing: string | null; role: string }[]
-}
+export default function AdminOverviewPage() {
+    const { data, loading, error, period } = useAdminData()
 
-type PendingRequest = {
-    id: string; rank: string; wing: string | null; appointment: string; created_at: string
-    user: { id: string; full_name: string | null; email: string | null } | null
-}
+    if (error) return <p className="text-sm text-danger">{error}</p>
+    if (!data || (loading && !data)) return <OverviewSkeleton />
 
-async function authHeaders() {
-    const { data: { session } } = await supabase.auth.getSession()
-    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` }
-}
+    const k = data.kpis
+    const periodLabel = `${period}d`
+    const trend = data.daily.map(d => ({ label: shortDate(d.date), value: d.activePct }))
 
-function StatCard({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
     return (
-        <div className="rounded-2xl bg-card border border-border p-5">
-            <div className="text-xs text-muted-foreground mb-2">{label}</div>
-            <div className="font-display font-extrabold text-3xl text-foreground">{value}</div>
-            {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
+        <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+            {/* 1 ── What needs attention */}
+            <Panel title="What needs your attention" subtitle="Computed from the last period's logs — click through to act" className="mb-6">
+                {data.findings.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nothing flagged this period.</p>
+                ) : (
+                    <ul className="grid gap-2 md:grid-cols-2">
+                        {data.findings.map(f => (
+                            <li key={f.title}>
+                                <Link href={f.href ?? '#'} className="flex items-start gap-3 rounded-xl border border-border p-3 hover:bg-muted transition-colors h-full">
+                                    <SeverityIcon severity={f.severity} />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-[13px] font-semibold text-foreground">{f.title}</div>
+                                        <div className="text-[12px] text-muted-foreground mt-0.5">{f.detail}</div>
+                                    </div>
+                                    <ChevronRight size={16} className="text-muted-foreground shrink-0 mt-1" aria-hidden />
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </Panel>
+
+            {/* 2 ── KPIs */}
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+                <StatTile label="Daily logging rate" value={k.dailyActivePct.value} prev={k.dailyActivePct.prev} unit="%" periodLabel={periodLabel}
+                    spark={data.daily.map(d => d.activePct)} />
+                <StatTile label="Calories on target" value={k.adherencePct.value} prev={k.adherencePct.prev} unit="%" periodLabel={periodLabel}
+                    hint="Logged days within ±10%" />
+                <StatTile label="Average sleep" value={k.avgSleepH.value} prev={k.avgSleepH.prev} unit="h" periodLabel={periodLabel}
+                    spark={data.daily.map(d => d.avgSleepH)} />
+                <StatTile label="Training per cadet" value={k.trainingMinWk.value} prev={k.trainingMinWk.prev} unit="min/wk" periodLabel={periodLabel}
+                    spark={data.daily.map(d => d.trainingMin)} />
+                <StatTile label="IPPT pass rate" value={k.ipptPassPct.value} prev={k.ipptPassPct.prev} unit="%" periodLabel={periodLabel}
+                    hint="Latest result per tested cadet" />
+                <StatTile label="Cadets at risk" value={k.atRisk.value} prev={k.atRisk.prev} upIsGood={false} periodLabel={periodLabel}
+                    hint={`of ${data.totals.cadets} · open watchlist`} href="/dashboard/admin/watchlist" />
+            </div>
+
+            {/* 3 ── Trend + risk drivers */}
+            <div className="grid gap-6 lg:grid-cols-3 mb-6">
+                <Panel title="Daily logging rate" subtitle="% of cadets who logged a meal, workout or sleep each day" className="lg:col-span-2">
+                    <TrendChart data={trend} valueLabel="Logging rate" unit="%" domain={[0, 100]} />
+                </Panel>
+                <Panel title="What's putting cadets at risk" subtitle="Cadets carrying each flag">
+                    <BarList items={data.riskDrivers.map(r => ({
+                        label: r.label, value: r.count, href: `/dashboard/admin/watchlist?flag=${r.key}`,
+                    }))} />
+                </Panel>
+            </div>
+
+            {/* 4 ── Wing heatmap */}
+            <Panel title="Wings at a glance" subtitle="Each metric shaded from weak to strong · click a wing to drill in" className="mb-6">
+                {data.wings.length === 0 ? <p className="text-sm text-muted-foreground">No cadets yet.</p> : (
+                    <HeatmapTable rows={data.wings} columns={WING_COLUMNS} rowKey={w => w.wing} rowHref={w => wingHref(w.wing)}
+                        rowLabel={w => <>{w.wing} <span className="text-muted-foreground font-normal">· {w.cadets}</span></>} />
+                )}
+            </Panel>
+
+            {/* 5 ── IPPT + sleep */}
+            <div className="grid gap-6 lg:grid-cols-2">
+                <Panel title="IPPT readiness by wing"
+                    subtitle={`${data.ipptUpcoming.within14} cadets test within 14 days, ${data.ipptUpcoming.within30} within 30 · ${data.ipptUpcoming.notReady30} not ready`}>
+                    <TierBars rows={data.wings.map(w => ({ label: w.wing, tiers: w.tiers, href: wingHref(w.wing) }))} />
+                </Panel>
+                <Panel title="Sleep distribution" subtitle="Cadets by average nightly sleep (3+ nights logged)">
+                    <Histogram emphasisLabel="Under 6h" data={data.sleepBuckets.map(b => ({ label: b.label, count: b.count, emphasis: b.below6 }))} />
+                </Panel>
+            </div>
         </div>
     )
 }
 
-export default function AdminPage() {
-    const { user } = useAuth()
-    const router = useRouter()
-    const [allowed, setAllowed] = useState(false)
-    const [overview, setOverview] = useState<Overview | null>(null)
-    const [pending, setPending] = useState<PendingRequest[]>([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState('')
-    const [working, setWorking] = useState<string | null>(null) // id of row being acted on
-
-    // Gate on role from the DB; non-superadmins bounce back to the dashboard.
-    useEffect(() => {
-        if (!user) return
-        supabase.from('users').select('role').eq('id', user.id).single().then(({ data }) => {
-            if (!isSuperadmin(data?.role)) router.replace('/dashboard')
-            else setAllowed(true)
-        })
-    }, [user, router])
-
-    const load = useCallback(async () => {
-        const headers = await authHeaders()
-        const [o, p] = await Promise.all([
-            fetch('/api/admin/overview', { headers }),
-            fetch('/api/instructor-requests?scope=pending', { headers }),
-        ])
-        if (!o.ok || !p.ok) { setError('Could not load admin data'); setLoading(false); return }
-        setOverview(await o.json())
-        setPending(await p.json())
-        setError('')
-        setLoading(false)
-    }, [])
-
-    useEffect(() => { if (allowed) queueMicrotask(() => { void load() }) }, [allowed, load])
-
-    const review = async (requestId: string, decision: 'approve' | 'reject') => {
-        setWorking(requestId)
-        const res = await fetch('/api/instructor-requests', {
-            method: 'PATCH', headers: await authHeaders(), body: JSON.stringify({ requestId, decision }),
-        })
-        setWorking(null)
-        if (!res.ok) { setError((await res.json()).error ?? 'Failed'); return }
-        await load()
-    }
-
-    const revoke = async (userId: string) => {
-        setWorking(userId)
-        const res = await fetch('/api/admin/role', {
-            method: 'PATCH', headers: await authHeaders(), body: JSON.stringify({ userId, role: 'cadet' }),
-        })
-        setWorking(null)
-        if (!res.ok) { setError((await res.json()).error ?? 'Failed'); return }
-        await load()
-    }
-
-    if (!allowed) return null
-
+function OverviewSkeleton() {
     return (
-        <div className="px-4 md:px-8 py-8 md:py-10 max-w-5xl mx-auto">
-            <div className="mb-8">
-                <h1 className="font-display font-extrabold text-[32px] tracking-tight text-foreground leading-none mb-1">Admin</h1>
-                <p className="text-sm text-muted-foreground">All wings · last {overview?.windowDays ?? 7} days</p>
+        <div className="space-y-6">
+            <Skeleton className="h-36 rounded-2xl" />
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}
             </div>
-
-            {error && <p className="text-sm text-danger mb-4">{error}</p>}
-
-            {/* ── Totals ─────────────────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {loading || !overview ? (
-                    Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)
-                ) : (
-                    <>
-                        <StatCard label="Cadets" value={overview.totals.cadets} sub={`${overview.totals.instructors} instructors`} />
-                        <StatCard label="Active cadets" value={`${overview.totals.activePct}%`} sub={`${overview.totals.activeCadets} logged anything`} />
-                        <StatCard label="Meals logged" value={overview.totals.meals.toLocaleString()} />
-                        <StatCard label="Workouts logged" value={overview.totals.workouts.toLocaleString()} />
-                    </>
-                )}
+            <div className="grid gap-6 lg:grid-cols-3">
+                <Skeleton className="h-72 rounded-2xl lg:col-span-2" />
+                <Skeleton className="h-72 rounded-2xl" />
             </div>
-
-            {/* ── Verification queue ────────────────────────────────────────── */}
-            <section className="rounded-2xl bg-card border border-border p-5 mb-8">
-                <h2 className="text-[13px] font-semibold text-foreground mb-3">
-                    Instructor requests{pending.length > 0 && <span className="text-muted-foreground"> · {pending.length}</span>}
-                </h2>
-                {loading ? (
-                    <Skeleton className="h-12 w-full" />
-                ) : pending.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No pending requests.</p>
-                ) : (
-                    <ul className="divide-y divide-border">
-                        {pending.map(r => (
-                            <li key={r.id} className="py-3 flex flex-col sm:flex-row sm:items-center gap-3">
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium text-foreground truncate">
-                                        {r.rank} {r.user?.full_name ?? 'Unknown'} <span className="text-muted-foreground font-normal">· {r.wing ?? 'No wing'}</span>
-                                    </div>
-                                    <div className="text-xs text-muted-foreground truncate">{r.appointment} · {r.user?.email}</div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button size="sm" variant="outline" disabled={working === r.id} onClick={() => review(r.id, 'reject')}>Reject</Button>
-                                    <Button size="sm" disabled={working === r.id} onClick={() => review(r.id, 'approve')}>Approve</Button>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </section>
-
-            {/* ── Per-wing table ────────────────────────────────────────────── */}
-            <section className="rounded-2xl bg-card border border-border p-5 mb-8">
-                <h2 className="text-[13px] font-semibold text-foreground mb-3">Wings</h2>
-                {loading || !overview ? (
-                    <Skeleton className="h-32 w-full" />
-                ) : (
-                    <div className="overflow-x-auto -mx-5 px-5">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="text-left text-xs text-muted-foreground">
-                                    <th className="py-2 pr-4 font-medium">Wing</th>
-                                    <th className="py-2 pr-4 font-medium text-right">Cadets</th>
-                                    <th className="py-2 pr-4 font-medium text-right">Active</th>
-                                    <th className="py-2 pr-4 font-medium text-right">Meals / cadet / day</th>
-                                    <th className="py-2 pr-4 font-medium text-right">Workouts / cadet</th>
-                                    <th className="py-2 font-medium text-right">Instructors</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {overview.wings.map(w => (
-                                    <tr key={w.wing} className="text-foreground">
-                                        <td className="py-2.5 pr-4 font-medium">{w.wing}</td>
-                                        <td className="py-2.5 pr-4 text-right">{w.cadets}</td>
-                                        <td className="py-2.5 pr-4 text-right">{w.activePct}%</td>
-                                        <td className="py-2.5 pr-4 text-right">{w.mealsPerCadetDay}</td>
-                                        <td className="py-2.5 pr-4 text-right">{w.workoutsPerCadet}</td>
-                                        <td className="py-2.5 text-right">{w.instructors}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </section>
-
-            {/* ── Staff ─────────────────────────────────────────────────────── */}
-            <section className="rounded-2xl bg-card border border-border p-5">
-                <h2 className="text-[13px] font-semibold text-foreground mb-3">Staff</h2>
-                {loading || !overview ? (
-                    <Skeleton className="h-12 w-full" />
-                ) : (
-                    <ul className="divide-y divide-border">
-                        {overview.staff.map(s => (
-                            <li key={s.id} className="py-3 flex items-center gap-3">
-                                <div className="flex-1 min-w-0 text-sm text-foreground truncate">
-                                    {s.rank} {s.full_name} <span className="text-muted-foreground">· {s.wing ?? 'No wing'} · {s.role}</span>
-                                </div>
-                                {s.role === 'instructor' && (
-                                    <Button size="sm" variant="outline" disabled={working === s.id} onClick={() => revoke(s.id)}>Revoke</Button>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </section>
+            <Skeleton className="h-64 rounded-2xl" />
         </div>
     )
 }
