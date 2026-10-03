@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { clearDataCache } from '@/lib/data-cache'
 
 interface AuthContextType {
     user: User | null
@@ -56,6 +57,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
                 setSession(session)
                 return
             }
+            // Signed out (incl. in another tab) → forget every cached response.
+            if (event === 'SIGNED_OUT') void clearDataCache()
             setSession(session)
             setUser(session?.user ?? null)
         })
@@ -122,6 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             const { error } = await supabase.auth.signOut()
             if (error) throw error
 
+            void clearDataCache() // see lib/use-data.ts
             setUser(null)
             setSession(null)
         } catch (err) {
