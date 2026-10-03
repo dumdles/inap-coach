@@ -18,9 +18,8 @@ export function clearDataCache() {
  * or refreshData('meals:') after logging a meal.
  */
 export function refreshData(prefix: string) {
-    return mutate(
-        key => Array.isArray(key) && typeof key[2] === 'string' && key[2].startsWith(prefix),
-        undefined,
-        { revalidate: true },
-    )
+    // Pass ONLY the key filter: SWR then re-fetches and keeps showing the current
+    // data. Passing a data argument — even `undefined` — would overwrite the cache
+    // with it first, blanking every matching screen back to its skeleton.
+    return mutate(key => Array.isArray(key) && typeof key[2] === 'string' && key[2].startsWith(prefix))
 }

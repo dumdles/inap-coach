@@ -21,10 +21,13 @@ const MAX_REPS = 1000
 const DEFAULT_REPS: Record<string, number> = { pushups: 20, situps: 20, pullups: 10 }
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '')
 
-export function QuickLogReps({ exercises, todayReps, onLogged }: {
+export type RepEntry = { id: string; name: string; reps: number }
+
+export function QuickLogReps({ exercises, todayReps, onLogged, submit }: {
     exercises: { id: string; name: string }[]
     todayReps: number | null // reps already logged today (from the race data), for the "today" counter
-    onLogged: () => void
+    onLogged: (total: number) => void // called after a successful log, with the reps added
+    submit?: (rows: RepEntry[]) => Promise<boolean> // override saving (the demo keeps it local)
 }) {
     const { user } = useAuth()
     const [reps, setReps] = useState<Record<string, string>>(
@@ -48,20 +51,28 @@ export function QuickLogReps({ exercises, todayReps, onLogged }: {
     async function logSet() {
         if (!user || invalid || total <= 0) return
         setSaving(true)
-        const rows = exercises.filter(e => Number(reps[e.id] || 0) > 0)
-        const results = await Promise.all(rows.map(e => authFetch('/api/workout-logs', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.id, templateId: e.id, name: e.name, source: 'manual', sets: 1, reps: Number(reps[e.id]) }),
-        }).then(r => r.ok).catch(() => false)))
+        const rows: RepEntry[] = exercises.filter(e => Number(reps[e.id] || 0) > 0).map(e => ({ id: e.id, name: e.name, reps: Number(reps[e.id]) }))
+        const ok = submit ? await submit(rows) : await saveToApi(user.id, rows)
         setSaving(false)
-        if (results.some(ok => !ok)) { toast.error('Some sets could not be logged — try again'); return }
+        if (!ok) { toast.error('Some sets could not be logged — try again'); return }
         toast.success(`+${total} reps logged 💪`)
         setJustLogged(total)
-        // Refresh this challenge, the challenge list and anything showing workouts (lib/data-cache.ts).
-        onLogged()
-        void refreshData('/api/challenges')
-        void refreshData('/api/workout-logs')
-        void refreshData('workouts:')
+        // The parent bumps the score on screen straight away; when saved for
+        // real, also refresh the challenge list and anything showing workouts.
+        onLogged(total)
+        if (!submit) {
+            void refreshData('/api/challenges')
+            void refreshData('/api/workout-logs')
+            void refreshData('workouts:')
+        }
+    }
+
+    async function saveToApi(userId: string, rows: RepEntry[]) {
+        const results = await Promise.all(rows.map(e => authFetch('/api/workout-logs', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, templateId: e.id, name: e.name, source: 'manual', sets: 1, reps: e.reps }),
+        }).then(r => r.ok).catch(() => false)))
+        return results.every(Boolean)
     }
 
     return (

@@ -3,9 +3,13 @@ import type { Requester } from '@/app/api/_lib/roles'
 import { isSuperadmin } from '@/lib/roles'
 import { fetchPaged } from '@/app/api/_lib/paged'
 import {
-    METRIC_SOURCES, buildStandings, challengeStatus, computeAwards, cumulativeByDay, inScope, scoreParticipants, summariseResults, teamKey,
-    type Challenge, type ChallengeLogs, type Participant, type Standings,
+    METRIC_SOURCES, buildStandings, challengeStatus, computeAwards, inScope, scoreParticipants, summariseResults,
+    type Challenge, type ChallengeLogs, type ComputedChallenge, type Participant,
 } from '@/lib/challenges'
+
+// View helpers (myStanding, topRows, buildRace) are pure and live in lib/challenges.ts
+// so the client-side demo can reuse them; re-exported here for the API routes.
+export { buildRace, myStanding, topRows, type ComputedChallenge } from '@/lib/challenges'
 
 // Server-side glue for challenges: who's in a challenge, fetching the logs in
 // its window, and paying out bonus points exactly once when it ends.
@@ -66,11 +70,6 @@ async function loadLogs(c: Pick<Challenge, 'metric' | 'exercise_ids' | 'starts_a
             .gte('night_date', dayFrom).lte('night_date', dayTo).order('id').range(f, t)) : none(),
     ])
     return { workouts, meals, summaries, sleeps } as ChallengeLogs
-}
-
-export type ComputedChallenge = {
-    participants: Participant[]; scores: Map<string, number>; standings: Standings
-    logs: ChallengeLogs; scoredUntil: string // logs are kept so the detail route can build the race chart
 }
 
 /** Live standings, computed from logs. While upcoming, everyone is on 0. */
@@ -167,78 +166,4 @@ export async function challengeBonusSince(sinceIso: string): Promise<Map<string,
     if (error) { console.error('[challenges] bonus lookup failed', error.message); return out } // e.g. table not migrated yet
     for (const a of data ?? []) out.set(a.user_id, (out.get(a.user_id) ?? 0) + a.points)
     return out
-}
-
-// ── View helpers shared by the list and detail routes ────────────────────────
-
-export type MyStanding = { score: number; place: number; of: number; team?: { label: string; place: number; score: number; of: number } } | null
-
-/** Where the caller stands (null for staff, who don't compete). */
-export function myStanding(c: Challenge, computed: ComputedChallenge, me: string): MyStanding {
-    const myScore = computed.scores.get(me)
-    if (myScore == null) return null
-    const st = computed.standings
-    if (st.format === 'individual') {
-        const row = st.rows.find(r => r.id === me)!
-        return { score: myScore, place: row.place, of: st.rows.length }
-    }
-    const p = computed.participants.find(x => x.id === me)!
-    const key = teamKey(c.team_level!, p)?.key
-    const t = st.rows.find(r => r.key === key)
-    return { score: myScore, place: 0, of: 0, team: t ? { label: t.label, place: t.place, score: t.score, of: st.rows.length } : undefined }
-}
-
-/** Top-3 rows (label + score) for cards and the podium. */
-export function topRows(computed: ComputedChallenge, n = 3) {
-    const st = computed.standings
-    return st.format === 'individual'
-        ? st.rows.slice(0, n).map(r => ({ place: r.place, label: `${r.rank} ${r.name}`.trim(), score: r.score }))
-        : st.rows.slice(0, n).map(r => ({ place: r.place, label: r.label, score: r.score }))
-}
-
-export type SeriesLine = { key: string; label: string; place: number; mine: boolean; values: number[] }
-
-/**
- * Race-chart data: cumulative score per SGT day for the top 3 (cadets or teams)
- * plus the caller / the caller's team, and — for the caller — their own daily
- * gains next to the average participant's. Streak metrics skip the daily bars
- * (a streak isn't a sum of daily gains).
- */
-export function buildRace(c: Challenge, computed: ComputedChallenge, me: string) {
-    const { participants, logs, standings, scoredUntil } = computed
-    if (challengeStatus(c) === 'upcoming' || !participants.length) return null
-    const { days, scores } = cumulativeByDay(c.metric, c.starts_at, scoredUntil, participants, logs, { exerciseIds: c.exercise_ids })
-    if (!days.length) return null
-    const r1 = (n: number) => Math.round(n * 10) / 10
-
-    let lines: SeriesLine[]
-    if (standings.format === 'individual') {
-        const picks = standings.rows.filter(r => r.place <= 3 && r.score > 0).slice(0, 3)
-        const mine = standings.rows.find(r => r.id === me)
-        if (mine && !picks.includes(mine)) picks.push(mine)
-        lines = picks.map(r => ({
-            key: r.id, label: `${r.rank} ${r.name}`.trim(), place: r.place, mine: r.id === me,
-            values: scores.map(day => day.get(r.id) ?? 0),
-        }))
-    } else {
-        const picks = standings.rows.filter(t => t.place <= 3 && t.score > 0).slice(0, 3)
-        const mine = standings.rows.find(t => t.memberIds.includes(me))
-        if (mine && !picks.includes(mine)) picks.push(mine)
-        lines = picks.map(t => ({
-            key: t.key, label: t.label, place: t.place, mine: t.memberIds.includes(me),
-            values: scores.map(day => r1(t.memberIds.reduce((a, id) => a + (day.get(id) ?? 0), 0) / t.memberIds.length)),
-        }))
-    }
-
-    // My daily gains vs the average participant's (sum metrics only).
-    let daily: { mine: number[]; avg: number[] } | null = null
-    if (c.metric !== 'best_streak' && computed.scores.has(me)) {
-        const n = participants.length
-        const totals = scores.map(day => { let t = 0; for (const v of day.values()) t += v; return t })
-        daily = {
-            mine: scores.map((day, i) => r1((day.get(me) ?? 0) - (i ? scores[i - 1].get(me) ?? 0 : 0))),
-            avg: totals.map((t, i) => r1((t - (i ? totals[i - 1] : 0)) / n)),
-        }
-    }
-    return { days, lines, daily }
 }

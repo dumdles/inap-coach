@@ -10,7 +10,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { Plus, Timer, Users, Trophy, ChevronRight, Gift, Medal, Flame, CalendarClock } from 'lucide-react'
+import { Plus, Timer, Users, Trophy, ChevronRight, Gift, Medal, Flame, CalendarClock, FlaskConical } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { useApi } from '@/lib/use-data'
@@ -65,9 +65,13 @@ export default function ChallengesPage() {
                     <h1 className="font-display font-extrabold text-[32px] tracking-tight text-foreground leading-none mb-1">Challenges</h1>
                     <p className="text-sm text-muted-foreground">Time-boxed competitions scored from what you already log. Podium finishes earn leaderboard bonus points.</p>
                 </div>
-                {data?.canCreate && (
-                    <Button onClick={() => setCreating(true)} className="shrink-0"><Plus size={16} /> <span className="hidden sm:inline">New challenge</span></Button>
-                )}
+                <div className="flex gap-2 shrink-0">
+                    {/* Playable walkthrough with fake cadets (nothing saved) — app/dashboard/challenges/demo */}
+                    <Button asChild variant="outline"><Link href="/dashboard/challenges/demo"><FlaskConical size={16} /> <span className="hidden sm:inline">Try the demo</span></Link></Button>
+                    {data?.canCreate && (
+                        <Button onClick={() => setCreating(true)}><Plus size={16} /> <span className="hidden sm:inline">New challenge</span></Button>
+                    )}
+                </div>
             </div>
 
             {error && <p className="text-sm text-danger mb-4">{error}</p>}
@@ -97,6 +101,7 @@ export default function ChallengesPage() {
                             <p className="text-sm text-muted-foreground mt-1">
                                 {data.canCreate ? 'Create one to get your cadets competing — try an MTR reps challenge.' : 'Your instructors haven’t started one yet — check back soon.'}
                             </p>
+                            <Link href="/dashboard/challenges/demo" className="inline-block mt-3 text-[13px] font-medium text-primary hover:underline">See how a challenge works →</Link>
                         </div>
                     ) : (
                         <div className="space-y-8">

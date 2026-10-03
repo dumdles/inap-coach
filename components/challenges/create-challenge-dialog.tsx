@@ -43,7 +43,14 @@ type RepExercise = { id: string; name: string }
 const MTR_NAMES = ['pushups', 'situps', 'pullups']
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '')
 
-function initialForm(myWing: string | null, isSuperadmin: boolean): Form {
+function initialForm(myWing: string | null, isSuperadmin: boolean, editing?: Challenge | null): Form {
+    if (editing) return {
+        title: editing.title, description: editing.description ?? '', metric: editing.metric,
+        format: editing.format, team_level: editing.team_level ?? 'section',
+        scope_wing: editing.scope_wing ?? ALL, scope_platoon: editing.scope_platoon ?? '',
+        starts_at: sgLocal(Date.parse(editing.starts_at)), ends_at: sgLocal(Date.parse(editing.ends_at)),
+        bonus_points: String(editing.bonus_points), exercise_ids: editing.exercise_ids ?? [],
+    }
     const nextHour = Math.ceil(Date.now() / 3600_000) * 3600_000
     return {
         title: '', description: '', metric: 'distance_km', format: 'individual', team_level: 'section',
@@ -53,11 +60,20 @@ function initialForm(myWing: string | null, isSuperadmin: boolean): Form {
     }
 }
 
-export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSuperadmin }: {
+/**
+ * Create a challenge, or edit one when `editing` is passed. Once a challenge is
+ * live only its title, description, end time and bonus can change (the rest is
+ * shown but locked — see LIVE_EDITABLE in lib/challenges.ts).
+ */
+export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSuperadmin, editing }: {
     open: boolean; onClose: () => void; onCreated: (c: Challenge) => void
     myWing: string | null; isSuperadmin: boolean
+    editing?: Challenge | null
 }) {
-    const [form, setForm] = useState<Form>(() => initialForm(myWing, isSuperadmin))
+    const [form, setForm] = useState<Form>(() => initialForm(myWing, isSuperadmin, editing))
+    // Captured when the dialog opens (not during render) so "is it live?" stays pure.
+    const [openedAt, setOpenedAt] = useState(0)
+    const locked = !!editing && openedAt >= Date.parse(editing.starts_at)
     const [touched, setTouched] = useState<Record<string, boolean>>({})
     const [wings, setWings] = useState<string[]>([])
     const [saving, setSaving] = useState(false)
@@ -72,20 +88,21 @@ export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSupe
 
     useEffect(() => {
         if (!open) return
-        queueMicrotask(() => { setForm(initialForm(myWing, isSuperadmin)); setTouched({}) })
+        queueMicrotask(() => { setForm(initialForm(myWing, isSuperadmin, editing)); setTouched({}); setOpenedAt(Date.now()) })
         if (isSuperadmin) supabase.from('ocs_wings').select('name').order('name').then(({ data }) => setWings((data ?? []).map(w => w.name)))
-    }, [open, myWing, isSuperadmin])
+    }, [open, myWing, isSuperadmin, editing])
 
     const payload: ChallengeInput = {
         title: form.title, description: form.description || null, metric: form.metric,
         format: form.format, team_level: form.format === 'team' ? form.team_level : null,
         scope_wing: form.scope_wing === ALL ? null : form.scope_wing || null,
         scope_platoon: form.scope_platoon.trim() || null,
-        starts_at: toIso(form.starts_at), ends_at: toIso(form.ends_at),
+        // A live challenge keeps its exact original start (the picker drops seconds).
+        starts_at: locked ? editing!.starts_at : toIso(form.starts_at), ends_at: toIso(form.ends_at),
         bonus_points: form.bonus_points === '' ? NaN : Number(form.bonus_points),
         exercise_ids: form.metric === 'reps' ? form.exercise_ids : null,
     }
-    const errors = validateChallenge(payload) // cheap — just recompute every render
+    const errors = validateChallenge(payload, undefined, editing ?? undefined) // cheap — just recompute every render
     // Show a field's error once it has been edited (or on submit).
     const err = (k: string) => (touched[k] || touched.__all ? errors[k] : undefined)
 
@@ -98,13 +115,13 @@ export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSupe
         setTouched({ __all: true })
         if (Object.keys(errors).length) return
         setSaving(true)
-        const res = await authFetch('/api/challenges', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        const res = await authFetch(editing ? `/api/challenges/${editing.id}` : '/api/challenges', {
+            method: editing ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
         })
         const json = await res.json().catch(() => ({}))
         setSaving(false)
-        if (!res.ok) { toast.error(json.error ?? 'Could not create challenge'); return }
-        toast.success('Challenge created — cadets have been notified')
+        if (!res.ok) { toast.error(json.error ?? (editing ? 'Could not save changes' : 'Could not create challenge')); return }
+        toast.success(editing ? 'Challenge updated' : 'Challenge created — cadets have been notified')
         onCreated(json)
         onClose()
     }
@@ -119,8 +136,11 @@ export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSupe
         <Dialog open={open} onOpenChange={o => { if (!o) onClose() }}>
             <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle className="text-[17px]">New challenge</DialogTitle>
-                    <p className="text-[13px] text-muted-foreground mt-0.5">Cadets in scope are enrolled automatically and scored from what they already log.</p>
+                    <DialogTitle className="text-[17px]">{editing ? 'Edit challenge' : 'New challenge'}</DialogTitle>
+                    <p className="text-[13px] text-muted-foreground mt-0.5">
+                        {locked ? 'It’s live, so only the title, description, end time and bonus can change — the rest stays fair for everyone already competing.'
+                            : 'Cadets in scope are enrolled automatically and scored from what they already log.'}
+                    </p>
                 </DialogHeader>
 
                 <div className="space-y-4 mt-2">
@@ -138,6 +158,8 @@ export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSupe
                         {errText('description')}
                     </div>
 
+                    {/* Locked once live: what's measured, who competes, and who's in. */}
+                    <fieldset disabled={locked} className={cn('space-y-4 min-w-0', locked && 'opacity-60')}>
                     <div>
                         <label className={labelCls}>Measure</label>
                         <Select value={form.metric} onValueChange={v => {
@@ -247,10 +269,14 @@ export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSupe
                         </div>
                     </div>
 
+                    </fieldset>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label className={labelCls}>Starts</label>
-                            <DateTimePicker value={form.starts_at} onChange={v => set('starts_at', v)} error={!!err('starts_at')} minuteStep={15} />
+                            <fieldset disabled={locked} className={cn('min-w-0', locked && 'opacity-60')}>
+                                <DateTimePicker value={form.starts_at} onChange={v => set('starts_at', v)} error={!!err('starts_at')} minuteStep={15} />
+                            </fieldset>
                             {errText('starts_at')}
                         </div>
                         <div>
@@ -277,7 +303,7 @@ export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSupe
 
                 <DialogFooter className="mt-4">
                     <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-                    <Button onClick={submit} disabled={saving}>{saving ? 'Creating…' : 'Create challenge'}</Button>
+                    <Button onClick={submit} disabled={saving}>{saving ? (editing ? 'Saving…' : 'Creating…') : (editing ? 'Save changes' : 'Create challenge')}</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

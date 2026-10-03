@@ -65,8 +65,22 @@ export type ChallengeInput = {
     starts_at: string; ends_at: string; bonus_points: number
 }
 
-/** Field → message. Empty object means valid. Used client-side (inline) and server-side (400). */
-export function validateChallenge(c: Partial<ChallengeInput>, now = Date.now()): Record<string, string> {
+/**
+ * Editing a challenge after it's created (creator or superadmin, until it's paid out):
+ *  • upcoming — everything can change (nobody has scored yet)
+ *  • live     — only the wording, the end time and the bonus; changing what's
+ *               measured, who's in or the start would be unfair mid-race
+ *  • ended    — nothing (it's being / been finalized)
+ */
+export const LIVE_EDITABLE = ['title', 'description', 'ends_at', 'bonus_points'] as const
+export function lockedFieldsWhenLive(): (keyof ChallengeInput)[] {
+    return ['metric', 'exercise_ids', 'format', 'team_level', 'scope_wing', 'scope_platoon', 'starts_at']
+}
+
+/** Field → message. Empty object means valid. Used client-side (inline) and server-side (400).
+ *  When editing, pass the original challenge: an unchanged (past) start is then
+ *  allowed, and the end must still be in the future. */
+export function validateChallenge(c: Partial<ChallengeInput>, now = Date.now(), editing?: Pick<Challenge, 'starts_at'>): Record<string, string> {
     const e: Record<string, string> = {}
     const title = (c.title ?? '').trim()
     if (title.length < LIMITS.titleMin || title.length > LIMITS.titleMax) e.title = `Title must be ${LIMITS.titleMin}–${LIMITS.titleMax} characters`
@@ -87,12 +101,14 @@ export function validateChallenge(c: Partial<ChallengeInput>, now = Date.now()):
     if (c.scope_platoon && !c.scope_wing) e.scope_platoon = 'Pick a wing before limiting to a platoon'
 
     const start = Date.parse(c.starts_at ?? ''), end = Date.parse(c.ends_at ?? '')
+    const startUnchanged = !!editing && start === Date.parse(editing.starts_at)
     if (Number.isNaN(start)) e.starts_at = 'Pick a start time'
-    else if (start < now - 24 * 3600_000) e.starts_at = 'Start can be at most 1 day in the past'
+    else if (!startUnchanged && start < now - 24 * 3600_000) e.starts_at = 'Start can be at most 1 day in the past'
     if (Number.isNaN(end)) e.ends_at = 'Pick an end time'
     else if (!Number.isNaN(start)) {
         if (end - start < LIMITS.minHours * 3600_000) e.ends_at = `Must run at least ${LIMITS.minHours} hour`
         else if (end - start > LIMITS.maxDays * 86400_000) e.ends_at = `Can run at most ${LIMITS.maxDays} days`
+        else if (editing && end <= now) e.ends_at = 'End must be in the future'
     }
 
     const b = Number(c.bonus_points)
@@ -271,8 +287,8 @@ export type Standings =
     | { format: 'individual'; rows: IndividualRow[] }
     | { format: 'team'; rows: TeamRow[] }
 
-/** Competition ranking: ties share a place (1, 2, 2, 4). */
-function placed<T extends { score: number }>(rows: T[]): (T & { place: number })[] {
+/** Competition ranking: ties share a place (1, 2, 2, 4). Also used client-side to re-rank optimistically. */
+export function placed<T extends { score: number }>(rows: T[]): (T & { place: number })[] {
     const sorted = [...rows].sort((a, b) => b.score - a.score)
     let place = 0
     return sorted.map((r, i) => {
@@ -355,4 +371,85 @@ export function summariseResults(standings: Standings, participants: number, awa
         ? standings.rows.filter(r => r.place <= 3 && r.score > 0).map(r => ({ place: r.place, label: `${r.rank} ${r.name}`.trim(), score: r.score }))
         : standings.rows.filter(r => r.place <= 3 && r.score > 0).map(r => ({ place: r.place, label: r.label, score: r.score }))
     return { participants, podium, awarded: awards.length }
+}
+
+// ── View helpers (shared by the API routes and the client-side demo) ─────────
+
+/** Everything computed for one challenge: who's in, scores, standings, and the
+ *  logs used (kept so buildRace can draw the race chart). */
+export type ComputedChallenge = {
+    participants: Participant[]; scores: Map<string, number>; standings: Standings
+    logs: ChallengeLogs; scoredUntil: string
+}
+
+export type MyStanding = { score: number; place: number; of: number; team?: { label: string; place: number; score: number; of: number } } | null
+
+/** Where the caller stands (null for staff, who don't compete). */
+export function myStanding(c: Challenge, computed: ComputedChallenge, me: string): MyStanding {
+    const myScore = computed.scores.get(me)
+    if (myScore == null) return null
+    const st = computed.standings
+    if (st.format === 'individual') {
+        const row = st.rows.find(r => r.id === me)!
+        return { score: myScore, place: row.place, of: st.rows.length }
+    }
+    const p = computed.participants.find(x => x.id === me)!
+    const key = teamKey(c.team_level!, p)?.key
+    const t = st.rows.find(r => r.key === key)
+    return { score: myScore, place: 0, of: 0, team: t ? { label: t.label, place: t.place, score: t.score, of: st.rows.length } : undefined }
+}
+
+/** Top-3 rows (label + score) for cards and the podium. */
+export function topRows(computed: ComputedChallenge, n = 3) {
+    const st = computed.standings
+    return st.format === 'individual'
+        ? st.rows.slice(0, n).map(r => ({ place: r.place, label: `${r.rank} ${r.name}`.trim(), score: r.score }))
+        : st.rows.slice(0, n).map(r => ({ place: r.place, label: r.label, score: r.score }))
+}
+
+export type SeriesLine = { key: string; label: string; place: number; mine: boolean; values: number[] }
+
+/**
+ * Race-chart data: cumulative score per SGT day for the top 3 (cadets or teams)
+ * plus the caller / the caller's team, and — for the caller — their own daily
+ * gains next to the average participant's. Streak metrics skip the daily bars
+ * (a streak isn't a sum of daily gains).
+ */
+export function buildRace(c: Challenge, computed: ComputedChallenge, me: string) {
+    const { participants, logs, standings, scoredUntil } = computed
+    if (challengeStatus(c) === 'upcoming' || !participants.length) return null
+    const { days, scores } = cumulativeByDay(c.metric, c.starts_at, scoredUntil, participants, logs, { exerciseIds: c.exercise_ids })
+    if (!days.length) return null
+    const r1 = (n: number) => Math.round(n * 10) / 10
+
+    let lines: SeriesLine[]
+    if (standings.format === 'individual') {
+        const picks = standings.rows.filter(r => r.place <= 3 && r.score > 0).slice(0, 3)
+        const mine = standings.rows.find(r => r.id === me)
+        if (mine && !picks.includes(mine)) picks.push(mine)
+        lines = picks.map(r => ({
+            key: r.id, label: `${r.rank} ${r.name}`.trim(), place: r.place, mine: r.id === me,
+            values: scores.map(day => day.get(r.id) ?? 0),
+        }))
+    } else {
+        const picks = standings.rows.filter(t => t.place <= 3 && t.score > 0).slice(0, 3)
+        const mine = standings.rows.find(t => t.memberIds.includes(me))
+        if (mine && !picks.includes(mine)) picks.push(mine)
+        lines = picks.map(t => ({
+            key: t.key, label: t.label, place: t.place, mine: t.memberIds.includes(me),
+            values: scores.map(day => r1(t.memberIds.reduce((a, id) => a + (day.get(id) ?? 0), 0) / t.memberIds.length)),
+        }))
+    }
+
+    // My daily gains vs the average participant's (sum metrics only).
+    let daily: { mine: number[]; avg: number[] } | null = null
+    if (c.metric !== 'best_streak' && computed.scores.has(me)) {
+        const n = participants.length
+        const totals = scores.map(day => { let t = 0; for (const v of day.values()) t += v; return t })
+        daily = {
+            mine: scores.map((day, i) => r1((day.get(me) ?? 0) - (i ? scores[i - 1].get(me) ?? 0 : 0))),
+            avg: totals.map((t, i) => r1((t - (i ? totals[i - 1] : 0)) / n)),
+        }
+    }
+    return { days, lines, daily }
 }
