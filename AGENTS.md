@@ -93,7 +93,8 @@ docs/
 
 ## Authentication
 
-`useAuth()` from `app/context/auth-context.tsx` returns `{ user, loading }`. `user.id` is the Supabase UUID used as the FK across all tables. Server-side API routes use `supabaseAdmin` (service role key) from `app/api/cron/_lib.ts` or created inline — never the anon client.
+`useAuth()` from `app/context/auth-context.tsx` returns `{ user, loading }`.
+Password reset: `/auth/forgot-password` (sends the Supabase reset email) → `/auth/reset-password` (sets the new password; only works when opened from the email link). Needs Redirect URLs + custom SMTP configured in Supabase — see `docs/ROLES_AND_ENVIRONMENTS.md` → Password reset. `user.id` is the Supabase UUID used as the FK across all tables. Server-side API routes use `supabaseAdmin` (service role key) from `app/api/cron/_lib.ts` or created inline — never the anon client.
 
 ## Roles & access
 

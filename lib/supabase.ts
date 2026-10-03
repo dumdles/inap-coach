@@ -7,6 +7,12 @@ if (!supabaseUrl || !supabasePublishableKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
+// Snapshot of the URL hash at page load, taken BEFORE the client below reads
+// and clears it. Supabase's password-reset email link lands on
+// /auth/reset-password#access_token=…&type=recovery (or #error=… if the link
+// expired); the reset page uses this to know it was opened from that link.
+export const initialAuthHash = typeof window !== 'undefined' ? window.location.hash : ''
+
 export const supabase = createClient(supabaseUrl, supabasePublishableKey)
 
 // Get current session
