@@ -3,13 +3,14 @@ import { supabaseAdmin } from '@/app/api/cron/_lib'
 import { verifyAuth } from '@/app/api/_lib/auth'
 import type { Role } from '@/lib/roles'
 
-export type Requester = { id: string; role: Role; wing: string | null; rank: string | null; platoon: string | null }
+export type Requester = { id: string; role: Role; wing: string | null; rank: string | null; platoon: string | null; section: string | null }
 
 type Ok = { requester: Requester; error?: never }
 type Fail = { requester?: never; error: NextResponse }
 
 /**
- * Verifies the Bearer token and loads the caller's role + wing from `users`.
+ * Verifies the Bearer token and loads the caller's role + wing/platoon/section
+ * from `users` (one query — routes can reuse these instead of re-fetching).
  * Pass `allowed` to restrict the route to certain roles (403 otherwise).
  *
  * Always use this instead of trusting a userId/requesterId sent by the client —
@@ -24,7 +25,7 @@ export async function requireRole(req: NextRequest, allowed?: Role[]): Promise<O
 
     const { data } = await supabaseAdmin
         .from('users')
-        .select('id, role, wing, rank, platoon')
+        .select('id, role, wing, rank, platoon, section')
         .eq('id', auth.user.id)
         .single()
     if (!data) return { error: NextResponse.json({ error: 'profile not found' }, { status: 404 }) }

@@ -113,6 +113,10 @@ docs/
 
 - All inserts/queries on the server use `supabaseAdmin` (service role, bypasses RLS).
 - Client code uses `supabase` from `lib/supabase.ts` (anon key, respects RLS).
+- **Supabase returns at most 1000 rows per request and silently drops the rest.** Any query that could exceed that must page with `fetchPaged()` (`app/api/_lib/paged.ts`) — or, better, aggregate in Postgres.
+- **Latency:** Vercel functions run in `sin1` next to the Supabase project (Singapore); each sequential query is a round trip, so run independent queries with `Promise.all`. `verifyAuth` checks the JWT locally (`getClaims`) and `requireRole` returns the caller's wing/platoon/section — reuse them instead of re-querying `users`.
+- **Leaderboard / wing standings** get per-day activity and meal streaks pre-aggregated by the `leaderboard_inputs()` Postgres function (`docs/performance_migration.sql`, wrapped by `app/api/_lib/leaderboard-inputs.ts`). Scoring rules stay in `lib/scoring.ts`. Never download raw log rows for a whole wing.
+- Indexes live in the migration files in `docs/` — add one there when a new query filters a large table on a new column.
 - Tables of interest: `users`, `meal_logs`, `food_items`, `food_templates`, `workout_logs`, `exercise_templates`, `weight_logs`, `notifications`, `friendships`, `workout_tags`, `wing_standings`.
 
 ## Feature rundown
@@ -126,7 +130,7 @@ docs/
   - Quantity validated: 1–5000g. Custom macros: calories 0–900 kcal, protein/carbs/fat 0–100g per 100g.
 
 ### Workouts (`app/dashboard/workouts/`)
-- Two sources: **manual** (LogModal) and **Polar** (auto-sync once per day via `/api/polar/exercises`).
+- Two sources: **manual** (LogModal) and **Polar** (background auto-sync at most once per day via `/api/polar/exercises`, only for cadets who've connected Polar; the list stays visible while it syncs).
 - Manual logging: pick exercise template → fill duration, calories, distance, sets/reps/rounds.
   - Limits: duration 0–600 min, calories 0–5000, distance 0–200 km, sets 0–100, reps 0–1000, rounds 0–100.
 - Polar dedup: `polar_exercise_id` unique constraint; duplicate inserts silently ignored (23505).
@@ -138,8 +142,8 @@ docs/
 - Polar steps and calories burned auto-imported from Polar cron.
 
 ### Insights (`app/dashboard/insights/`)
-- Calls `/api/insights?userId=<uuid>` which generates schema-validated insights via `generateStructured()` (AI SDK, Gemini Flash → fallback model).
-- Results cached 24h in `user_insights` table per user.
+- Calls `/api/insights` (caller from the Bearer token) which generates schema-validated insights via `generateStructured()` (AI SDK, Gemini Flash → fallback model).
+- Results cached 24h in `user_insights` table per user. Stale-while-revalidate: an expired cache is returned immediately and regenerated in the background with Next's `after()`; only a cadet's first visit waits for the AI.
 - Pass `&refresh=1` to force regeneration.
 - Loading state shows animated spinner + friendly "Analysing your data…" message (not a silent skeleton).
 

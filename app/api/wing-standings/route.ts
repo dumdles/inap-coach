@@ -1,8 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { computeScore, computeStreak } from '@/lib/scoring'
+import { computeScore } from '@/lib/scoring'
 import { verifyAuth } from '@/app/api/_lib/auth'
 import { challengeBonusSince } from '@/app/api/_lib/challenges'
+import { loadUserActivity } from '@/app/api/_lib/leaderboard-inputs'
+import { fetchPaged } from '@/app/api/_lib/paged'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,52 +25,38 @@ export async function GET(req: NextRequest) {
         ? new Date(now.getFullYear(), now.getMonth(), 1)
         : new Date(now.getTime() - 6 * 86400_000)
 
-    const { data: users, error } = await supabaseAdmin
-        .from('users')
-        .select('id, wing')
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    if (!users?.length) return NextResponse.json([])
-
-    const userIds = users.map(u => u.id)
-
-    const [{ data: periodLogs }, { data: allLogs }] = await Promise.all([
-        supabaseAdmin
-            .from('meal_logs')
-            .select('user_id, logged_at')
-            .in('user_id', userIds)
-            .gte('logged_at', start.toISOString()),
-        supabaseAdmin
-            .from('meal_logs')
-            .select('user_id, logged_at')
-            .in('user_id', userIds)
-            .gte('logged_at', new Date(Date.now() - 365 * 86400_000).toISOString()),
-    ])
-
-    const mealsByUserDay: Record<string, Record<string, number>> = {}
-    const allDaysByUser: Record<string, Set<string>> = {}
-    for (const u of users) {
-        mealsByUserDay[u.id] = {}
-        allDaysByUser[u.id] = new Set()
+    // Every user with a wing. Paged: PostgREST caps a single response at 1000 rows.
+    let users: { id: string; wing: string }[]
+    try {
+        users = await fetchPaged<{ id: string; wing: string }>((from, to) => supabaseAdmin
+            .from('users').select('id, wing').not('wing', 'is', null).order('id').range(from, to))
+    } catch (e) {
+        return NextResponse.json({ error: e instanceof Error ? e.message : 'Could not load users' }, { status: 500 })
     }
-    for (const log of periodLogs ?? []) {
-        const day = log.logged_at.slice(0, 10)
-        mealsByUserDay[log.user_id][day] = (mealsByUserDay[log.user_id][day] ?? 0) + 1
-    }
-    for (const log of allLogs ?? []) {
-        allDaysByUser[log.user_id]?.add(log.logged_at.slice(0, 10))
-    }
+    if (!users.length) return NextResponse.json([])
 
-    // Challenge bonus points awarded this period count towards each cadet's score
-    const bonusByUser = await challengeBonusSince(start.toISOString())
+    // Meals + streaks only (wing standings don't score workouts/sleep), pre-aggregated
+    // in Postgres — see app/api/_lib/leaderboard-inputs.ts. Challenge bonus points
+    // awarded this period also count. Both fetched in parallel.
+    let activity: Awaited<ReturnType<typeof loadUserActivity>>
+    let bonusByUser: Map<string, number>
+    try {
+        [activity, bonusByUser] = await Promise.all([
+            loadUserActivity(users.map(u => u.id), start, false),
+            challengeBonusSince(start.toISOString()),
+        ])
+    } catch (e) {
+        console.error('[wing-standings]', e)
+        return NextResponse.json({ error: e instanceof Error ? e.message : 'Could not load standings' }, { status: 500 })
+    }
 
     // Aggregate by wing
     const wingMap: Record<string, { total: number; count: number }> = {}
     for (const u of users) {
         const wing = u.wing
         if (!wing) continue
-        const streak = computeStreak(allDaysByUser[u.id])
-        const score = computeScore(mealsByUserDay[u.id], streak) + (bonusByUser.get(u.id) ?? 0)
+        const a = activity.get(u.id)!
+        const score = computeScore(a.mealsByDay, a.streak) + (bonusByUser.get(u.id) ?? 0)
         wingMap[wing] = wingMap[wing] ?? { total: 0, count: 0 }
         wingMap[wing].total += score
         wingMap[wing].count += 1

@@ -830,10 +830,11 @@ export default function WorkoutsPage() {
         return () => { cancelled = true }
     }, [user?.id])
 
-    // Load all logs — filtering is done client-side so charts always have full data
-    const fetchLogs = React.useCallback(async () => {
+    // Load all logs — filtering is done client-side so charts always have full data.
+    // `silent` refreshes in place (no skeleton) — used after a background Polar sync.
+    const fetchLogs = React.useCallback(async (opts: { silent?: boolean } = {}) => {
         if (!user?.id) return
-        setLogsLoading(true)
+        if (!opts.silent) setLogsLoading(true)
         const data = await authFetch('/api/workout-logs').then(r => r.json())
         setLogs(Array.isArray(data) ? data : [])
         setLogsLoading(false)
@@ -863,12 +864,16 @@ export default function WorkoutsPage() {
         } catch {
             // Non-fatal — still refresh the list in case prior syncs added data
         } finally {
-            await fetchLogs()
+            // Logs are already on screen; swap in any newly imported ones without a skeleton.
+            await fetchLogs({ silent: true })
             setPolarLoading(false)
         }
     }, [user?.id, fetchLogs])
 
-    React.useEffect(() => { syncPolar() }, [syncPolar])
+    // Auto-sync (at most once a day, see above) only for cadets who have connected
+    // Polar — everyone else would just get an error back on every visit. It runs in
+    // the background: the "Syncing from Polar…" strip shows while the list stays visible.
+    React.useEffect(() => { if (isPolarConnected) syncPolar() }, [isPolarConnected, syncPolar])
 
     async function handleSave(data: {
         templateId: string; name: string; duration_min?: number; calories?: number

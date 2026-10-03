@@ -437,12 +437,13 @@ export default function DashboardPage() {
 
     // Fetch wing leaderboard once profile (with wing) is loaded
     useEffect(() => {
-        if (!user || !profile?.wing) { setLbLoading(false); return }
+        // Stay in the loading state until the profile arrives; only stop if it has no wing.
+        if (!user || !profile?.wing) { if (!profileLoading) setLbLoading(false); return }
         authFetch(`/api/leaderboard?scope=wing&wing=${encodeURIComponent(profile.wing)}&period=week`)
             .then(r => r.json())
             .then((data: LeaderboardEntry[]) => { setLeaderboard(Array.isArray(data) ? data : []) })
             .finally(() => setLbLoading(false))
-    }, [user, profile?.wing])
+    }, [user, profile?.wing, profileLoading])
 
     // Fetch last night's sleep
     useEffect(() => {

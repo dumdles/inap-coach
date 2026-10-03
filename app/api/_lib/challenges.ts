@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/app/api/cron/_lib'
 import type { Requester } from '@/app/api/_lib/roles'
 import { isSuperadmin } from '@/lib/roles'
+import { fetchPaged } from '@/app/api/_lib/paged'
 import {
     buildStandings, challengeStatus, computeAwards, inScope, scoreParticipants, summariseResults,
     type Challenge, type ChallengeLogs, type Participant, type Standings,
@@ -9,19 +10,6 @@ import {
 // Server-side glue for challenges: who's in a challenge, fetching the logs in
 // its window, and paying out bonus points exactly once when it ends.
 // All scoring rules live in lib/challenges.ts.
-
-const PAGE = 1000 // PostgREST returns at most 1000 rows per request
-
-async function fetchPaged<T>(build: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T[]> {
-    const rows: T[] = []
-    for (let from = 0; ; from += PAGE) {
-        const { data, error } = await build(from, from + PAGE - 1)
-        if (error) throw new Error(error.message)
-        const page = (data ?? []) as T[]
-        rows.push(...page)
-        if (page.length < PAGE) return rows
-    }
-}
 
 /** Can this user see the challenge? Superadmins: all. Others: if they're in its scope or created it. */
 export function canSeeChallenge(r: Requester, c: Challenge) {
@@ -74,11 +62,14 @@ export type ComputedChallenge = { participants: Participant[]; scores: Map<strin
 
 /** Live standings, computed from logs. While upcoming, everyone is on 0. */
 export async function computeChallenge(c: Challenge): Promise<ComputedChallenge> {
-    const participants = await loadParticipants(c)
     const empty: ChallengeLogs = { workouts: [], meals: [], summaries: [], sleeps: [] }
     // Only score up to "now" for a live challenge, so the window never includes the future.
     const endsAt = new Date(Math.min(Date.now(), Date.parse(c.ends_at))).toISOString()
-    const logs = challengeStatus(c) === 'upcoming' ? empty : await loadLogs({ starts_at: c.starts_at, ends_at: endsAt })
+    // Participants and logs don't depend on each other — fetch both at once.
+    const [participants, logs] = await Promise.all([
+        loadParticipants(c),
+        challengeStatus(c) === 'upcoming' ? empty : loadLogs({ starts_at: c.starts_at, ends_at: endsAt }),
+    ])
     const scores = scoreParticipants(c.metric, c.starts_at, endsAt, participants, logs)
     return { participants, scores, standings: buildStandings(c, participants, scores) }
 }

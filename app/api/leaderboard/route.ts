@@ -1,9 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { computeScore, computeStreak } from '@/lib/scoring'
+import { computeScore } from '@/lib/scoring'
 import { requireRole } from '@/app/api/_lib/roles'
 import { isSuperadmin } from '@/lib/roles'
 import { challengeBonusSince } from '@/app/api/_lib/challenges'
+import { loadUserActivity } from '@/app/api/_lib/leaderboard-inputs'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,8 +51,9 @@ export async function GET(req: NextRequest) {
     } else if (scope === 'section') {
         // Section numbers repeat in every platoon and wing ("Section 2" exists
         // everywhere), so a section is only unique within wing + platoon.
-        const { data: me } = await supabaseAdmin.from('users').select('wing, platoon, section').eq('id', userId).single()
-        if (me?.section && me.wing) {
+        // requireRole already loaded the caller's wing/platoon/section.
+        const me = auth.requester
+        if (me.section && me.wing) {
             let q = supabaseAdmin
                 .from('users')
                 .select(USER_FIELDS)
@@ -83,71 +85,29 @@ export async function GET(req: NextRequest) {
     const userIds = users.map(u => u.id)
     const start = windowStart(period)
 
-    const startDate = start.toISOString().slice(0, 10)
-    const [{ data: periodLogs }, { data: allLogs }, { data: workoutLogs }, { data: sleepLogs }] = await Promise.all([
-        supabaseAdmin
-            .from('meal_logs')
-            .select('user_id, logged_at')
-            .in('user_id', userIds)
-            .gte('logged_at', start.toISOString()),
-        supabaseAdmin
-            .from('meal_logs')
-            .select('user_id, logged_at')
-            .in('user_id', userIds)
-            .gte('logged_at', new Date(Date.now() - 365 * 86400_000).toISOString()),
-        supabaseAdmin
-            .from('workout_logs')
-            .select('user_id, calories, logged_at')
-            .in('user_id', userIds)
-            .gte('logged_at', start.toISOString()),
-        supabaseAdmin
-            .from('sleep_logs')
-            .select('user_id, night_date, duration_min, sleep_score, ans_charge_status')
-            .in('user_id', userIds)
-            .gte('night_date', startDate),
-    ])
-
-    // Aggregate meals, workout kcal, and sleep by user+day
-    const mealsByUserDay: Record<string, Record<string, number>> = {}
-    const allDaysByUser: Record<string, Set<string>> = {}
-    const workoutKcalByUserDay: Record<string, Record<string, number>> = {}
-    const sleepByUserDay: Record<string, Record<string, { durationMin: number; sleepScore: number | null; ansStatus: number | null }>> = {}
-    for (const u of users) {
-        mealsByUserDay[u.id] = {}
-        allDaysByUser[u.id] = new Set()
-        workoutKcalByUserDay[u.id] = {}
-        sleepByUserDay[u.id] = {}
-    }
-    for (const log of periodLogs ?? []) {
-        const day = log.logged_at.slice(0, 10)
-        mealsByUserDay[log.user_id][day] = (mealsByUserDay[log.user_id][day] ?? 0) + 1
-    }
-    for (const log of allLogs ?? []) {
-        allDaysByUser[log.user_id]?.add(log.logged_at.slice(0, 10))
-    }
-    for (const log of workoutLogs ?? []) {
-        if (!log.calories) continue
-        const day = log.logged_at.slice(0, 10)
-        workoutKcalByUserDay[log.user_id][day] = (workoutKcalByUserDay[log.user_id][day] ?? 0) + log.calories
-    }
-    for (const log of sleepLogs ?? []) {
-        if (!log.duration_min || !sleepByUserDay[log.user_id]) continue
-        sleepByUserDay[log.user_id][log.night_date] = {
-            durationMin: log.duration_min,
-            sleepScore: log.sleep_score ?? null,
-            ansStatus: log.ans_charge_status ?? null,
-        }
+    // Both are independent → fetch in parallel. Activity is pre-aggregated in
+    // Postgres (see app/api/_lib/leaderboard-inputs.ts); challenge bonus points
+    // are those won during this period (see lib/challenges.ts).
+    let activity: Awaited<ReturnType<typeof loadUserActivity>>
+    let bonusByUser: Map<string, number>
+    try {
+        [activity, bonusByUser] = await Promise.all([
+            loadUserActivity(userIds, start),
+            challengeBonusSince(start.toISOString()),
+        ])
+    } catch (e) {
+        console.error('[leaderboard]', e)
+        return NextResponse.json({ error: e instanceof Error ? e.message : 'Could not load leaderboard' }, { status: 500 })
     }
 
-    // Bonus points from challenges won during this period (see lib/challenges.ts)
-    const bonusByUser = await challengeBonusSince(start.toISOString())
-
+    const today = new Date().toISOString().slice(0, 10)
     const ranked = users
         .map(u => {
-            const streak = computeStreak(allDaysByUser[u.id])
+            const a = activity.get(u.id)!
+            const streak = a.streak
             const challengeBonus = bonusByUser.get(u.id) ?? 0
-            const score = computeScore(mealsByUserDay[u.id], streak, workoutKcalByUserDay[u.id], sleepByUserDay[u.id]) + challengeBonus
-            const mealsToday = mealsByUserDay[u.id][new Date().toISOString().slice(0, 10)] ?? 0
+            const score = computeScore(a.mealsByDay, streak, a.workoutKcalByDay, a.sleepByDay) + challengeBonus
+            const mealsToday = a.mealsByDay[today] ?? 0
             return { ...u, score, streak, mealsToday, challengeBonus }
         })
         .sort((a, b) => b.score - a.score)
