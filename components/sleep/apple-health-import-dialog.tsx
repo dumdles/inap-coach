@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/app/context/auth-context'
 import { cn } from '@/lib/utils'
 import { UploadIcon, FileTextIcon, CheckIcon } from 'lucide-react'
+import { authFetch } from '@/lib/auth-fetch'
 
 type Props = {
     open: boolean
@@ -37,11 +38,10 @@ export function AppleHealthImportDialog({ open, onOpenChange, onImported }: Prop
         setResult(null)
 
         const form = new FormData()
-        form.append('userId', user.id)
         form.append('file', file)
 
         try {
-            const res = await fetch('/api/sleep-logs/import-apple-health', { method: 'POST', body: form })
+            const res = await authFetch('/api/sleep-logs/import-apple-health', { method: 'POST', body: form })
             const data = await res.json()
             if (!res.ok) {
                 setResult({ ok: false, error: data.error ?? 'Import failed' })

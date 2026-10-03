@@ -25,7 +25,9 @@ export async function POST(req: NextRequest) {
 
     const { error: profileError } = await supabaseAdmin
         .from('users')
-        .insert([{ id: userId, email, ...userData }])
+        // role is forced to 'cadet' — instructor access is requested separately
+        // and approved by a superadmin (see app/api/instructor-requests).
+        .insert([{ id: userId, email, ...userData, role: 'cadet' }])
 
     if (profileError) {
         await supabaseAdmin.auth.admin.deleteUser(userId)

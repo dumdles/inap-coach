@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { canViewUser } from '@/app/api/_lib/access'
 import { verifyAuth } from '@/app/api/_lib/auth'
 
 const supabaseAdmin = createClient(
@@ -8,12 +9,16 @@ const supabaseAdmin = createClient(
     { auth: { autoRefreshToken: false, persistSession: false } },
 )
 
-// GET /api/weight-logs?userId=<uuid>&days=90
+// GET /api/weight-logs[?userId=<uuid>]&days=90
 export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl
-    const userId = searchParams.get('userId')
-    const days = parseInt(searchParams.get('days') ?? '90')
-    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
+    // Whose data: ?userId= (defaults to the caller). Viewing someone else needs
+    // permission — same-wing instructor, superadmin or accepted friend (see _lib/access).
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+    const userId = searchParams.get('userId') || auth.user.id
+    if (!(await canViewUser(auth.user.id, userId))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const days = Math.min(parseInt(searchParams.get('days') ?? '90', 10) || 90, 3650)
 
     const since = new Date()
     since.setDate(since.getDate() - days)

@@ -1,8 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/app/context/auth-context'
 import { cn } from '@/lib/utils'
+import { authFetch } from '@/lib/auth-fetch'
+import { useApi } from '@/lib/use-data'
+import { refreshData } from '@/lib/data-cache'
 
 type Notification = {
     id: string
@@ -20,6 +23,8 @@ const TYPE_ICON: Record<string, string> = {
     ippt_reminder:       '🏃',
     leaderboard_movement:'📈',
     nutrition_tip:       '💡',
+    instructor_request:  '🛡️',
+    challenge:           '🏁',
     info:                'ℹ️',
 }
 
@@ -113,31 +118,28 @@ function NotifRow({ notif, onRead }: { notif: Notification; onRead: (id: string)
 
 export default function NotificationsPage() {
     const { user } = useAuth()
-    const [items, setItems] = useState<Notification[]>([])
-    const [loading, setLoading] = useState(true)
     const [markingAll, setMarkingAll] = useState(false)
 
-    const load = useCallback(async () => {
-        if (!user) return
-        const res = await fetch(`/api/notifications?userId=${user.id}&limit=100`)
-        const data = await res.json()
-        setItems(data ?? [])
-        setLoading(false)
-    }, [user])
-
-    useEffect(() => { load() }, [load])
+    // Cached via the shared data cache (lib/use-data.ts): reopening this page
+    // shows the last list instantly and refreshes it in the background.
+    const { data, isLoading: loading, mutate } = useApi<Notification[]>('/api/notifications?limit=100')
+    const items = Array.isArray(data) ? data : []
 
     async function markAllRead() {
         if (!user) return
         setMarkingAll(true)
-        await fetch(`/api/notifications?userId=${user.id}`, { method: 'PATCH' })
-        setItems(prev => prev.map(n => ({ ...n, read: true })))
+        await authFetch('/api/notifications', { method: 'PATCH' })
+        await mutate(prev => prev?.map(n => ({ ...n, read: true })), { revalidate: false })
         setMarkingAll(false)
+        // Re-check every notification query, incl. the unread badge in the dashboard layout.
+        void refreshData('/api/notifications')
     }
 
     async function markOneRead(id: string) {
-        setItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-        await fetch(`/api/notifications/${id}`, { method: 'PATCH' })
+        // Optimistic: show it as read straight away, then tell the server.
+        void mutate(prev => prev?.map(n => n.id === id ? { ...n, read: true } : n), { revalidate: false })
+        await authFetch(`/api/notifications/${id}`, { method: 'PATCH' })
+        void refreshData('/api/notifications')
     }
 
     const unread = items.filter(n => !n.read).length

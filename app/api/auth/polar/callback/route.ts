@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { verifyPolarState } from "@/app/api/_lib/polar-state";
+import { syncPolarSleep } from "@/app/api/_lib/polar-sleep";
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -10,6 +12,14 @@ export async function GET(request: NextRequest) {
 
     if (!code) {
     return NextResponse.redirect(new URL("/error", request.url));
+    }
+
+    // Which FitRep user started this? Only trust a state we signed (see
+    // app/api/_lib/polar-state.ts) — checked before spending the code.
+    const userId = verifyPolarState(state);
+    if (!userId) {
+        console.error("Polar callback: invalid or expired state");
+        return NextResponse.redirect(new URL("/dashboard/workouts?polarError=invalid-state", request.url));
     }
 
   // Exchange the authorization code for an access token
@@ -32,31 +42,6 @@ export async function GET(request: NextRequest) {
 
     const tokens = await tokenRes.json();
 
-    // Extract user ID from state parameter, with cookie fallback for resiliency.
-    let userId = null;
-
-    if (state) {
-        try {
-            userId = Buffer.from(state, "base64url").toString("utf-8");
-        } catch (error) {
-            try {
-                userId = Buffer.from(state, "base64").toString("utf-8");
-            } catch (fallbackError) {
-                console.error("Error decoding state:", error, fallbackError);
-            }
-        }
-    }
-
-    if (!userId) {
-        userId = request.cookies.get("polar_oauth_user_id")?.value ?? null;
-    }
-
-    if (!userId) {
-        console.error("No user ID found in state parameter");
-        return NextResponse.redirect(new URL("/error", request.url));
-    }
-
-    console.log(`Received tokens for user ${userId}:`, tokens);
 
 
 
@@ -99,9 +84,10 @@ export async function GET(request: NextRequest) {
             }
         }).then(res => res.json());
 
-        console.log(`Fetched daily activity for user ${userId}:`, dailyActivityResponse);
+        console.log(`Fetched daily activity for user ${userId}:`, dailyActivityResponse?.length ?? 0, 'entries');
 
-        await fetch(new URL(`/api/polar/sleep?userId=${encodeURIComponent(userId)}`, request.url));
+        // First sleep sync — called directly; /api/polar/sleep needs the user's Bearer token.
+        await syncPolarSleep(userId);
 
         // const cardioLoadResponse = await fetch('https://www.polaraccesslink.com/v3/users/cardio-load', {
         //     method: "GET",
@@ -116,9 +102,8 @@ export async function GET(request: NextRequest) {
 
     }
 
-    console.log(`Successfully saved tokens for user ${userId}:`, tokens.access_token);
+    console.log(`Saved Polar tokens for user ${userId}`);
 
     const response = NextResponse.redirect(new URL("/dashboard/workouts", request.url));
-    response.cookies.delete("polar_oauth_user_id");
     return response;
 }

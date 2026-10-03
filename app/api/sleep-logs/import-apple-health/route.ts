@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth } from '@/app/api/_lib/auth'
 import { supabaseAdmin } from '@/app/api/cron/_lib'
 
 // Apple Health export.xml contains entries like:
@@ -161,17 +162,17 @@ function groupIntoNights(records: RawRecord[]): Night[] {
 
 // POST /api/sleep-logs/import-apple-health
 // Body: multipart/form-data with fields:
-//   userId — string
 //   file   — the export.xml from iOS Health app
+// Imports into the caller's account (Bearer token).
 export async function POST(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+    const userId = auth.user.id
+
     const form = await req.formData().catch(() => null)
     if (!form) return NextResponse.json({ error: 'Expected multipart/form-data' }, { status: 400 })
 
-    const userId = form.get('userId')
     const file = form.get('file')
-    if (typeof userId !== 'string' || !userId) {
-        return NextResponse.json({ error: 'userId required' }, { status: 400 })
-    }
     if (!(file instanceof File)) {
         return NextResponse.json({ error: 'file required' }, { status: 400 })
     }

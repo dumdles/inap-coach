@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { canViewUser } from '@/app/api/_lib/access'
 import { supabaseAdmin } from '@/app/api/cron/_lib'
 import { verifyAuth } from '@/app/api/_lib/auth'
 
-// GET /api/sleep-logs?userId=<uuid>&limit=<n>
+// GET /api/sleep-logs[?userId=<uuid>]&limit=<n>
 export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl
-    const userId = searchParams.get('userId')
-    const limit = parseInt(searchParams.get('limit') ?? '60', 10)
-    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
+    // Whose data: ?userId= (defaults to the caller). Viewing someone else needs
+    // permission — same-wing instructor, superadmin or accepted friend (see _lib/access).
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+    const userId = searchParams.get('userId') || auth.user.id
+    if (!(await canViewUser(auth.user.id, userId))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const limit = Math.min(parseInt(searchParams.get('limit') ?? '60', 10) || 60, 366)
 
     const { data, error } = await supabaseAdmin
         .from('sleep_logs')

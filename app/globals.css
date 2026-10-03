@@ -35,6 +35,11 @@
   --color-sleep-rem:   var(--sleep-rem);
   --color-sleep-light: var(--sleep-light);
   --color-sleep-awake: var(--sleep-awake);
+  --color-viz-accent: var(--viz-accent);
+  --color-medal-gold: var(--medal-gold);
+  --color-medal-silver: var(--medal-silver);
+  --color-medal-bronze: var(--medal-bronze);
+  --color-viz-muted:  var(--viz-muted);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
@@ -149,6 +154,34 @@
   --sleep-rem:   #7c3aed;   /* violet-600 — REM / dreaming    */
   --sleep-light: #93c5fd;   /* blue-300   — transitional      */
   --sleep-awake: #d97706;   /* amber-600  — wake periods      */
+
+  /* Admin data-viz palette — fixed so goal-mode theming never repaints charts.
+     Validated with the dataviz palette checker (CVD + contrast) on #FFFFFF.
+     accent = the series being looked at; muted = comparison / context.
+     tier-1..3 = ordered IPPT tiers (Gold → Pass), darkest = best.
+     heat-1..5 = sequential heatmap ramp (low → high); heat-ink-* = legible text on that cell. */
+  /* Podium medals (rank #1–3). Always shown with the place number, never as a
+     data-series colour. Pairs validated for colour-blind + normal-vision
+     separation (dataviz validate_palette); silver is grey on purpose. */
+  --medal-gold:   #B8860B;
+  --medal-silver: #6B778C;
+  --medal-bronze: #8B4A2B;
+  --viz-accent: #2a78d6;
+  --viz-muted:  #C1C7D0;
+  --viz-grid:   #EBECF0;
+  --viz-tier-1: #1c5cab;
+  --viz-tier-2: #3987e5;
+  --viz-tier-3: #86b6ef;
+  --viz-heat-1: #cde2fb;
+  --viz-heat-2: #9ec5f4;
+  --viz-heat-3: #5598e7;
+  --viz-heat-4: #256abf;
+  --viz-heat-5: #104281;
+  --viz-heat-ink-1: #091E42;
+  --viz-heat-ink-2: #091E42;
+  --viz-heat-ink-3: #FFFFFF;
+  --viz-heat-ink-4: #FFFFFF;
+  --viz-heat-ink-5: #FFFFFF;
 
   /* Typography */
   --font-display: 'Satoshi', sans-serif;
@@ -293,6 +326,28 @@
   --sleep-rem:   #a78bfa;   /* violet-400 */
   --sleep-light: #bfdbfe;   /* blue-200   */
   --sleep-awake: #fbbf24;   /* amber-400  */
+
+  /* Admin data-viz palette, stepped for the dark card surface (#172B4D).
+     In dark mode "more" reads as lighter, so the ramps run dark → light. */
+  --medal-gold:   #E0A526;
+  --medal-silver: #A5ADBA;
+  --medal-bronze: #B86A3A;
+  --viz-accent: #3987e5;
+  --viz-muted:  #505F79;
+  --viz-grid:   #253858;
+  --viz-tier-1: #b7d3f6;
+  --viz-tier-2: #5598e7;
+  --viz-tier-3: #256abf;
+  --viz-heat-1: #1c4278;
+  --viz-heat-2: #1c5cab;
+  --viz-heat-3: #3987e5;
+  --viz-heat-4: #86b6ef;
+  --viz-heat-5: #cde2fb;
+  --viz-heat-ink-1: #FFFFFF;
+  --viz-heat-ink-2: #FFFFFF;
+  --viz-heat-ink-3: #FFFFFF;
+  --viz-heat-ink-4: #091E42;
+  --viz-heat-ink-5: #091E42;
 }
 
 /* ── Goal-mode accent overrides ─────────────────────── */

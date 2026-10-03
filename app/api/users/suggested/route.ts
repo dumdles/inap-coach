@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth } from '@/app/api/_lib/auth'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,15 +8,17 @@ const supabaseAdmin = createClient(
     { auth: { autoRefreshToken: false, persistSession: false } },
 )
 
-// GET /api/users/suggested?userId=<uuid>
+// GET /api/users/suggested — for the caller
 // Returns users from same section (then wing) not yet connected
 export async function GET(req: NextRequest) {
-    const userId = req.nextUrl.searchParams.get('userId')
-    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
+    // Caller comes from the Bearer token — never from a userId the client sends
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+    const userId = auth.user.id
 
     const { data: me } = await supabaseAdmin
         .from('users')
-        .select('section, wing')
+        .select('section, platoon, wing')
         .eq('id', userId)
         .single()
 
@@ -33,15 +36,17 @@ export async function GET(req: NextRequest) {
         connectedIds.add(f.addressee_id)
     }
 
-    // Prefer same section first, then same wing
-    const { data: sameSection } = me.section
-        ? await supabaseAdmin
-            .from('users')
-            .select('id, full_name, rank, wing, section')
-            .eq('section', me.section)
-            .neq('id', userId)
-            .limit(10)
-        : { data: [] }
+    // Prefer same section first, then same wing. Section numbers repeat across
+    // platoons and wings, so "same section" means same wing + platoon + section.
+    let sectionQuery = supabaseAdmin
+        .from('users')
+        .select('id, full_name, rank, wing, section')
+        .eq('wing', me.wing)
+        .eq('section', me.section)
+        .neq('id', userId)
+        .limit(10)
+    if (me.platoon) sectionQuery = sectionQuery.eq('platoon', me.platoon)
+    const { data: sameSection } = me.section && me.wing ? await sectionQuery : { data: [] }
 
     const sectionIds = new Set((sameSection ?? []).map((u: { id: string }) => u.id))
 

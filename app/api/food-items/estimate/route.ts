@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth } from '@/app/api/_lib/auth'
 import { z } from 'zod'
 import { generateStructured } from '@/app/api/_lib/ai'
 
@@ -36,7 +37,11 @@ Rules:
 - If the food name is ambiguous, use the most common preparation and serving (e.g. "chicken" = grilled skinless breast, 150g serving).
 - Do not add any text, explanation, or markdown outside the JSON object.`
 
+// Signed-in users only — each call spends AI credits.
 export async function POST(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+
     const body = await req.json().catch(() => ({}))
     const name = (body.name ?? '').toString().trim()
     if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 })

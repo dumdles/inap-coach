@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { calculateTDEE } from '@/lib/tdee'
@@ -15,6 +15,8 @@ import {
 import router from 'next/router'
 import { Button } from '@/components/ui/button'
 import { NumberPopIn } from '@/components/ui/transitions'
+import { authFetch } from '@/lib/auth-fetch'
+import { useApi, useData } from '@/lib/use-data'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -95,6 +97,13 @@ function fmtTime(iso: string): string {
 
 function todayStr(): string {
     return new Date().toLocaleDateString('en-CA') // YYYY-MM-DD in local time
+}
+
+/** [start, end] ISO timestamps of a local YYYY-MM-DD day, for logged_at range filters. */
+function dayBounds(day: string): [string, string] {
+    const start = new Date(day); start.setHours(0, 0, 0, 0)
+    const end   = new Date(day); end.setHours(23, 59, 59, 999)
+    return [start.toISOString(), end.toISOString()]
 }
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -368,45 +377,81 @@ export default function DashboardPage() {
     // Mobile FAB on the dashboard logs a meal.
     useFab({ label: 'Log a meal', icon: <UtensilsIcon size={22} />, onClick: () => setLogMealOpen(true) })
 
-    const [profile, setProfile]               = useState<UserProfile | null>(null)
-    const [meals, setMeals]                   = useState<MealLog[]>([])
-    const [leaderboard, setLeaderboard]       = useState<LeaderboardEntry[]>([])
-    const [sleep, setSleep]                   = useState<SleepSummary | null>(null)
-    const [workouts, setWorkouts]             = useState<WorkoutEntry[]>([])
+    // ── Data ──────────────────────────────────────────────────────────────────
+    // Each card loads independently through the shared cache (lib/use-data.ts):
+    // the first visit shows skeletons; returning to Home shows the last data
+    // instantly and refreshes it in the background.
+    const day = todayStr()
+    const { data: profile, isLoading: profileLoading } = useData<UserProfile | null>('profile:home', async uid => {
+        const { data, error } = await supabase
+            .from('users')
+            .select('full_name, rank, wing, gender, weight_kg, height_cm, date_of_birth, activity_level, goal_mode, ippt_date')
+            .eq('id', uid)
+            .single()
+        if (error) throw error
+        return data as UserProfile
+    })
 
-    const [profileLoading, setProfileLoading] = useState(true)
-    const [mealsLoading, setMealsLoading]     = useState(true)
-    const [lbLoading, setLbLoading]           = useState(true)
-    const [sleepLoading, setSleepLoading]     = useState(true)
-    const [workoutsLoading, setWorkoutsLoading] = useState(true)
+    // Today's meals and workouts — keyed by date so a new day never shows yesterday's.
+    const { data: meals = [], isLoading: mealsLoading, mutate: refreshMeals } = useData<MealLog[]>(`meals:home:${day}`, async uid => {
+        const [start, end] = dayBounds(day)
+        const { data, error } = await supabase
+            .from('meal_logs')
+            .select('id, meal_type, quantity_g, logged_at, food_items(name, calories_per_100g, protein_g, carbs_g, fat_g)')
+            .eq('user_id', uid)
+            .gte('logged_at', start)
+            .lte('logged_at', end)
+            .order('logged_at', { ascending: true })
+        if (error) throw error
+        return (data as unknown as MealLog[]) ?? []
+    })
 
-    const [aiSummary, setAiSummary]           = useState<string | null>(null)
-    const [aiLoading, setAiLoading]           = useState(true)
+    const { data: workouts = [], isLoading: workoutsLoading } = useData<WorkoutEntry[]>(`workouts:home:${day}`, async uid => {
+        const [start, end] = dayBounds(day)
+        const { data, error } = await supabase
+            .from('workout_logs')
+            .select('id, name, duration_min, calories')
+            .eq('user_id', uid)
+            .gte('logged_at', start)
+            .lte('logged_at', end)
+        if (error) throw error
+        return (data as WorkoutEntry[]) ?? []
+    })
+
+    // Last night's sleep
+    const { data: sleep = null, isLoading: sleepLoading } = useData<SleepSummary | null>('sleep:home:latest', async uid => {
+        const { data, error } = await supabase
+            .from('sleep_logs')
+            .select('night_date, duration_min, sleep_score, ans_charge_status')
+            .eq('user_id', uid)
+            .order('night_date', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        if (error) throw error
+        return data as SleepSummary | null
+    })
+
+    // Wing leaderboard — waits for the profile (needs the wing)
+    const { data: lbData, isLoading: lbFetching } = useApi<LeaderboardEntry[]>(
+        profile?.wing ? `/api/leaderboard?scope=wing&wing=${encodeURIComponent(profile.wing)}&period=week` : null,
+    )
+    const leaderboard = Array.isArray(lbData) ? lbData : []
+    const lbLoading = profileLoading || lbFetching
+
+    // Cached AI coach summary — reuses the 24h insights cache, no extra AI cost
+    const { data: insights, isLoading: aiLoading } = useApi<{ summary?: string }>('/api/insights')
+    const aiSummary = insights?.summary ?? null
 
     // Track whether the user has already logged a result for their past IPPT date
     const [ipptResultLogged, setIpptResultLogged] = useState<boolean | null>(null)
     const [logIPPTOpen, setLogIPPTOpen]           = useState(false)
-
-    // Fetch user profile
-    useEffect(() => {
-        if (!user) return
-        supabase
-            .from('users')
-            .select('full_name, rank, wing, gender, weight_kg, height_cm, date_of_birth, activity_level, goal_mode, ippt_date')
-            .eq('id', user.id)
-            .single()
-            .then(({ data }) => {
-                setProfile(data as UserProfile)
-                setProfileLoading(false)
-            })
-    }, [user])
 
     // After profile loads, check if we should prompt for a post-IPPT result
     useEffect(() => {
         if (!user || !profile?.ippt_date) { setIpptResultLogged(null); return }
         const daysPast = Math.floor((Date.now() - new Date(profile.ippt_date).getTime()) / 86_400_000)
         if (daysPast < 0) { setIpptResultLogged(null); return }  // not yet passed
-        fetch(`/api/ippt-results?userId=${user.id}`)
+        authFetch('/api/ippt-results')
             .then(r => r.json())
             .then((results: { test_date: string }[]) => {
                 const hasResult = results.some(r => r.test_date === profile.ippt_date)
@@ -414,73 +459,6 @@ export default function DashboardPage() {
             })
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, profile?.ippt_date])
-
-    // Fetch today's meals
-    const fetchMeals = useCallback(async () => {
-        if (!user) return
-        const day = todayStr()
-        const start = new Date(day); start.setHours(0, 0, 0, 0)
-        const end   = new Date(day); end.setHours(23, 59, 59, 999)
-        const { data } = await supabase
-            .from('meal_logs')
-            .select('id, meal_type, quantity_g, logged_at, food_items(name, calories_per_100g, protein_g, carbs_g, fat_g)')
-            .eq('user_id', user.id)
-            .gte('logged_at', start.toISOString())
-            .lte('logged_at', end.toISOString())
-            .order('logged_at', { ascending: true })
-        setMeals((data as unknown as MealLog[]) ?? [])
-        setMealsLoading(false)
-    }, [user])
-
-    useEffect(() => { fetchMeals() }, [fetchMeals])
-
-    // Fetch wing leaderboard once profile (with wing) is loaded
-    useEffect(() => {
-        if (!user || !profile?.wing) { setLbLoading(false); return }
-        fetch(`/api/leaderboard?scope=wing&wing=${encodeURIComponent(profile.wing)}&userId=${user.id}&period=week`)
-            .then(r => r.json())
-            .then((data: LeaderboardEntry[]) => { setLeaderboard(Array.isArray(data) ? data : []) })
-            .finally(() => setLbLoading(false))
-    }, [user, profile?.wing])
-
-    // Fetch last night's sleep
-    useEffect(() => {
-        if (!user) return
-        supabase
-            .from('sleep_logs')
-            .select('night_date, duration_min, sleep_score, ans_charge_status')
-            .eq('user_id', user.id)
-            .order('night_date', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-            .then(({ data }) => { setSleep(data as SleepSummary | null) })
-            .then(() => setSleepLoading(false), () => setSleepLoading(false))
-    }, [user])
-
-    // Fetch cached AI coach summary — reuses the 24h insights cache, no extra AI cost
-    useEffect(() => {
-        if (!user) return
-        fetch(`/api/insights?userId=${user.id}`)
-            .then(r => r.ok ? r.json() : null)
-            .then(data => { if (data?.summary) setAiSummary(data.summary) })
-            .finally(() => setAiLoading(false))
-    }, [user])
-
-    // Fetch today's workouts
-    useEffect(() => {
-        if (!user) return
-        const day = todayStr()
-        const start = new Date(day); start.setHours(0, 0, 0, 0)
-        const end   = new Date(day); end.setHours(23, 59, 59, 999)
-        supabase
-            .from('workout_logs')
-            .select('id, name, duration_min, calories')
-            .eq('user_id', user.id)
-            .gte('logged_at', start.toISOString())
-            .lte('logged_at', end.toISOString())
-            .then(({ data }) => { setWorkouts((data as WorkoutEntry[]) ?? []) })
-            .then(() => setWorkoutsLoading(false), () => setWorkoutsLoading(false))
-    }, [user])
 
     // Compute targets + totals
     const targets = profile
@@ -836,7 +814,7 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            <LogMealDialog open={logMealOpen} onOpenChange={open => { setLogMealOpen(open); if (!open) fetchMeals() }} />
+            <LogMealDialog open={logMealOpen} onOpenChange={open => { setLogMealOpen(open); if (!open) void refreshMeals() }} />
             <LogIPPTDialog
                 open={logIPPTOpen}
                 onClose={() => setLogIPPTOpen(false)}

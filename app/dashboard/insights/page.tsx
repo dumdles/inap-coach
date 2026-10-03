@@ -1,12 +1,13 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useAuth } from '@/app/context/auth-context'
+import React, { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import gsap from 'gsap'
+import { authFetch } from '@/lib/auth-fetch'
+import { useApi } from '@/lib/use-data'
 
 const COOLDOWN_MS = 60 * 60 * 1000 // 1 hour between manual refreshes
 const COOLDOWN_KEY = 'insights_last_refresh'
@@ -259,13 +260,16 @@ function InsightsLoadingState({ containerCls }: { containerCls: string }) {
 }
 
 export default function InsightsPage() {
-    const { user } = useAuth()
-    const [data, setData] = useState<InsightsData | null>(null)
-    const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
-    const [error, setError] = useState(false)
+    const [refreshFailed, setRefreshFailed] = useState(false)
     const [cooldownRemaining, setCooldownRemaining] = useState(0)
     const [activeInsight, setActiveInsight] = useState<Insight | null>(null)
+
+    // Cached via the shared data cache (lib/use-data.ts). Home's AI summary uses
+    // the same '/api/insights' key, so both screens share one cached response.
+    const { data, error: loadError, mutate } = useApi<InsightsData>('/api/insights')
+    // Error page: a manual refresh failed, or the first load failed with nothing cached.
+    const error = refreshFailed || (!data && !!loadError)
 
     useEffect(() => {
         const stored = parseInt(localStorage.getItem(COOLDOWN_KEY) ?? '0')
@@ -280,40 +284,32 @@ export default function InsightsPage() {
         return () => clearInterval(interval)
     }, [])
 
-    const fetchInsights = useCallback(async (refresh = false) => {
-        if (!user) return
-
-        if (refresh) {
-            const stored = parseInt(localStorage.getItem(COOLDOWN_KEY) ?? '0')
-            const remaining = Math.max(0, stored + COOLDOWN_MS - Date.now())
-            if (remaining > 0) {
-                const mins = Math.ceil(remaining / 60_000)
-                toast.warning(`Refresh cooldown active — try again in ${mins} min${mins !== 1 ? 's' : ''}.`)
-                return
-            }
-            localStorage.setItem(COOLDOWN_KEY, Date.now().toString())
-            setCooldownRemaining(COOLDOWN_MS)
-            setRefreshing(true)
-        } else {
-            setLoading(true)
+    // Manual "Refresh" — forces the AI to regenerate (rate-limited by the cooldown).
+    // This is a one-off action, so it isn't cached itself; instead its result is
+    // written into the '/api/insights' cache entry so Home's summary matches.
+    async function refreshInsights() {
+        const stored = parseInt(localStorage.getItem(COOLDOWN_KEY) ?? '0')
+        const remaining = Math.max(0, stored + COOLDOWN_MS - Date.now())
+        if (remaining > 0) {
+            const mins = Math.ceil(remaining / 60_000)
+            toast.warning(`Refresh cooldown active — try again in ${mins} min${mins !== 1 ? 's' : ''}.`)
+            return
         }
-
-        setError(false)
+        localStorage.setItem(COOLDOWN_KEY, Date.now().toString())
+        setCooldownRemaining(COOLDOWN_MS)
+        setRefreshing(true)
+        setRefreshFailed(false)
         try {
-            const url = `/api/insights?userId=${user.id}${refresh ? '&refresh=1' : ''}`
-            const res = await fetch(url)
+            const res = await authFetch('/api/insights?refresh=1')
             if (!res.ok) throw new Error('ai_unavailable')
-            const json = await res.json()
-            setData(json)
+            const json: InsightsData = await res.json()
+            await mutate(json, { revalidate: false })
         } catch {
-            setError(true)
+            setRefreshFailed(true)
         } finally {
-            setLoading(false)
             setRefreshing(false)
         }
-    }, [user])
-
-    useEffect(() => { fetchInsights() }, [fetchInsights])
+    }
 
     const summaryRef = useRef<HTMLDivElement>(null)
     const cardsRef = useRef<HTMLDivElement>(null)
@@ -340,7 +336,8 @@ export default function InsightsPage() {
 
     const containerCls = 'px-4 sm:px-6 lg:px-10 pt-8 pb-24 max-w-5xl mx-auto'
 
-    if (loading) return <InsightsLoadingState containerCls={containerCls} />
+    // First visit (nothing cached yet): friendly "Analysing your data…" state.
+    if (!data && !error) return <InsightsLoadingState containerCls={containerCls} />
 
     if (error || !data) {
         return (
@@ -360,7 +357,7 @@ export default function InsightsPage() {
                         <p className="text-[13px] text-muted-foreground mt-1">This may be a temporary issue. Try again in a moment.</p>
                     </div>
                     <button
-                        onClick={() => fetchInsights(true)}
+                        onClick={() => void refreshInsights()}
                         disabled={refreshing || cooldownRemaining > 0}
                         className={cn(
                             'inline-flex items-center gap-2 rounded-full border px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40',
@@ -387,7 +384,7 @@ export default function InsightsPage() {
                     <p className="text-sm text-muted-foreground mt-1.5">AI-powered coaching based on your last 14 days</p>
                 </div>
                 <button
-                    onClick={() => fetchInsights(true)}
+                    onClick={() => void refreshInsights()}
                     disabled={refreshing || cooldownRemaining > 0}
                     className={cn(
                         'inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-40 flex-shrink-0 mt-1',

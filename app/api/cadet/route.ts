@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { computeScore, computeStreak, isInstructor } from '@/lib/scoring'
+import { computeScore, computeStreak } from '@/lib/scoring'
+import { hasInstructorAccess, isSuperadmin } from '@/lib/roles'
+import { requireRole } from '@/app/api/_lib/roles'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,21 +10,24 @@ const supabaseAdmin = createClient(
     { auth: { autoRefreshToken: false, persistSession: false } },
 )
 
-// GET /api/cadet?cadetId=<uuid>&requesterId=<uuid>
+// GET /api/cadet?cadetId=<uuid>   (Authorization: Bearer <token>)
+// The requester is taken from the verified session, never from the query.
 export async function GET(req: NextRequest) {
-    const { searchParams } = req.nextUrl
-    const cadetId = searchParams.get('cadetId')
-    const requesterId = searchParams.get('requesterId')
-    if (!cadetId || !requesterId) return NextResponse.json({ error: 'missing params' }, { status: 400 })
+    const auth = await requireRole(req)
+    if (auth.error) return auth.error
+    const requester = auth.requester
+    const requesterId = requester.id
 
-    // Verify requester is an instructor in the same wing
-    const [{ data: requester }, { data: cadet }] = await Promise.all([
-        supabaseAdmin.from('users').select('rank, wing').eq('id', requesterId).single(),
-        supabaseAdmin.from('users').select('*').eq('id', cadetId).single(),
-    ])
-    if (!requester || !cadet) return NextResponse.json({ error: 'not found' }, { status: 404 })
+    const cadetId = req.nextUrl.searchParams.get('cadetId')
+    if (!cadetId) return NextResponse.json({ error: 'missing params' }, { status: 400 })
 
-    const isInstructorInSameWing = isInstructor(requester.rank) && requester.wing === cadet.wing
+    const { data: cadet } = await supabaseAdmin.from('users').select('*').eq('id', cadetId).single()
+    if (!cadet) return NextResponse.json({ error: 'not found' }, { status: 404 })
+
+    // Full access: verified instructor in the same wing, or a superadmin (any wing).
+    const isInstructorInSameWing =
+        isSuperadmin(requester.role) ||
+        (hasInstructorAccess(requester.role) && requester.wing === cadet.wing)
     if (!isInstructorInSameWing) {
         const { data: friendship } = await supabaseAdmin
             .from('friendships')

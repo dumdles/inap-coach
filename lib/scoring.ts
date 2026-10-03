@@ -1,4 +1,6 @@
-// OCT and ME4T are cadets; everything else (officers, WOSpec, ME4A+) are instructors
+// OCT and ME4T are cadets; everything else (officers, WOSpec, ME4A+) is *eligible*
+// to request instructor access. Rank alone grants nothing — access comes from
+// users.role after a superadmin approves the request (see lib/roles.ts).
 export const INSTRUCTOR_RANKS = [
     // Officers
     '2LT', 'LTA', 'CPT', 'MAJ', 'LTC', 'SLTC', 'COL',
@@ -24,7 +26,7 @@ export const SLEEP_PTS_POOR       = 10   // anything else (still rewards logging
 export const SLEEP_BONUS_HIGH_SCORE = 10 // Polar sleep_score >= 80
 export const SLEEP_BONUS_GOOD_ANS   = 10 // Polar ans_charge_status >= 4 (above usual or better)
 
-export function isInstructor(rank: string): boolean {
+export function isInstructorRank(rank: string): boolean {
     return INSTRUCTOR_RANKS.includes(rank)
 }
 
