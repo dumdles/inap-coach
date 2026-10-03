@@ -5,7 +5,7 @@
 // once finished — the podium and any bonus points the caller earned.
 // Data: GET /api/challenges/[id] (scores computed live from logs).
 
-import React, { use, useCallback, useEffect, useState } from 'react'
+import React, { use, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Timer, Users, Trophy, CalendarDays } from 'lucide-react'
@@ -14,6 +14,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { authFetch } from '@/lib/auth-fetch'
+import { ApiError, useApi } from '@/lib/use-data'
+import { refreshData } from '@/lib/data-cache'
 import { useAuth } from '@/app/context/auth-context'
 import { cn } from '@/lib/utils'
 import { Panel, StatTile } from '@/components/admin/charts'
@@ -40,18 +42,16 @@ export default function ChallengeDetailPage({ params }: { params: Promise<{ id: 
     const { id } = use(params)
     const router = useRouter()
     const { user } = useAuth()
-    const [d, setD] = useState<Detail | null>(null)
-    const [error, setError] = useState('')
     const [showAll, setShowAll] = useState(false)
     const [confirmCancel, setConfirmCancel] = useState(false)
 
-    const load = useCallback(async () => {
-        const res = await authFetch(`/api/challenges/${id}`)
-        const json = await res.json().catch(() => ({}))
-        if (!res.ok) { setError(res.status === 404 ? 'Challenge not found' : json.error ?? 'Could not load challenge'); return }
-        setD(json)
-    }, [id])
-    useEffect(() => { queueMicrotask(() => { void load() }) }, [load])
+    // Cached via the shared data cache (lib/use-data.ts): reopening a challenge
+    // shows the last standings instantly while fresh scores load in the background.
+    const { data: d, error: loadError } = useApi<Detail>(`/api/challenges/${id}`)
+    // Only show an error when there's nothing cached to fall back on.
+    const error = d || !loadError ? ''
+        : loadError instanceof ApiError && loadError.status === 404 ? 'Challenge not found'
+        : loadError.message || 'Could not load challenge'
 
     async function cancel() {
         const res = await authFetch(`/api/challenges/${id}`, { method: 'DELETE' })
@@ -59,6 +59,8 @@ export default function ChallengeDetailPage({ params }: { params: Promise<{ id: 
         setConfirmCancel(false)
         if (!res.ok) { toast.error(json.error ?? 'Could not cancel'); return }
         toast.success('Challenge cancelled')
+        // Refresh the cached challenges list (and this detail) so the cancelled one disappears.
+        void refreshData('/api/challenges')
         router.replace('/dashboard/challenges')
     }
 

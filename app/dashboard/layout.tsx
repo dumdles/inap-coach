@@ -20,6 +20,8 @@ import {
     Pencil, Plus, Flag,
 } from 'lucide-react'
 import { authFetch } from '@/lib/auth-fetch'
+import { useApi, useData } from '@/lib/use-data'
+import { refreshData } from '@/lib/data-cache'
 
 // ── Notification types ─────────────────────────────────────
 type Notification = {
@@ -46,19 +48,17 @@ function notifTimeAgo(iso: string) {
 // Reused by the desktop anchored popover (NotificationPanel) and the mobile
 // bottom sheet (MobileBell) so both stay in sync. Fetches its own data.
 function NotificationList({ userId, onClose }: { userId: string; onClose: () => void }) {
-    const [items, setItems] = useState<Notification[]>([])
-    const [loading, setLoading] = useState(true)
-
-    useEffect(() => {
-        authFetch('/api/notifications')
-            .then(r => r.json())
-            .then(data => { setItems(data ?? []); setLoading(false) })
-            .catch(() => setLoading(false))
-    }, [userId])
+    // Same cached '/api/notifications' entry as the unread badge (useUnreadCount),
+    // so opening the bell shows the list instantly (shared cache: lib/use-data.ts).
+    const { data, isLoading: loading, mutate } = useApi<Notification[]>(userId ? '/api/notifications' : null)
+    const items = Array.isArray(data) ? data : []
 
     async function markAllRead() {
         await authFetch('/api/notifications', { method: 'PATCH' })
-        setItems(prev => prev.map(n => ({ ...n, read: true })))
+        // Show them as read straight away, then re-check every notification query
+        // (this list, the badge, and the full notifications page).
+        await mutate(prev => prev?.map(n => ({ ...n, read: true })), { revalidate: false })
+        void refreshData('/api/notifications')
     }
 
     const unread = items.filter(n => !n.read).length
@@ -170,22 +170,23 @@ function NotificationPanel({ userId, anchorRef, onClose }: {
     )
 }
 
-// ── Shared unread count (one fetch, visibility-aware, 5 min poll) ──
+// ── Shared unread count (one cached fetch, 5 min poll) ──
+// Uses the shared data cache (lib/use-data.ts): SWR skips the poll while the tab
+// is hidden and re-checks when it regains focus, like the old visibility listener.
 function useUnreadCount(userId: string) {
-    const [unread, setUnread] = useState(0)
-    const fetch$ = useCallback(() => {
-        if (!userId || document.hidden) return
-        authFetch('/api/notifications')
-            .then(r => r.json())
-            .then((data: Notification[]) => setUnread((data ?? []).filter(n => !n.read).length))
-            .catch(() => {})
-    }, [userId])
-    useEffect(() => {
-        fetch$()
-        const id = setInterval(fetch$, 5 * 60_000)
-        document.addEventListener('visibilitychange', fetch$)
-        return () => { clearInterval(id); document.removeEventListener('visibilitychange', fetch$) }
-    }, [fetch$])
+    const { data } = useApi<Notification[]>(userId ? '/api/notifications' : null, { refreshInterval: 5 * 60_000 })
+    const serverUnread = Array.isArray(data) ? data.filter(n => !n.read).length : 0
+    // Opening the bell clears the badge locally (without marking anything read on
+    // the server). The override is tied to the data it was set against, so it
+    // drops as soon as the server list changes (e.g. a new notification arrives).
+    const [override, setOverride] = useState<{ base: Notification[] | undefined; value: number } | null>(null)
+    const unread = override && override.base === data ? override.value : serverUnread
+    const setUnread = useCallback((n: number | ((prev: number) => number)) => {
+        setOverride(prev => {
+            const current = prev && prev.base === data ? prev.value : serverUnread
+            return { base: data, value: typeof n === 'function' ? n(current) : n }
+        })
+    }, [data, serverUnread])
     return [unread, setUnread] as const
 }
 
@@ -779,12 +780,13 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
     )
 }
 
+type LayoutProfile = { rank?: string; full_name?: string; wing?: string; role?: string; goal_mode?: string | null }
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, isLoading } = useAuth()
     const router = useRouter()
     const pathname = usePathname()
     const [expanded, setExpanded] = useState(true)
-    const [profile, setProfile] = useState<{ rank?: string; full_name?: string; wing?: string; role?: string } | null>(null)
     const { setGoalMode } = useTheme()
     const [unread, setUnread] = useUnreadCount(user?.id ?? '')
     const { primary, overflow, primaryHrefs, setPrimary } = useNavTabs()
@@ -802,16 +804,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (!isLoading && !user) router.replace('/login')
     }, [isLoading, user, router])
 
-    useEffect(() => {
-        if (!user) return
-        supabase.from('users').select('rank, full_name, wing, goal_mode, role').eq('id', user.id).single()
-            .then(({ data }) => {
-                if (data) {
-                    setProfile(data)
-                    if (data.goal_mode) setGoalMode(data.goal_mode as GoalMode)
-                }
-            })
-    }, [user])
+    // Sidebar / nav profile, cached across navigations (lib/use-data.ts).
+    // Each time it loads, apply the cadet's saved goal-mode theme.
+    const { data: profileRow } = useData<LayoutProfile>('profile:layout', async uid => {
+        const { data, error } = await supabase.from('users').select('rank, full_name, wing, goal_mode, role').eq('id', uid).single()
+        if (error) throw error
+        return data as LayoutProfile
+    }, {
+        onSuccess: data => { if (data?.goal_mode) setGoalMode(data.goal_mode as GoalMode) },
+    })
+    const profile = profileRow ?? null
 
     if (isLoading || !user) {
         return (

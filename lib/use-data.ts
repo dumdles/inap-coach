@@ -21,6 +21,10 @@ import { authFetch } from '@/lib/auth-fetch'
 //   sign-out (auth-context), so cadets never see each other's data.
 // - The cache lives in memory for the browser tab; a full page reload starts fresh.
 
+export class ApiError extends Error {
+    constructor(message: string, public status: number) { super(message) }
+}
+
 /** Shared defaults: collapse identical requests made within 2s (e.g. two cards
  *  mounting together), and refresh on tab focus at most once a minute. Every
  *  time a page opens it still re-checks in the background, so data written on
@@ -29,10 +33,8 @@ const DEFAULTS: SWRConfiguration = {
     dedupingInterval: 2_000,
     focusThrottleInterval: 60_000,
     errorRetryCount: 2,
-}
-
-export class ApiError extends Error {
-    constructor(message: string, public status: number) { super(message) }
+    // A 4xx (forbidden, not found…) won't fix itself — only retry network/server errors.
+    shouldRetryOnError: err => !(err instanceof ApiError && err.status >= 400 && err.status < 500),
 }
 
 /** GET one of our /api routes with the Bearer token; throws ApiError on a non-2xx. */

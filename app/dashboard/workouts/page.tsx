@@ -23,6 +23,8 @@ import {
     BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip,
 } from "recharts"
 import { authFetch } from '@/lib/auth-fetch'
+import { useApi, useData } from '@/lib/use-data'
+import { refreshData } from '@/lib/data-cache'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -131,6 +133,19 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 }
 
 const LOGS_PER_PAGE = 10
+
+// Stable empty fallbacks for cached lists, so `?? EMPTY` doesn't create a new
+// array every render (that would re-fire effects that depend on the list).
+const EMPTY_LOGS: WorkoutLog[] = []
+const EMPTY_TEMPLATES: ExerciseTemplate[] = []
+const EMPTY_FRIENDS: Friend[] = []
+
+/** After a workout is saved, edited, deleted or synced: other screens (Home,
+ *  leaderboard) show workouts too, so refresh their cached copies. */
+function refreshOtherScreens() {
+    refreshData('workouts:')
+    refreshData('/api/leaderboard')
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -767,13 +782,7 @@ function LogModal({
 
 export default function WorkoutsPage() {
     const { user, session } = useAuth()
-    const [templates, setTemplates] = React.useState<ExerciseTemplate[]>([])
-    const [friends, setFriends] = React.useState<Friend[]>([])
-    const [logs, setLogs] = React.useState<WorkoutLog[]>([])
-    const [logsLoading, setLogsLoading] = React.useState(true)
     const [polarLoading, setPolarLoading] = React.useState(false)
-    const [isPolarConnected, setIsPolarConnected] = React.useState(false)
-    const [isPolarConnectionChecked, setIsPolarConnectionChecked] = React.useState(false)
     const [loggerOpen, setLoggerOpen] = React.useState(false)
     const [editLog, setEditLog] = React.useState<WorkoutLog | null>(null)
     const [confirmDeleteId, setConfirmDeleteId] = React.useState<string | null>(null)
@@ -785,62 +794,52 @@ export default function WorkoutsPage() {
     const [detailId, setDetailId] = React.useState<string | null>(null)
     const [historyPage, setHistoryPage] = React.useState(1)
 
-    // Load templates + friends once
-    React.useEffect(() => {
-        supabase
+    // ── Data ──────────────────────────────────────────────────────────────────
+    // Loaded through the shared cache (lib/use-data.ts): the first visit shows
+    // skeletons; coming back to Workouts shows the last data instantly and
+    // refreshes it in the background.
+
+    // Exercise templates (for the log modal's picker)
+    const { data: templatesData } = useData<ExerciseTemplate[]>('templates:workouts', async () => {
+        const { data, error } = await supabase
             .from("exercise_templates")
             .select("*")
             .order("sort_order")
-            .then(({ data }) => setTemplates((data as ExerciseTemplate[]) ?? []))
-    }, [])
+        if (error) throw error
+        return (data as ExerciseTemplate[]) ?? []
+    })
+    const templates = templatesData ?? EMPTY_TEMPLATES
 
-    React.useEffect(() => {
-        if (!user?.id) return
-        supabase
+    // Accepted friends (for tagging a workout)
+    const { data: friendsData } = useData<Friend[]>('friends:workouts', async uid => {
+        const { data: rows, error } = await supabase
             .from("friendships")
             .select("requester_id, addressee_id")
-            .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`)
+            .or(`requester_id.eq.${uid},addressee_id.eq.${uid}`)
             .eq("status", "accepted")
-            .then(async ({ data: rows }) => {
-                if (!rows?.length) return
-                const ids = rows.map(r => r.requester_id === user.id ? r.addressee_id : r.requester_id)
-                const { data: users } = await supabase
-                    .from("users")
-                    .select("id, full_name, rank")
-                    .in("id", ids)
-                setFriends((users as Friend[]) ?? [])
-            })
-    }, [user?.id])
+        if (error) throw error
+        if (!rows?.length) return []
+        const ids = rows.map(r => r.requester_id === uid ? r.addressee_id : r.requester_id)
+        const { data: users, error: usersError } = await supabase
+            .from("users")
+            .select("id, full_name, rank")
+            .in("id", ids)
+        if (usersError) throw usersError
+        return (users as Friend[]) ?? []
+    })
+    const friends = friendsData ?? EMPTY_FRIENDS
 
-    React.useEffect(() => {
-        if (!user?.id) return
-        let cancelled = false
-        authFetch('/api/auth/polar/status')
-            .then(r => r.json())
-            .then((data: { connected?: boolean }) => {
-                if (cancelled) return
-                setIsPolarConnected(Boolean(data.connected))
-                setIsPolarConnectionChecked(true)
-            })
-            .catch(() => {
-                if (cancelled) return
-                setIsPolarConnected(false)
-                setIsPolarConnectionChecked(true)
-            })
-        return () => { cancelled = true }
-    }, [user?.id])
+    // Is Polar connected? Until the first answer arrives we show neither the
+    // connect banner nor start a sync. A failed check counts as "not connected".
+    const { data: polarStatus, error: polarStatusError, mutate: mutatePolarStatus } =
+        useApi<{ connected?: boolean }>('/api/auth/polar/status')
+    const isPolarConnected = Boolean(polarStatus?.connected)
+    const isPolarConnectionChecked = polarStatus !== undefined || polarStatusError !== undefined
 
-    // Load all logs — filtering is done client-side so charts always have full data.
-    // `silent` refreshes in place (no skeleton) — used after a background Polar sync.
-    const fetchLogs = React.useCallback(async (opts: { silent?: boolean } = {}) => {
-        if (!user?.id) return
-        if (!opts.silent) setLogsLoading(true)
-        const data = await authFetch('/api/workout-logs').then(r => r.json())
-        setLogs(Array.isArray(data) ? data : [])
-        setLogsLoading(false)
-    }, [user?.id])
-
-    React.useEffect(() => { fetchLogs() }, [fetchLogs])
+    // All logs — filtering is done client-side so charts always have full data.
+    // `mutateLogs()` re-fetches in place (no skeleton), e.g. after a Polar sync or a save.
+    const { data: logsData, isLoading: logsLoading, mutate: mutateLogs } = useApi<WorkoutLog[]>('/api/workout-logs')
+    const logs = Array.isArray(logsData) ? logsData : EMPTY_LOGS
 
     // Reset to page 1 when filter/period changes
     React.useEffect(() => { setHistoryPage(1) }, [activeFilter, activePeriod, logs])
@@ -858,17 +857,19 @@ export default function WorkoutsPage() {
             const res = await authFetch('/api/polar/exercises')
             const data = await res.json()
             if (!data.error) {
-                setIsPolarConnected(true)
+                // A successful sync proves Polar is connected (e.g. a forced Refresh).
+                mutatePolarStatus({ connected: true }, { revalidate: false })
                 localStorage.setItem(storageKey, Date.now().toString())
+                refreshOtherScreens()
             }
         } catch {
             // Non-fatal — still refresh the list in case prior syncs added data
         } finally {
             // Logs are already on screen; swap in any newly imported ones without a skeleton.
-            await fetchLogs({ silent: true })
+            await mutateLogs()
             setPolarLoading(false)
         }
-    }, [user?.id, fetchLogs])
+    }, [user?.id, mutateLogs, mutatePolarStatus])
 
     // Auto-sync (at most once a day, see above) only for cadets who have connected
     // Polar — everyone else would just get an error back on every visit. It runs in
@@ -888,7 +889,8 @@ export default function WorkoutsPage() {
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
             body: JSON.stringify({ userId: user?.id, taggerName, ...data }),
         })
-        await fetchLogs()
+        refreshOtherScreens()
+        await mutateLogs()
     }
 
     async function handleEdit(id: string, data: Record<string, unknown>) {
@@ -897,12 +899,15 @@ export default function WorkoutsPage() {
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
             body: JSON.stringify(data),
         })
-        await fetchLogs()
+        refreshOtherScreens()
+        await mutateLogs()
     }
 
     async function handleDelete(id: string) {
         await authFetch(`/api/workout-logs?id=${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${session?.access_token}` } })
-        setLogs(prev => prev.filter(l => l.id !== id))
+        // Drop it from the list right away, then re-fetch to confirm.
+        mutateLogs(prev => prev?.filter(l => l.id !== id), { revalidate: true })
+        refreshOtherScreens()
         setConfirmDeleteId(null)
     }
 

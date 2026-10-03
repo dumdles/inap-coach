@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import gsap from 'gsap'
 import { authFetch } from '@/lib/auth-fetch'
+import { useApi, useData } from '@/lib/use-data'
+import { refreshData } from '@/lib/data-cache'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type RankedUser = {
@@ -37,6 +39,12 @@ type FriendUser = {
     rank: string
     wing: string
     friendshipId: string
+}
+
+type FriendshipsData = {
+    friends?: FriendUser[]
+    pendingReceived?: FriendUser[]
+    pendingSent?: FriendUser[]
 }
 
 type SearchUser = {
@@ -476,19 +484,23 @@ function AddFriendDialog({
     const [dialogTab, setDialogTab] = useState<DialogTab>('suggested')
     const [query, setQuery] = useState('')
     const [searchResults, setSearchResults] = useState<SearchUser[]>([])
-    const [suggested, setSuggested] = useState<SearchUser[]>([])
     const [sent, setSent] = useState<Set<string>>(new Set())
     const [searching, setSearching] = useState(false)
     const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
     useEffect(() => {
         if (!open) { setQuery(''); setSearchResults([]); setSent(new Set()) }
-        if (open && currentUserId) {
-            authFetch('/api/users/suggested')
-                .then(r => r.json())
-                .then(d => setSuggested(Array.isArray(d) ? d : []))
-        }
-    }, [open, currentUserId])
+    }, [open])
+
+    // Suggestions come from the shared cache (lib/use-data.ts): fetched when the
+    // dialog first opens, then shown instantly on re-open while they refresh.
+    // keepPreviousData keeps the list on screen while the dialog animates closed.
+    // (Search-as-you-type below is deliberately NOT cached.)
+    const { data: suggestedData } = useApi<SearchUser[]>(
+        open && currentUserId ? '/api/users/suggested' : null,
+        { keepPreviousData: true },
+    )
+    const suggested = Array.isArray(suggestedData) ? suggestedData : []
 
     useEffect(() => {
         clearTimeout(debounce.current)
@@ -657,7 +669,6 @@ export default function FriendsPage() {
     const { user } = useAuth()
     const router = useRouter()
     const searchParams = useSearchParams()
-    const [profile, setProfile] = useState<{ rank: string; wing: string; section?: string } | null>(null)
     const initialTab = (searchParams.get('tab') ?? '') as LeaderTab
     const [tab, setTab] = useState<LeaderTab>(VALID_LEADER_TABS.has(initialTab) ? initialTab : 'wing')
 
@@ -668,58 +679,51 @@ export default function FriendsPage() {
         router.replace(`?${params.toString()}`, { scroll: false })
     }
     const [period, setPeriod] = useState<'week' | 'month'>('week')
-    const [leaderboard, setLeaderboard] = useState<RankedUser[]>([])
-    const [wingStandings, setWingStandings] = useState<WingStanding[]>([])
-    const [friends, setFriends] = useState<FriendUser[]>([])
-    const [pendingReceived, setPendingReceived] = useState<FriendUser[]>([])
     const [addOpen, setAddOpen] = useState(false)
-    const [loadingBoard, setLoadingBoard] = useState(true)
-    const [existingFriendIds, setExistingFriendIds] = useState<Set<string>>(new Set())
-    const [pendingSentIds, setPendingSentIds] = useState<Set<string>>(new Set())
 
-    useEffect(() => {
-        if (!user) return
-        supabase.from('users').select('rank, wing, section').eq('id', user.id).single()
-            .then(({ data }) => { if (data) setProfile(data) })
-    }, [user])
+    // ── Data ──────────────────────────────────────────────────────────────────
+    // Loaded through the shared cache (lib/use-data.ts): each tab/period is cached
+    // separately, so switching back and forth (or returning to this page) is
+    // instant after the first load; the cache refreshes in the background.
+    const { data: profile = null, isLoading: profileLoading } = useData<{ rank: string; wing: string; section?: string } | null>('profile:friends', async uid => {
+        const { data, error } = await supabase.from('users').select('rank, wing, section').eq('id', uid).single()
+        if (error) throw error
+        return data
+    })
 
-    const fetchFriends = useCallback(async () => {
-        if (!user) return
-        const res = await authFetch('/api/friendships')
-        const data = await res.json()
-        const acceptedFriends: FriendUser[] = data.friends ?? []
-        setFriends(acceptedFriends)
-        // Only accepted friends go into existingFriendIds — pending sent tracked separately
-        setExistingFriendIds(new Set<string>([
-            ...acceptedFriends.map(f => f.id),
-            ...(data.pendingReceived ?? []).map((f: FriendUser) => f.id),
-        ]))
-        setPendingSentIds(new Set<string>((data.pendingSent ?? []).map((f: FriendUser) => f.id)))
-        setPendingReceived(data.pendingReceived ?? [])
-    }, [user])
+    const { data: friendships, mutate: refreshFriends } = useApi<FriendshipsData>('/api/friendships')
+    const friends = useMemo(() => friendships?.friends ?? [], [friendships])
+    const pendingReceived = useMemo(() => friendships?.pendingReceived ?? [], [friendships])
+    // Accepted friends + people who sent us a request; pending *sent* tracked separately
+    const existingFriendIds = useMemo(() => new Set<string>([
+        ...friends.map(f => f.id),
+        ...pendingReceived.map(f => f.id),
+    ]), [friends, pendingReceived])
+    const pendingSentIds = useMemo(
+        () => new Set<string>((friendships?.pendingSent ?? []).map(f => f.id)),
+        [friendships],
+    )
 
-    useEffect(() => { fetchFriends() }, [fetchFriends])
+    // Leaderboard for the active tab + period — waits for the profile (needs the wing).
+    const scope = tab === 'wing' ? 'wing' : tab === 'section' ? 'section' : 'friends'
+    const wingParam = tab === 'wing' && profile?.wing ? `&wing=${encodeURIComponent(profile.wing)}` : ''
+    const { data: lbData, isLoading: lbLoading } = useApi<RankedUser[]>(
+        profile ? `/api/leaderboard?scope=${scope}&period=${period}${wingParam}` : null,
+    )
+    const leaderboard = useMemo(() => (Array.isArray(lbData) ? lbData : []), [lbData])
+    const loadingBoard = profileLoading || lbLoading
 
-    const fetchLeaderboard = useCallback(async () => {
-        if (!user || !profile) return
-        setLoadingBoard(true)
-        const scope = tab === 'wing' ? 'wing' : tab === 'section' ? 'section' : 'friends'
-        const wingParam = tab === 'wing' && profile.wing ? `&wing=${encodeURIComponent(profile.wing)}` : ''
-        const res = await authFetch(
-            `/api/leaderboard?scope=${scope}&period=${period}${wingParam}`,
-        )
-        const data = await res.json()
-        setLeaderboard(Array.isArray(data) ? data : [])
-        setLoadingBoard(false)
-    }, [user, profile, tab, period])
+    // keepPreviousData: keep showing the old standings while another period loads.
+    const { data: standingsData } = useApi<WingStanding[]>(`/api/wing-standings?period=${period}`, { keepPreviousData: true })
+    const wingStandings = useMemo(() => (Array.isArray(standingsData) ? standingsData : []), [standingsData])
 
-    useEffect(() => { fetchLeaderboard() }, [fetchLeaderboard])
-
-    useEffect(() => {
-        authFetch(`/api/wing-standings?period=${period}`)
-            .then(r => r.json())
-            .then(d => setWingStandings(Array.isArray(d) ? d : []))
-    }, [period])
+    // After a friendship change, re-fetch the friends list here and every cached
+    // leaderboard / suggestion list (this page and other screens) in the background.
+    const refreshAfterFriendChange = (opts: { leaderboard: boolean; suggestions: boolean }) => {
+        void refreshFriends()
+        if (opts.leaderboard) void refreshData('/api/leaderboard')
+        if (opts.suggestions) void refreshData('/api/users/suggested')
+    }
 
     const handleAccept = async (friendshipId: string) => {
         await authFetch('/api/friendships', {
@@ -727,8 +731,7 @@ export default function FriendsPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ friendshipId, action: 'accept' }),
         })
-        fetchFriends()
-        fetchLeaderboard()
+        refreshAfterFriendChange({ leaderboard: true, suggestions: true })
     }
 
     const handleReject = async (friendshipId: string) => {
@@ -737,17 +740,16 @@ export default function FriendsPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ friendshipId, action: 'reject' }),
         })
-        fetchFriends()
+        refreshAfterFriendChange({ leaderboard: false, suggestions: true })
     }
 
     const handleUnfriend = async (friendshipId: string) => {
         await authFetch(`/api/friendships?id=${friendshipId}`, { method: 'DELETE' })
-        fetchFriends()
-        fetchLeaderboard()
+        refreshAfterFriendChange({ leaderboard: true, suggestions: true })
     }
 
     const me = leaderboard.find(u => u.id === user?.id)
-    const top3 = leaderboard.slice(0, 3)
+    const top3 = useMemo(() => leaderboard.slice(0, 3), [leaderboard])
     const noMealYet = me && me.mealsToday === 0
 
     return (
@@ -909,7 +911,9 @@ export default function FriendsPage() {
                 existingIds={existingFriendIds}
                 pendingSentIds={pendingSentIds}
                 pendingReceived={pendingReceived}
-                onSent={() => { fetchFriends(); fetchLeaderboard() }}
+                // Suggestions aren't refreshed here so the person just added stays
+                // in the open list (shown as "Pending"); they refresh on next open.
+                onSent={() => refreshAfterFriendChange({ leaderboard: true, suggestions: false })}
                 onAccept={handleAccept}
                 onReject={handleReject}
             />

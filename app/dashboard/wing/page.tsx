@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
@@ -41,6 +41,8 @@ import {
     ScatterChart, Scatter, ZAxis, ReferenceLine,
 } from 'recharts'
 import { authFetch } from '@/lib/auth-fetch'
+import { useApi, useData } from '@/lib/use-data'
+import { refreshData } from '@/lib/data-cache'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -536,12 +538,8 @@ function EngagementScatter({ cadets }: { cadets: CadetRow[] }) {
 export default function WingPage() {
     const { user } = useAuth()
     const router = useRouter()
-    const [profile, setProfile] = useState<{ rank: string; wing: string; role: string } | null>(null)
-    const [cadets, setCadets] = useState<CadetRow[]>([])
     const [period, setPeriod] = useState<'week' | 'month'>('week')
-    const [loading, setLoading] = useState(true)
     const [sortBy, setSortBy] = useState<'score' | 'streak' | 'name'>('score')
-    const [availableWings, setAvailableWings] = useState<string[]>([])
     const [filterSection, setFilterSection] = useState<string | null>(null)
     const [filterPlatoon, setFilterPlatoon] = useState<string | null>(null)
     const [adminConfirm, setAdminConfirm] = useState<AdminConfirm>(null)
@@ -550,36 +548,33 @@ export default function WingPage() {
     const [adminWorking, setAdminWorking] = useState(false)
     const cadetListRef = useRef<HTMLDivElement | null>(null)
 
-    useEffect(() => {
-        if (!user) return
-        supabase.from('users').select('rank, wing, role').eq('id', user.id).single()
-            .then(({ data }) => {
-                if (!data) return
-                setProfile(data)
-                if (!hasInstructorAccess(data.role)) router.replace('/dashboard')
-            })
-        // Fetch all wings from the reference table (not distinct user values, so the list is always complete)
-        supabase.from('ocs_wings').select('name').order('name').then(({ data }) => {
-            if (data) setAvailableWings(data.map(w => w.name))
-        })
-    }, [user, router])
+    // ── Data ──────────────────────────────────────────────────────────────────
+    // Loaded through the shared cache (lib/use-data.ts): coming back to this page
+    // shows the last roster instantly and refreshes it in the background.
+    const { data: profile = null } = useData<{ rank: string; wing: string; role: string } | null>('profile:wing', async uid => {
+        const { data, error } = await supabase.from('users').select('rank, wing, role').eq('id', uid).single()
+        if (error) throw error
+        return data
+    })
 
-    const fetchCadets = useCallback(async () => {
-        if (!user || !profile) return
-        setLoading(true)
-        const res = await authFetch(
-            `/api/leaderboard?scope=wing&wing=${encodeURIComponent(profile.wing)}&period=${period}`,
-        )
-        const data = await res.json()
-        setCadets(Array.isArray(data) ? data : [])
-        setLoading(false)
-    }, [user, profile, period])
-
+    // Only instructors / superadmins may view the wing console.
     useEffect(() => {
-        queueMicrotask(() => {
-            void fetchCadets()
-        })
-    }, [fetchCadets])
+        if (profile && !hasInstructorAccess(profile.role)) router.replace('/dashboard')
+    }, [profile, router])
+
+    // Fetch all wings from the reference table (not distinct user values, so the list is always complete)
+    const { data: availableWings = [] } = useData<string[]>('wings:list', async () => {
+        const { data, error } = await supabase.from('ocs_wings').select('name').order('name')
+        if (error) throw error
+        return (data ?? []).map(w => w.name)
+    })
+
+    // Wing roster + scores — waits for the profile (needs the wing). Each period is
+    // cached separately, so flipping week ↔ month is instant after the first load.
+    const { data: lbData, isLoading: loading, mutate: mutateCadets } = useApi<CadetRow[]>(
+        profile ? `/api/leaderboard?scope=wing&wing=${encodeURIComponent(profile.wing)}&period=${period}` : null,
+    )
+    const cadets = useMemo(() => (Array.isArray(lbData) ? lbData : []), [lbData])
 
     // Derive unique sections and platoons for filter chips
     const allSections = useMemo(() =>
@@ -604,14 +599,16 @@ export default function WingPage() {
                 body: JSON.stringify(body),
             })
             if (!res.ok) throw new Error((await res.json()).error ?? 'Failed')
-            if (action === 'remove_section') {
-                setCadets(prev => prev.map(c => c.id === cadetId ? { ...c, section: null } : c))
-            } else if (action === 'assign_section') {
-                setCadets(prev => prev.map(c => c.id === cadetId ? { ...c, section: transferSection } : c))
-            } else {
+            // Update the cached roster straight away (no refetch yet)…
+            const update = (rows: CadetRow[]) => {
+                if (action === 'remove_section') return rows.map(c => c.id === cadetId ? { ...c, section: null } : c)
+                if (action === 'assign_section') return rows.map(c => c.id === cadetId ? { ...c, section: transferSection } : c)
                 // transfer_wing — remove from this wing's view entirely
-                setCadets(prev => prev.filter(c => c.id !== cadetId))
+                return rows.filter(c => c.id !== cadetId)
             }
+            await mutateCadets(prev => (Array.isArray(prev) ? update(prev) : prev), { revalidate: false })
+            // …then re-fetch every cached leaderboard (this page, Home, Friends) in the background.
+            void refreshData('/api/leaderboard')
         } finally {
             setAdminWorking(false)
             setAdminConfirm(null)

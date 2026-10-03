@@ -109,6 +109,13 @@ docs/
 - All maths lives in `lib/admin-analytics.ts` (pure, no DB): KPIs with deltas vs the previous window, per-wing/daily aggregates, per-cadet watchlist flags (tune in `THRESHOLDS`) and the plain-English "What needs your attention" findings.
 - Charts in `components/admin/charts.tsx` use the fixed `--viz-*` tokens in `globals.css` (colour-blind-validated; not affected by goal-mode theming).
 
+## Client data loading (cache)
+
+Dashboard pages load data through `useApi(path)` / `useData(name, loader)` from `lib/use-data.ts` (SWR, stale-while-revalidate) — not `useEffect` + `useState`. Revisiting a page renders the cached data instantly and refreshes it in the background; `isLoading` is only true when nothing is cached (that's when to show skeletons).
+- `useData` names follow `<entity>:<screen>:<params>` (e.g. `meals:home:2026-10-03`); one name = one data shape. `useApi` keys are the path incl. query string.
+- After a write: call the query's `mutate()`, plus `refreshData(prefix)` from `lib/data-cache.ts` for other screens showing that entity (e.g. `refreshData('meals:')`, `refreshData('/api/leaderboard')`).
+- The cache is in-memory per tab, keyed by user id, and cleared on sign-out (`auth-context`). Don't cache form/edit state, search-as-you-type, or one-off actions.
+
 ## Database patterns
 
 - All inserts/queries on the server use `supabaseAdmin` (service role, bypasses RLS).

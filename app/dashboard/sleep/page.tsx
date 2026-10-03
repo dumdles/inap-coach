@@ -26,6 +26,8 @@ import {
     BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine,
 } from 'recharts'
 import { authFetch } from '@/lib/auth-fetch'
+import { useApi } from '@/lib/use-data'
+import { refreshData } from '@/lib/data-cache'
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -1272,12 +1274,21 @@ function SettingsPopover({
 
 // ── Main page ─────────────────────────────────────────────────────────────
 
+// Stable fallbacks while nothing is cached yet (a fresh `[]` every render would
+// re-fire the "back to page 1" effect below on every render).
+const EMPTY_LOGS: SleepLog[] = []
+const DEFAULT_SETTINGS: SleepSettings = { target_hours: 7.5, target_bedtime: null, target_wake_time: null }
+
+/** After sleep is logged, edited, deleted, imported or synced: Home and the
+ *  leaderboard show sleep too, so refresh their cached copies. */
+function refreshOtherScreens() {
+    refreshData('sleep:')
+    refreshData('/api/leaderboard')
+}
+
 export default function SleepPage() {
     const { user, session } = useAuth()
 
-    const [logs, setLogs] = useState<SleepLog[]>([])
-    const [logsLoading, setLogsLoading] = useState(true)
-    const [settings, setSettings] = useState<SleepSettings>({ target_hours: 7.5, target_bedtime: null, target_wake_time: null })
     const [polarSyncing, setPolarSyncing] = useState(false)
     const [logDialogOpen, setLogDialogOpen] = useState(false)
     const [importDialogOpen, setImportDialogOpen] = useState(false)
@@ -1291,23 +1302,24 @@ export default function SleepPage() {
     const [detailLog, setDetailLog] = useState<SleepLog | null>(null)
     const [historyPage, setHistoryPage] = useState(1)
 
-    const fetchLogs = useCallback(async () => {
-        if (!user?.id) return
-        setLogsLoading(true)
-        const res = await authFetch('/api/sleep-logs?limit=90')
-        const data = await res.json()
-        setLogs(Array.isArray(data) ? data : [])
-        setLogsLoading(false)
-    }, [user?.id])
+    // ── Data ──────────────────────────────────────────────────────────────
+    // Loaded through the shared cache (lib/use-data.ts): the first visit shows
+    // skeletons; coming back to Sleep shows the last data instantly and
+    // refreshes it in the background. `mutateLogs()` re-fetches in place.
+    const { data: logsData, isLoading: logsLoading, mutate: mutateLogs } = useApi<SleepLog[]>('/api/sleep-logs?limit=90')
+    const logs = Array.isArray(logsData) ? logsData : EMPTY_LOGS
 
-    const fetchSettings = useCallback(async () => {
-        if (!user?.id) return
-        const res = await authFetch('/api/sleep-logs/settings')
-        const data = await res.json()
-        if (data) setSettings(data)
-    }, [user?.id])
+    // Sleep targets. The settings popover copies these into its own form state
+    // each time it opens, so a background refresh never overwrites edits.
+    const { data: settingsData, mutate: mutateSettings } = useApi<SleepSettings>('/api/sleep-logs/settings')
+    const settings = settingsData ?? DEFAULT_SETTINGS
 
-    useEffect(() => { fetchLogs(); fetchSettings() }, [fetchLogs, fetchSettings])
+    // After a log is added/edited/imported: re-fetch this list and other screens' copies.
+    const handleLogsChanged = useCallback(() => {
+        mutateLogs()
+        refreshOtherScreens()
+    }, [mutateLogs])
+
     // Return to page 1 whenever the log list updates (e.g. after delete or sync)
     useEffect(() => { setHistoryPage(1) }, [logs])
 
@@ -1316,15 +1328,18 @@ export default function SleepPage() {
         setPolarSyncing(true)
         try {
             await authFetch('/api/polar/sleep')
-            await fetchLogs()
+            refreshOtherScreens()
+            await mutateLogs()
         } finally {
             setPolarSyncing(false)
         }
-    }, [user?.id, fetchLogs])
+    }, [user?.id, mutateLogs])
 
     async function handleDelete(id: string) {
         await authFetch(`/api/sleep-logs?id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${session?.access_token}` } })
-        setLogs(prev => prev.filter(l => l.id !== id))
+        // Drop it from the list right away, then re-fetch to confirm.
+        mutateLogs(prev => prev?.filter(l => l.id !== id), { revalidate: true })
+        refreshOtherScreens()
         setConfirmDeleteId(null)
     }
 
@@ -1334,7 +1349,8 @@ export default function SleepPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(s),
         })
-        setSettings(s)
+        // Show the new targets right away, then re-fetch to confirm.
+        mutateSettings(s, { revalidate: true })
     }
 
     // Derived stats
@@ -1681,13 +1697,13 @@ export default function SleepPage() {
                 open={logDialogOpen}
                 onOpenChange={open => { setLogDialogOpen(open); if (!open) setEditingLog(null) }}
                 editing={editingLog as LogSleepDialogLog | null}
-                onLogged={fetchLogs}
+                onLogged={handleLogsChanged}
             />
 
             <AppleHealthImportDialog
                 open={importDialogOpen}
                 onOpenChange={setImportDialogOpen}
-                onImported={fetchLogs}
+                onImported={handleLogsChanged}
             />
 
             <SleepLogDetailDialog

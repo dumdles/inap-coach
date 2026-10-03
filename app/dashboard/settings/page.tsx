@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
+import { refreshData } from '@/lib/data-cache'
 import { calculateTDEE } from '@/lib/tdee'
 import { wingToService, SERVICE_META, SERVICE_GOAL_RECOMMENDATION, SERVICE_CALORIE_OFFSET } from '@/lib/service'
 import { cn } from '@/lib/utils'
@@ -399,6 +400,9 @@ export default function SettingsPage() {
         if (error) { showToast('Error saving — try again'); return }
         setOrig(form)
         setGoalMode(form.goal_mode)
+        // Name, wing, section, goals etc. show on many cached screens — refresh them (lib/use-data.ts).
+        void refreshData('profile:')
+        void refreshData('/api/leaderboard')
         showToast('Settings saved')
     }
 

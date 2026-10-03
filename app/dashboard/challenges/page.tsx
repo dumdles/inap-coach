@@ -5,12 +5,12 @@
 // recently finished). Verified instructors and superadmins also get
 // "New challenge". Scoring + rules: lib/challenges.ts. API: app/api/challenges.
 
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { Plus, Timer, Users, Trophy, ChevronRight } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { authFetch } from '@/lib/auth-fetch'
+import { useApi } from '@/lib/use-data'
 import { cn } from '@/lib/utils'
 import { CHALLENGE_METRICS, challengeStatus, formatLabel, scopeLabel, type Challenge } from '@/lib/challenges'
 import { CreateChallengeDialog } from '@/components/challenges/create-challenge-dialog'
@@ -19,19 +19,17 @@ import { timeLeftLabel } from '@/components/challenges/time'
 type ListResponse = { challenges: Challenge[]; canCreate: boolean; myWing: string | null; isSuperadmin: boolean }
 
 export default function ChallengesPage() {
-    const [data, setData] = useState<ListResponse | null>(null)
-    const [error, setError] = useState('')
     const [creating, setCreating] = useState(false)
-    const [now, setNow] = useState(0) // captured at load time; keeps render pure
+    // Captured on mount and again whenever fresh data arrives; keeps render pure.
+    const [now, setNow] = useState(() => Date.now())
 
-    const load = useCallback(async () => {
-        const res = await authFetch('/api/challenges')
-        const json = await res.json().catch(() => ({}))
-        if (!res.ok) { setError(json.error ?? 'Could not load challenges'); return }
-        setData(json)
-        setNow(Date.now())
-    }, [])
-    useEffect(() => { queueMicrotask(() => { void load() }) }, [load])
+    // Cached via the shared data cache (lib/use-data.ts): returning to this page
+    // shows the last list instantly and refreshes it in the background.
+    const { data, error: loadError, mutate } = useApi<ListResponse>('/api/challenges', {
+        onSuccess: () => setNow(Date.now()),
+    })
+    // Only show an error when there's nothing cached to fall back on.
+    const error = !data && loadError ? loadError.message || 'Could not load challenges' : ''
 
     const by = (s: string) => (data?.challenges ?? []).filter(c => challengeStatus(c, now) === s)
     const live = by('live').sort((a, b) => Date.parse(a.ends_at) - Date.parse(b.ends_at))
@@ -72,7 +70,7 @@ export default function ChallengesPage() {
 
             {data && (
                 <CreateChallengeDialog open={creating} onClose={() => setCreating(false)}
-                    onCreated={() => void load()} myWing={data.myWing} isSuperadmin={data.isSuperadmin} />
+                    onCreated={() => void mutate()} myWing={data.myWing} isSuperadmin={data.isSuperadmin} />
             )}
         </div>
     )

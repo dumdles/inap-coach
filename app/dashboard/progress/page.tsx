@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { authFetch } from '@/lib/auth-fetch'
+import { useApi, useData } from '@/lib/use-data'
+import { refreshData } from '@/lib/data-cache'
 
 type WeightLog = {
     id: string
@@ -205,9 +207,6 @@ function WeightChart({ logs, targetWeight }: { logs: WeightLog[]; targetWeight: 
 export default function ProgressPage() {
     const { user, session } = useAuth()
     const router = useRouter()
-    const [profile, setProfile] = useState<UserProfile | null>(null)
-    const [weightLogs, setWeightLogs] = useState<WeightLog[]>([])
-    const [loading, setLoading] = useState(true)
     const [showLogModal, setShowLogModal] = useState(false)
     const [editLog, setEditLog] = useState<WeightLog | null>(null)
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
@@ -216,18 +215,35 @@ export default function ProgressPage() {
     useFab({ label: 'Log a check-in', icon: <ScaleIcon size={22} />, onClick: () => { setEditLog(null); setShowLogModal(true) } })
     const [range, setRange] = useState<30 | 60 | 90>(90)
 
-    const fetchData = useCallback(async () => {
-        if (!user) return
-        const [{ data: prof }, logsRes] = await Promise.all([
-            supabase.from('users').select('weight_kg, target_weight_kg, weight_goal_date, goal_mode, height_cm').eq('id', user.id).single(),
-            authFetch(`/api/weight-logs?days=${range}`).then(r => r.json()),
-        ])
-        setProfile(prof)
-        setWeightLogs(Array.isArray(logsRes) ? logsRes : [])
-        setLoading(false)
-    }, [user, range])
+    // ── Data ──────────────────────────────────────────────────────────────────
+    // Loaded through the shared cache (lib/use-data.ts): the first visit shows
+    // the skeleton; coming back shows the last data instantly and refreshes it.
+    const { data: profile = null, isLoading: profileLoading } = useData<UserProfile | null>('profile:progress', async uid => {
+        const { data, error } = await supabase
+            .from('users')
+            .select('weight_kg, target_weight_kg, weight_goal_date, goal_mode, height_cm')
+            .eq('id', uid)
+            .single()
+        if (error) throw error
+        return data as UserProfile
+    })
 
-    useEffect(() => { fetchData() }, [fetchData])
+    // Weight logs for the selected range. keepPreviousData: switching range keeps
+    // the current chart on screen (no skeleton) until the new range arrives.
+    const { data: logsData, isLoading: logsLoading, mutate: mutateLogs } = useApi<WeightLog[]>(
+        `/api/weight-logs?days=${range}`,
+        { keepPreviousData: true },
+    )
+    const weightLogs = Array.isArray(logsData) ? logsData : []
+    const loading = profileLoading || logsLoading
+
+    // After a write: re-fetch this page's logs plus every other cached weight
+    // query (other screens may read weight via useData 'weight:…' or the API).
+    const refreshWeight = () => {
+        void mutateLogs()
+        void refreshData('weight:')
+        void refreshData('/api/weight-logs')
+    }
 
     const logWeight = async (weight_kg: number, body_fat_pct: number | null) => {
         await authFetch('/api/weight-logs', {
@@ -236,7 +252,9 @@ export default function ProgressPage() {
             body: JSON.stringify({ userId: user?.id, weight_kg, body_fat_pct }),
         })
         await supabase.from('users').update({ weight_kg }).eq('id', user!.id)
-        fetchData()
+        refreshWeight()
+        // The profile's weight_kg changed too (also refreshes this page's profile)
+        void refreshData('profile:')
     }
 
     const editWeight = async (weight_kg: number, body_fat_pct: number | null) => {
@@ -246,12 +264,14 @@ export default function ProgressPage() {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
             body: JSON.stringify({ weight_kg, body_fat_pct }),
         })
-        fetchData()
+        refreshWeight()
     }
 
     const deleteWeight = async (id: string) => {
         await authFetch(`/api/weight-logs?id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${session?.access_token}` } })
-        setWeightLogs(prev => prev.filter(l => l.id !== id))
+        // Remove it from the list straight away, then re-fetch in the background
+        void mutateLogs(prev => (prev ?? []).filter(l => l.id !== id), { revalidate: false })
+        refreshWeight()
         setDeleteConfirmId(null)
     }
 

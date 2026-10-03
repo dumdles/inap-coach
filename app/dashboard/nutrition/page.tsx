@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '@/app/context/auth-context'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useData } from '@/lib/use-data'
+import { refreshData } from '@/lib/data-cache'
 import { calculateTDEE } from '@/lib/tdee'
 import { LogMealDialog, type DailyTotals, type UserTargets } from '@/components/nutrition/log-meal-dialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -333,110 +334,109 @@ function fmtHistoryDate(dateStr: string) {
 }
 
 export default function NutritionPage() {
-    const { user } = useAuth()
     const [dialogOpen, setDialogOpen] = useState(false)
     const [selectedLog, setSelectedLog] = useState<MealLog | null>(null)
 
     // Mobile FAB on the nutrition page logs a meal.
     useFab({ label: 'Log a meal', icon: <UtensilsIcon size={22} />, onClick: () => setDialogOpen(true) })
-    const [meals, setMeals] = useState<MealLog[]>([])
-    const [profile, setProfile] = useState<UserProfile | null>(null)
-    const [loading, setLoading] = useState(true)
 
     // History tab state
     const [tab, setTab] = useState<'today' | 'history'>('today')
     const [historyRange, setHistoryRange] = useState<HistoryRange>(7)
-    const [historyDays, setHistoryDays] = useState<HistoryDay[]>([])
-    const [historyLoading, setHistoryLoading] = useState(false)
 
     const todayStr = new Date().toLocaleDateString('en-CA')
 
-    const fetchMeals = useCallback(async () => {
-        if (!user) return
+    // ── Data ──────────────────────────────────────────────────────────────────
+    // Loaded through the shared cache (lib/use-data.ts): the first visit shows
+    // skeletons; coming back shows the last data instantly and refreshes it.
+    const { data: profile = null } = useData<UserProfile | null>('profile:nutrition', async uid => {
+        const { data, error } = await supabase
+            .from('users')
+            .select('gender, weight_kg, height_cm, date_of_birth, activity_level, goal_mode')
+            .eq('id', uid)
+            .single()
+        if (error) throw error
+        return data as UserProfile
+    })
+
+    // Today's meals — keyed by date so a new day never shows yesterday's.
+    const { data: meals = [], isLoading: loading, mutate: mutateMeals } = useData<MealLog[]>(`meals:nutrition:${todayStr}`, async uid => {
         const startOfDay = new Date(todayStr)
         startOfDay.setHours(0, 0, 0, 0)
         const endOfDay = new Date(todayStr)
         endOfDay.setHours(23, 59, 59, 999)
 
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('meal_logs')
             .select('id, meal_type, quantity_g, logged_at, notes, food_items (id, name, calories_per_100g, protein_g, carbs_g, fat_g)')
-            .eq('user_id', user.id)
+            .eq('user_id', uid)
             .gte('logged_at', startOfDay.toISOString())
             .lte('logged_at', endOfDay.toISOString())
             .order('logged_at', { ascending: true })
+        if (error) throw error
+        return (data as unknown as MealLog[]) ?? []
+    })
 
-        setMeals((data as unknown as MealLog[]) ?? [])
-        setLoading(false)
-    }, [user, todayStr])
+    // History — only fetched while the History tab is open (null key = wait).
+    // Keyed by range + today so switching back to a previous range is instant.
+    const { data: historyDays = [], isLoading: historyLoading } = useData<HistoryDay[]>(
+        tab === 'history' ? `meals:nutrition-history:${historyRange}:${todayStr}` : null,
+        async uid => {
+            const from = new Date()
+            from.setDate(from.getDate() - historyRange)
+            from.setHours(0, 0, 0, 0)
+            // Exclude today — it's shown in the Today tab
+            const endOfYesterday = new Date(todayStr)
+            endOfYesterday.setHours(0, 0, 0, 0)
+            endOfYesterday.setMilliseconds(-1)
 
-    const fetchHistory = useCallback(async (days: HistoryRange) => {
-        if (!user) return
-        setHistoryLoading(true)
-        const from = new Date()
-        from.setDate(from.getDate() - days)
-        from.setHours(0, 0, 0, 0)
-        // Exclude today — it's shown in the Today tab
-        const endOfYesterday = new Date(todayStr)
-        endOfYesterday.setHours(0, 0, 0, 0)
-        endOfYesterday.setMilliseconds(-1)
+            const { data, error } = await supabase
+                .from('meal_logs')
+                .select('id, meal_type, quantity_g, logged_at, notes, food_items (id, name, calories_per_100g, protein_g, carbs_g, fat_g)')
+                .eq('user_id', uid)
+                .gte('logged_at', from.toISOString())
+                .lte('logged_at', endOfYesterday.toISOString())
+                .order('logged_at', { ascending: false })
+            if (error) throw error
 
-        const { data } = await supabase
-            .from('meal_logs')
-            .select('id, meal_type, quantity_g, logged_at, notes, food_items (id, name, calories_per_100g, protein_g, carbs_g, fat_g)')
-            .eq('user_id', user.id)
-            .gte('logged_at', from.toISOString())
-            .lte('logged_at', endOfYesterday.toISOString())
-            .order('logged_at', { ascending: false })
+            const logs = (data as unknown as MealLog[]) ?? []
 
-        const logs = (data as unknown as MealLog[]) ?? []
+            // Group by local date (en-CA gives YYYY-MM-DD)
+            const byDate: Record<string, MealLog[]> = {}
+            for (const log of logs) {
+                const dateKey = new Date(log.logged_at).toLocaleDateString('en-CA')
+                if (!byDate[dateKey]) byDate[dateKey] = []
+                byDate[dateKey].push(log)
+            }
 
-        // Group by local date (en-CA gives YYYY-MM-DD)
-        const byDate: Record<string, MealLog[]> = {}
-        for (const log of logs) {
-            const dateKey = new Date(log.logged_at).toLocaleDateString('en-CA')
-            if (!byDate[dateKey]) byDate[dateKey] = []
-            byDate[dateKey].push(log)
-        }
+            return Object.entries(byDate)
+                .sort(([a], [b]) => b.localeCompare(a))
+                .map(([date, dayLogs]) => ({
+                    date,
+                    logs: dayLogs,
+                    totals: dayLogs.reduce(
+                        (acc, log) => {
+                            const m = calcMacros(log)
+                            return {
+                                calories: acc.calories + m.calories,
+                                protein: parseFloat((acc.protein + m.protein).toFixed(1)),
+                                carbs: parseFloat((acc.carbs + m.carbs).toFixed(1)),
+                                fat: parseFloat((acc.fat + m.fat).toFixed(1)),
+                            }
+                        },
+                        { calories: 0, protein: 0, carbs: 0, fat: 0 }
+                    ),
+                }))
+        },
+    )
 
-        const grouped: HistoryDay[] = Object.entries(byDate)
-            .sort(([a], [b]) => b.localeCompare(a))
-            .map(([date, dayLogs]) => ({
-                date,
-                logs: dayLogs,
-                totals: dayLogs.reduce(
-                    (acc, log) => {
-                        const m = calcMacros(log)
-                        return {
-                            calories: acc.calories + m.calories,
-                            protein: parseFloat((acc.protein + m.protein).toFixed(1)),
-                            carbs: parseFloat((acc.carbs + m.carbs).toFixed(1)),
-                            fat: parseFloat((acc.fat + m.fat).toFixed(1)),
-                        }
-                    },
-                    { calories: 0, protein: 0, carbs: 0, fat: 0 }
-                ),
-            }))
-
-        setHistoryDays(grouped)
-        setHistoryLoading(false)
-    }, [user, todayStr])
-
-    useEffect(() => {
-        if (!user) return
-        supabase
-            .from('users')
-            .select('gender, weight_kg, height_cm, date_of_birth, activity_level, goal_mode')
-            .eq('id', user.id)
-            .single()
-            .then(({ data }) => { if (data) setProfile(data) })
-        fetchMeals()
-    }, [user, fetchMeals])
-
-    // Fetch history whenever the history tab is active or range changes
-    useEffect(() => {
-        if (tab === 'history') fetchHistory(historyRange)
-    }, [tab, historyRange, fetchHistory])
+    // After an edit/delete: update today's list straight away, then re-fetch every
+    // meal query (incl. History and Home) and the leaderboard in the background.
+    function afterMealChange(update: (prev: MealLog[]) => MealLog[]) {
+        void mutateMeals(prev => update(prev ?? []), { revalidate: false })
+        void refreshData('meals:')
+        void refreshData('/api/leaderboard')
+    }
 
     const targets: UserTargets = profile
         ? calculateTDEE({
@@ -839,13 +839,13 @@ export default function NutritionPage() {
                 onOpenChange={setDialogOpen}
                 dailyTotals={totals}
                 targets={targets}
-                onLogged={fetchMeals}
+                onLogged={() => void mutateMeals()}
             />
             <FoodItemDialog
                 log={selectedLog}
                 onClose={() => setSelectedLog(null)}
-                onDeleted={id => setMeals(prev => prev.filter(m => m.id !== id))}
-                onEdited={(id, qty, mealType) => setMeals(prev => prev.map(m =>
+                onDeleted={id => afterMealChange(prev => prev.filter(m => m.id !== id))}
+                onEdited={(id, qty, mealType) => afterMealChange(prev => prev.map(m =>
                     m.id === id ? { ...m, quantity_g: qty, meal_type: mealType } : m
                 ))}
             />

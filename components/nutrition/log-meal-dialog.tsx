@@ -13,6 +13,7 @@ import { SuccessCheck } from '@/components/ui/success-check'
 import { Shimmer } from '@/components/ui/shimmer'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { authFetch } from '@/lib/auth-fetch'
+import { refreshData } from '@/lib/data-cache'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -436,6 +437,10 @@ export function LogMealDialog({ open, onOpenChange, dailyTotals, targets, onLogg
         })
         setSubmitting(false)
         if (insertError) { setError(insertError.message); return }
+        // Refresh every cached meal query (Home, Nutrition, …) and the leaderboard
+        // so other screens show the new meal — see lib/data-cache.ts.
+        void refreshData('meals:')
+        void refreshData('/api/leaderboard')
         onLogged?.()
         setLogged(true)
         setTimeout(() => onOpenChange(false), 900)
