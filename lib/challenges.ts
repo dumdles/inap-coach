@@ -8,6 +8,9 @@
 //    metric, a time window and an optional bonus.
 //  • Every cadet in scope is auto-enrolled; their score is computed live from
 //    what they already log (meals, workouts, sleep) between starts_at and ends_at.
+//  • "Reps" challenges (e.g. the Meal Time Regime — push-ups, sit-ups and
+//    pull-ups before each meal) count sets × reps of the chosen exercises from
+//    workout logs; cadets can quick-log them from the challenge page.
 //  • Format "individual" ranks cadets; "team" ranks sections/platoons/wings by
 //    the AVERAGE of their members' scores (fair across team sizes, and every
 //    member counts — a cadet who logs nothing pulls the team down).
@@ -26,6 +29,7 @@ export const CHALLENGE_METRICS = {
     meals_logged:    { label: 'Meals logged',           unit: 'meals',   group: 'Nutrition',   hint: 'Number of meals logged' },
     active_days:     { label: 'Active days',            unit: 'days',    group: 'Consistency', hint: 'Days with any meal, workout or sleep logged' },
     best_streak:     { label: 'Longest streak',         unit: 'days',    group: 'Consistency', hint: 'Longest run of consecutive active days' },
+    reps:            { label: 'Reps',                   unit: 'reps',    group: 'Reps (e.g. MTR)', hint: 'Total reps (sets × reps) of the chosen exercises' },
 } as const
 
 export type ChallengeMetric = keyof typeof CHALLENGE_METRICS
@@ -37,6 +41,7 @@ export type TeamLevel = 'section' | 'platoon' | 'wing'
 export type Challenge = {
     id: string; title: string; description: string | null
     metric: ChallengeMetric; format: ChallengeFormat; team_level: TeamLevel | null
+    exercise_ids: string[] | null // exercise_templates counted by a 'reps' challenge
     scope_wing: string | null; scope_platoon: string | null
     starts_at: string; ends_at: string; bonus_points: number
     created_by: string; created_at: string
@@ -48,12 +53,14 @@ export const LIMITS = {
     titleMin: 3, titleMax: 80, descriptionMax: 280,
     bonusMin: 0, bonusMax: 200,
     minHours: 1, maxDays: 60,
+    maxExercises: 6,
 }
 export const AWARD_SHARES = [1, 0.6, 0.3] // places 1–3, as a share of bonus_points
 
 export type ChallengeInput = {
     title: string; description?: string | null
     metric: string; format: string; team_level?: string | null
+    exercise_ids?: string[] | null
     scope_wing?: string | null; scope_platoon?: string | null
     starts_at: string; ends_at: string; bonus_points: number
 }
@@ -65,6 +72,12 @@ export function validateChallenge(c: Partial<ChallengeInput>, now = Date.now()):
     if (title.length < LIMITS.titleMin || title.length > LIMITS.titleMax) e.title = `Title must be ${LIMITS.titleMin}–${LIMITS.titleMax} characters`
     if ((c.description ?? '').length > LIMITS.descriptionMax) e.description = `Description must be at most ${LIMITS.descriptionMax} characters`
     if (!METRIC_KEYS.includes(c.metric as ChallengeMetric)) e.metric = 'Pick what to measure'
+    if (c.metric === 'reps') {
+        const ids = c.exercise_ids ?? []
+        if (!Array.isArray(ids) || ids.length === 0) e.exercise_ids = 'Pick at least one exercise to count'
+        else if (ids.length > LIMITS.maxExercises) e.exercise_ids = `Pick at most ${LIMITS.maxExercises} exercises`
+        else if (ids.some(id => typeof id !== 'string' || !UUID.test(id))) e.exercise_ids = 'Unknown exercise'
+    }
     if (c.format !== 'individual' && c.format !== 'team') e.format = 'Pick individual or team'
     if (c.format === 'team') {
         if (!['section', 'platoon', 'wing'].includes(c.team_level ?? '')) e.team_level = 'Pick which units compete'
@@ -86,6 +99,8 @@ export function validateChallenge(c: Partial<ChallengeInput>, now = Date.now()):
     if (!Number.isInteger(b) || b < LIMITS.bonusMin || b > LIMITS.bonusMax) e.bonus_points = `Bonus must be a whole number ${LIMITS.bonusMin}–${LIMITS.bonusMax}`
     return e
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // ── Status helpers ───────────────────────────────────────────────────────────
 export type ChallengeStatus = 'upcoming' | 'live' | 'ended'
@@ -120,7 +135,10 @@ export type Participant = {
     goal_mode: string | null; weight_kg: number | null
 }
 export type ChallengeLogs = {
-    workouts: { user_id: string; logged_at: string; duration_min: number | null; distance_km: number | null }[]
+    workouts: {
+        user_id: string; logged_at: string; duration_min: number | null; distance_km: number | null
+        template_id?: string | null; sets?: number | null; reps?: number | null
+    }[]
     meals: { user_id: string; logged_at: string }[]
     summaries: { user_id: string; date: string; total_calories: number; total_protein_g: number; calorie_target: number | null }[]
     sleeps: { user_id: string; night_date: string }[]
@@ -147,7 +165,10 @@ function longestStreak(dates: Set<string>) {
  * Logs outside the window or from non-participants are ignored, so callers can
  * pass a superset. Day-based metrics use Singapore calendar dates.
  */
-export function scoreParticipants(metric: ChallengeMetric, startsAt: string, endsAt: string, people: Participant[], logs: ChallengeLogs): Map<string, number> {
+export function scoreParticipants(
+    metric: ChallengeMetric, startsAt: string, endsAt: string, people: Participant[], logs: ChallengeLogs,
+    opts: { exerciseIds?: string[] | null } = {},
+): Map<string, number> {
     const from = Date.parse(startsAt), to = Date.parse(endsAt)
     const inTs = (iso: string) => { const t = Date.parse(iso); return t >= from && t < to }
     const fromDay = sgDate(startsAt), toDay = sgDate(new Date(to - 1).toISOString())
@@ -167,6 +188,13 @@ export function scoreParticipants(metric: ChallengeMetric, startsAt: string, end
         case 'workouts':
             for (const w of logs.workouts) if (inTs(w.logged_at)) add(w.user_id, 1)
             break
+        case 'reps': {
+            // A log of "3 sets × 20 reps" counts 60; a log with reps but no sets counts once.
+            const ids = new Set(opts.exerciseIds ?? [])
+            for (const w of logs.workouts)
+                if (inTs(w.logged_at) && w.template_id && ids.has(w.template_id)) add(w.user_id, (w.sets || 1) * (w.reps ?? 0))
+            break
+        }
         case 'meals_logged':
             for (const m of logs.meals) if (inTs(m.logged_at)) add(m.user_id, 1)
             break
@@ -195,6 +223,39 @@ export function scoreParticipants(metric: ChallengeMetric, startsAt: string, end
         }
     }
     return score
+}
+
+/** Which log tables a metric reads — the server only fetches those. */
+export const METRIC_SOURCES: Record<ChallengeMetric, (keyof ChallengeLogs)[]> = {
+    distance_km: ['workouts'], workout_minutes: ['workouts'], workouts: ['workouts'], reps: ['workouts'],
+    meals_logged: ['meals'], calorie_days: ['summaries'], protein_days: ['summaries'],
+    active_days: ['meals', 'workouts', 'sleeps'], best_streak: ['meals', 'workouts', 'sleeps'],
+}
+
+// ── Progress over time (race chart) ──────────────────────────────────────────
+/**
+ * Cumulative score at the end of each Singapore day of the window, up to `until`
+ * (now, for a live challenge). Re-scores the prefix window for each day, so it
+ * works for every metric (incl. streaks) with the exact same rules as the final
+ * score: the last point always equals scoreParticipants() for the whole window.
+ */
+export function cumulativeByDay(
+    metric: ChallengeMetric, startsAt: string, until: string, people: Participant[], logs: ChallengeLogs,
+    opts: { exerciseIds?: string[] | null } = {},
+): { days: string[]; scores: Map<string, number>[] } {
+    const from = Date.parse(startsAt), to = Date.parse(until)
+    const days: string[] = [], scores: Map<string, number>[] = []
+    if (!(to > from)) return { days, scores }
+    let day = sgDate(startsAt)
+    for (let i = 0; i < LIMITS.maxDays + 2; i++) {
+        // End of this SGT day (00:00 next day, SGT = UTC+8), capped at `until`.
+        const dayEnd = Math.min(Date.parse(day + 'T00:00:00+08:00') + 86400_000, to)
+        days.push(day)
+        scores.push(scoreParticipants(metric, startsAt, new Date(dayEnd).toISOString(), people, logs, opts))
+        if (dayEnd >= to) break
+        day = sgDate(new Date(dayEnd).toISOString())
+    }
+    return { days, scores }
 }
 
 // ── Standings ────────────────────────────────────────────────────────────────

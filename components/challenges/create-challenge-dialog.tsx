@@ -12,6 +12,7 @@ import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { authFetch } from '@/lib/auth-fetch'
+import { useData } from '@/lib/use-data'
 import { cn } from '@/lib/utils'
 import {
     CHALLENGE_METRICS, METRIC_KEYS, LIMITS, AWARD_SHARES, validateChallenge,
@@ -32,7 +33,15 @@ type Form = {
     format: 'individual' | 'team'; team_level: string
     scope_wing: string; scope_platoon: string
     starts_at: string; ends_at: string; bonus_points: string
+    exercise_ids: string[]
 }
+
+// Exercises a "Reps" challenge can count: templates logged as sets × reps.
+type RepExercise = { id: string; name: string }
+// The SCF Meal Time Regime — push-ups, sit-ups, pull-ups before each meal.
+// Matched by name, ignoring case/spaces/hyphens (docs/challenges_reps_migration.sql seeds them).
+const MTR_NAMES = ['pushups', 'situps', 'pullups']
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '')
 
 function initialForm(myWing: string | null, isSuperadmin: boolean): Form {
     const nextHour = Math.ceil(Date.now() / 3600_000) * 3600_000
@@ -40,6 +49,7 @@ function initialForm(myWing: string | null, isSuperadmin: boolean): Form {
         title: '', description: '', metric: 'distance_km', format: 'individual', team_level: 'section',
         scope_wing: isSuperadmin ? ALL : (myWing ?? ''), scope_platoon: '',
         starts_at: sgLocal(nextHour), ends_at: sgLocal(nextHour + 7 * 86400_000), bonus_points: '50',
+        exercise_ids: [],
     }
 }
 
@@ -51,6 +61,14 @@ export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSupe
     const [touched, setTouched] = useState<Record<string, boolean>>({})
     const [wings, setWings] = useState<string[]>([])
     const [saving, setSaving] = useState(false)
+
+    // Rep-countable exercises (cached, lib/use-data.ts) — only fetched while the dialog is open.
+    const { data: repExercises = [] } = useData<RepExercise[]>(open ? 'templates:challenge-reps' : null, async () => {
+        const { data, error } = await supabase.from('exercise_templates').select('id, name, fields').order('sort_order')
+        if (error) throw error
+        return (data ?? []).filter(t => (t.fields as { sets_reps?: boolean } | null)?.sets_reps).map(t => ({ id: t.id, name: t.name }))
+    })
+    const mtrIds = repExercises.filter(e => MTR_NAMES.includes(norm(e.name))).map(e => e.id)
 
     useEffect(() => {
         if (!open) return
@@ -65,6 +83,7 @@ export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSupe
         scope_platoon: form.scope_platoon.trim() || null,
         starts_at: toIso(form.starts_at), ends_at: toIso(form.ends_at),
         bonus_points: form.bonus_points === '' ? NaN : Number(form.bonus_points),
+        exercise_ids: form.metric === 'reps' ? form.exercise_ids : null,
     }
     const errors = validateChallenge(payload) // cheap — just recompute every render
     // Show a field's error once it has been edited (or on submit).
@@ -121,7 +140,11 @@ export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSupe
 
                     <div>
                         <label className={labelCls}>Measure</label>
-                        <Select value={form.metric} onValueChange={v => set('metric', v)}>
+                        <Select value={form.metric} onValueChange={v => {
+                            set('metric', v)
+                            // Picking "Reps" starts from the MTR set (push-ups, sit-ups, pull-ups) if available.
+                            if (v === 'reps' && form.exercise_ids.length === 0 && mtrIds.length) setForm(f => ({ ...f, exercise_ids: mtrIds }))
+                        }}>
                             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                             <SelectContent>
                                 {groups.map(g => (
@@ -137,6 +160,37 @@ export function CreateChallengeDialog({ open, onClose, onCreated, myWing, isSupe
                         <p className="text-[11px] text-muted-foreground mt-1">{CHALLENGE_METRICS[form.metric as keyof typeof CHALLENGE_METRICS]?.hint}</p>
                         {errText('metric')}
                     </div>
+
+                    {form.metric === 'reps' && (
+                        <div>
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                                <label className={cn(labelCls, 'mb-0')}>Exercises to count</label>
+                                {mtrIds.length > 0 && (
+                                    <button type="button" onClick={() => set('exercise_ids', mtrIds)}
+                                        className="text-[12px] font-medium text-primary hover:underline">Use MTR set</button>
+                                )}
+                            </div>
+                            {repExercises.length === 0 ? (
+                                <p className="text-[12px] text-muted-foreground">No rep-based exercises yet — run docs/challenges_reps_migration.sql to add Push-ups, Sit-ups and Pull-ups.</p>
+                            ) : (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {repExercises.map(ex => {
+                                        const on = form.exercise_ids.includes(ex.id)
+                                        return (
+                                            <button key={ex.id} type="button" aria-pressed={on}
+                                                onClick={() => set('exercise_ids', on ? form.exercise_ids.filter(x => x !== ex.id) : [...form.exercise_ids, ex.id])}
+                                                className={cn('h-8 px-3 rounded-full border text-[13px] transition-colors',
+                                                    on ? 'bg-primary text-primary-foreground border-primary' : 'bg-background text-foreground border-border hover:border-foreground/30')}>
+                                                {ex.name}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                            <p className="text-[11px] text-muted-foreground mt-1">Reps of all picked exercises add up. Cadets can quick-log them from the challenge page.</p>
+                            {errText('exercise_ids')}
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>

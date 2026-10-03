@@ -20,7 +20,7 @@ import { AlertOctagon, AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2
 import { cn } from '@/lib/utils'
 import type { IpptTier, Severity } from '@/lib/admin-analytics'
 
-const AXIS_TICK = { fontSize: 11, fill: 'var(--color-muted-foreground)' }
+export const AXIS_TICK = { fontSize: 11, fill: 'var(--color-muted-foreground)' }
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 export function Panel({ title, subtitle, action, className, children }: {
@@ -373,7 +373,7 @@ export function LegendKey({ color, label, square }: { color: string; label: stri
     )
 }
 
-function TooltipBox({ title, children }: { title: string; children: React.ReactNode }) {
+export function TooltipBox({ title, children }: { title: string; children: React.ReactNode }) {
     return (
         <div className="bg-popover border border-border rounded-xl px-3 py-2 text-[12px] shadow-md min-w-[140px]">
             <div className="font-semibold text-foreground mb-1 whitespace-nowrap">{title}</div>
@@ -382,7 +382,7 @@ function TooltipBox({ title, children }: { title: string; children: React.ReactN
     )
 }
 
-function TooltipRow({ color, label, value }: { color: string; label: string; value: string }) {
+export function TooltipRow({ color, label, value }: { color: string; label: string; value: string }) {
     return (
         <div className="flex items-center justify-between gap-4 whitespace-nowrap">
             <span className="inline-flex items-center gap-1.5 text-muted-foreground">
