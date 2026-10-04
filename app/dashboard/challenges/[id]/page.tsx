@@ -17,6 +17,8 @@ import { authFetch } from '@/lib/auth-fetch'
 import { ApiError, useApi, useData } from '@/lib/use-data'
 import { refreshData } from '@/lib/data-cache'
 import { useAuth } from '@/app/context/auth-context'
+import { applyPreview } from '@/lib/role-preview'
+import { useRolePreview } from '@/lib/use-role-preview'
 import { supabase } from '@/lib/supabase'
 import { ChallengeArena, withLoggedReps, type ChallengeDetail } from '@/components/challenges/arena'
 import { CreateChallengeDialog } from '@/components/challenges/create-challenge-dialog'
@@ -39,11 +41,13 @@ export default function ChallengeDetailPage({ params }: { params: Promise<{ id: 
         : loadError.message || 'Could not load challenge'
 
     // Name + wing for the share image and the edit dialog (cached).
-    const { data: me } = useData<{ rank: string | null; full_name: string | null; wing: string | null; role: string | null }>('profile:challenge', async uid => {
+    const { data: meRow } = useData<{ rank: string | null; full_name: string | null; wing: string | null; role: string | null }>('profile:challenge', async uid => {
         const { data, error } = await supabase.from('users').select('rank, full_name, wing, role').eq('id', uid).single()
         if (error) throw error
         return data
     })
+    // Superadmin "View as" swaps in the previewed role + wing (lib/role-preview.ts).
+    const me = applyPreview(meRow, useRolePreview())
 
     async function cancel() {
         const res = await authFetch(`/api/challenges/${id}`, { method: 'DELETE' })

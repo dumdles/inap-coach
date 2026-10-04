@@ -18,6 +18,25 @@ editing `users.role`. Hiding nav items in the UI is cosmetic only.
 3. Open **Admin** and revoke any backfilled instructor accounts that shouldn't have access
    (the migration grants `instructor` to every existing user with an instructor rank so nobody is locked out).
 
+### "View as" — superadmin role preview
+Superadmins can see FitRep exactly as a **cadet** or an **instructor of a chosen wing**
+would, without a second account: **View as…** in the sidebar user menu (phone: More),
+or the button at the top of the Admin console. While previewing, a "Viewing as" card
+(sidebar) / pill (phone) shows the role with **Switch** and **Exit**.
+
+- Nav, page gates (Admin, My Wing) and the API answers all follow the previewed role
+  and wing. Your own logs still show — only the role and wing change.
+- Role-gated **writes are refused** while previewing (creating/editing challenges,
+  approving requests, cadet admin), so nothing is ever done "as" someone else.
+  Logging your own meals/workouts still works.
+- The preview is per browser tab (sessionStorage) and ends on sign-out or in a new tab.
+- Safe by design: the server honours the preview headers only for a real superadmin, and
+  only to *lower* access. Code: `lib/role-preview.ts` (rules), `lib/use-role-preview.ts`
+  (store), `app/api/_lib/preview.ts` + `requireRole` / `canViewUser` (server),
+  `components/role-preview/view-as.tsx` (UI).
+
+There is no separate "admin" role — the Admin console *is* the superadmin view.
+
 ## Environments
 
 | Branch | Deploys to | Database | Purpose |

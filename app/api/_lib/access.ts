@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/app/api/cron/_lib'
 import { hasInstructorAccess, isSuperadmin } from '@/lib/roles'
+import type { RolePreview } from '@/lib/role-preview'
 
 // Shared authorisation rules for "can user A see user B's data?".
 // Used by read routes that serve another cadet's logs (e.g. the instructor /
@@ -8,6 +9,8 @@ import { hasInstructorAccess, isSuperadmin } from '@/lib/roles'
 //   • superadmin — anyone
 //   • verified instructor — cadets in the same wing
 //   • accepted friend — each other
+// Pass readPreview(req) so a superadmin using "View as" gets the previewed
+// role's answer (lib/role-preview.ts); it's ignored for everyone else.
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -16,7 +19,7 @@ export function isUuid(v: unknown): v is string {
     return typeof v === 'string' && UUID_RE.test(v)
 }
 
-export async function canViewUser(requesterId: string, targetId: string): Promise<boolean> {
+export async function canViewUser(requesterId: string, targetId: string, preview: RolePreview | null = null): Promise<boolean> {
     if (requesterId === targetId) return true
     if (!isUuid(targetId)) return false
 
@@ -25,8 +28,11 @@ export async function canViewUser(requesterId: string, targetId: string): Promis
     const target = users?.find(u => u.id === targetId)
     if (!requester || !target) return false
 
-    if (isSuperadmin(requester.role)) return true
-    if (hasInstructorAccess(requester.role) && requester.wing && requester.wing === target.wing) return true
+    let { role, wing } = requester
+    if (preview && isSuperadmin(role)) { role = preview.role; wing = preview.wing ?? wing }
+
+    if (isSuperadmin(role)) return true
+    if (hasInstructorAccess(role) && wing && wing === target.wing) return true
 
     const { data: friendship } = await supabaseAdmin
         .from('friendships')

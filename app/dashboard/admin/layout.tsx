@@ -11,12 +11,16 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Layers, ListChecks, Users, RefreshCw } from 'lucide-react'
+import { LayoutDashboard, Layers, ListChecks, Users, RefreshCw, Eye } from 'lucide-react'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { isSuperadmin } from '@/lib/roles'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { AdminDataProvider, useAdminData, type Period } from '@/components/admin/admin-data'
+import { applyPreview } from '@/lib/role-preview'
+import { useRolePreview } from '@/lib/use-role-preview'
+import { useViewAs } from '@/components/role-preview/view-as'
 
 const TABS = [
     { href: '/dashboard/admin', label: 'Overview', Icon: LayoutDashboard },
@@ -29,14 +33,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const { user } = useAuth()
     const router = useRouter()
     const [allowed, setAllowed] = useState(false)
+    // A superadmin previewing another role ("View as") is sent home like that role would be.
+    const preview = useRolePreview()
 
     useEffect(() => {
         if (!user) return
         supabase.from('users').select('role').eq('id', user.id).single().then(({ data }) => {
-            if (!isSuperadmin(data?.role)) router.replace('/dashboard')
+            if (!isSuperadmin(applyPreview(data, preview)?.role)) { setAllowed(false); router.replace('/dashboard') }
             else setAllowed(true)
         })
-    }, [user, router])
+    }, [user, router, preview])
 
     if (!allowed) return null
 
@@ -53,18 +59,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 function AdminHeader() {
     const pathname = usePathname()
     const { period, setPeriod, loading, reload, data } = useAdminData()
+    const viewAs = useViewAs()
     const onStaff = pathname.startsWith('/dashboard/admin/staff')
     const isActive = (href: string) => href === '/dashboard/admin' ? pathname === href : pathname.startsWith(href)
 
     return (
         <div className="mb-6">
-            <div className="flex flex-col gap-1 mb-5">
-                <div className="text-[11px] font-bold tracking-[0.14em] uppercase text-muted-foreground">Command</div>
-                <h1 className="font-display font-extrabold text-[32px] tracking-tight text-foreground leading-none">OCS overview</h1>
-                <p className="text-sm text-muted-foreground">
-                    {data ? `${data.totals.cadets} cadets across ${data.totals.wings} wings` : 'All wings'}
-                    {!onStaff && ` · last ${period} days vs the ${period} before`}
-                </p>
+            <div className="flex items-start justify-between gap-3 mb-5">
+                <div className="flex flex-col gap-1 min-w-0">
+                    <div className="text-[11px] font-bold tracking-[0.14em] uppercase text-muted-foreground">Command</div>
+                    <h1 className="font-display font-extrabold text-[32px] tracking-tight text-foreground leading-none">OCS overview</h1>
+                    <p className="text-sm text-muted-foreground">
+                        {data ? `${data.totals.cadets} cadets across ${data.totals.wings} wings` : 'All wings'}
+                        {!onStaff && ` · last ${period} days vs the ${period} before`}
+                    </p>
+                </div>
+                {/* Preview the app as a cadet / instructor (components/role-preview/view-as.tsx) */}
+                {viewAs && (
+                    <Button variant="outline" size="sm" onClick={viewAs.open} className="shrink-0">
+                        <Eye size={14} /> View as…
+                    </Button>
+                )}
             </div>
 
             {/* Tab bar + period controls share one row on desktop; on phones the

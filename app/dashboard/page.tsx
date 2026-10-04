@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
+import { applyPreview } from '@/lib/role-preview'
+import { useRolePreview } from '@/lib/use-role-preview'
 import { calculateTDEE } from '@/lib/tdee'
 import { LogMealDialog } from '@/components/nutrition/log-meal-dialog'
 import { LogIPPTDialog } from '@/components/ippt/log-ippt-dialog'
@@ -40,6 +42,7 @@ type UserProfile = {
     full_name: string | null
     rank: string | null
     wing: string | null
+    role?: string | null
     gender: string
     weight_kg: number
     height_cm: number
@@ -382,15 +385,18 @@ export default function DashboardPage() {
     // the first visit shows skeletons; returning to Home shows the last data
     // instantly and refreshes it in the background.
     const day = todayStr()
-    const { data: profile, isLoading: profileLoading } = useData<UserProfile | null>('profile:home', async uid => {
+    const { data: profileRow, isLoading: profileLoading } = useData<UserProfile | null>('profile:home', async uid => {
         const { data, error } = await supabase
             .from('users')
-            .select('full_name, rank, wing, gender, weight_kg, height_cm, date_of_birth, activity_level, goal_mode, ippt_date')
+            .select('full_name, rank, wing, role, gender, weight_kg, height_cm, date_of_birth, activity_level, goal_mode, ippt_date')
             .eq('id', uid)
             .single()
         if (error) throw error
         return data as UserProfile
     })
+    // Superadmin "View as" shows the previewed wing (lib/role-preview.ts).
+    const preview = useRolePreview()
+    const profile = useMemo(() => applyPreview(profileRow, preview), [profileRow, preview])
 
     // Today's meals and workouts — keyed by date so a new day never shows yesterday's.
     const { data: meals = [], isLoading: mealsLoading, mutate: refreshMeals } = useData<MealLog[]>(`meals:home:${day}`, async uid => {

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { clearDataCache } from '@/lib/data-cache'
+import { setRolePreview } from '@/lib/use-role-preview'
 
 interface AuthContextType {
     user: User | null
@@ -58,7 +59,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
                 return
             }
             // Signed out (incl. in another tab) → forget every cached response.
-            if (event === 'SIGNED_OUT') void clearDataCache()
+            // Also drop any superadmin "View as" preview (lib/role-preview.ts).
+            if (event === 'SIGNED_OUT') { void clearDataCache(); setRolePreview(null) }
             setSession(session)
             setUser(session?.user ?? null)
         })
@@ -126,6 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             if (error) throw error
 
             void clearDataCache() // see lib/use-data.ts
+            setRolePreview(null)  // end any superadmin "View as" preview
             setUser(null)
             setSession(null)
         } catch (err) {

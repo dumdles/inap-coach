@@ -6,6 +6,8 @@ import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { hasInstructorAccess } from '@/lib/roles'
+import { applyPreview } from '@/lib/role-preview'
+import { useRolePreview } from '@/lib/use-role-preview'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useRouter } from 'next/navigation'
 import gsap from 'gsap'
@@ -551,11 +553,14 @@ export default function WingPage() {
     // ── Data ──────────────────────────────────────────────────────────────────
     // Loaded through the shared cache (lib/use-data.ts): coming back to this page
     // shows the last roster instantly and refreshes it in the background.
-    const { data: profile = null } = useData<{ rank: string; wing: string; role: string } | null>('profile:wing', async uid => {
+    const { data: profileRow = null } = useData<{ rank: string; wing: string; role: string } | null>('profile:wing', async uid => {
         const { data, error } = await supabase.from('users').select('rank, wing, role').eq('id', uid).single()
         if (error) throw error
         return data
     })
+    // Superadmin "View as" swaps in the previewed role + wing (lib/role-preview.ts).
+    const preview = useRolePreview()
+    const profile = useMemo(() => applyPreview(profileRow, preview), [profileRow, preview])
 
     // Only instructors / superadmins may view the wing console.
     useEffect(() => {

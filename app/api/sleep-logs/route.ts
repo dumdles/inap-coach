@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { canViewUser } from '@/app/api/_lib/access'
+import { readPreview } from '@/app/api/_lib/preview'
 import { supabaseAdmin } from '@/app/api/cron/_lib'
 import { verifyAuth } from '@/app/api/_lib/auth'
 
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
     const auth = await verifyAuth(req)
     if (auth.error) return auth.error
     const userId = searchParams.get('userId') || auth.user.id
-    if (!(await canViewUser(auth.user.id, userId))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!(await canViewUser(auth.user.id, userId, readPreview(req)))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     const limit = Math.min(parseInt(searchParams.get('limit') ?? '60', 10) || 60, 366)
 
     const { data, error } = await supabaseAdmin

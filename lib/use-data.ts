@@ -3,6 +3,7 @@
 import useSWR, { type SWRConfiguration } from 'swr'
 import { useAuth } from '@/app/context/auth-context'
 import { authFetch } from '@/lib/auth-fetch'
+import { previewTag, useRolePreview } from '@/lib/use-role-preview'
 
 // ── Client-side data cache ────────────────────────────────────────────────────
 // Every dashboard page used to fetch its data from scratch each time it opened,
@@ -48,8 +49,11 @@ export async function apiGet<T>(path: string): Promise<T> {
 /** Cached GET of an /api route. Pass `null` to wait (e.g. until a profile has loaded). */
 export function useApi<T>(path: string | null, config?: SWRConfiguration<T>) {
     const { user } = useAuth()
+    // A superadmin "View as" preview changes what the API returns, so each view
+    // gets its own cache entry (the 4th key part; '' when not previewing).
+    const preview = previewTag(useRolePreview())
     return useSWR<T>(
-        user && path ? ['api', user.id, path] : null,
+        user && path ? ['api', user.id, path, preview] : null,
         () => apiGet<T>(path!),
         { ...DEFAULTS, ...config },
     )

@@ -17,11 +17,14 @@ import {
     Home, Utensils, Dumbbell, Moon, TrendingUp,
     Trophy, Brain, LayoutGrid, ShieldCheck, Bell, Settings, LogOut,
     ChevronLeft, ChevronRight, Check, SportShoe, MoreHorizontal, Calculator, Sparkles,
-    Pencil, Plus, Flag,
+    Pencil, Plus, Flag, Eye,
 } from 'lucide-react'
 import { authFetch } from '@/lib/auth-fetch'
 import { useApi, useData } from '@/lib/use-data'
 import { refreshData } from '@/lib/data-cache'
+import { applyPreview } from '@/lib/role-preview'
+import { setRolePreview, useRolePreview } from '@/lib/use-role-preview'
+import { ViewAsMobilePill, ViewAsProvider, ViewAsSidebarCard, useViewAs } from '@/components/role-preview/view-as'
 
 // ── Notification types ─────────────────────────────────────
 type Notification = {
@@ -260,7 +263,8 @@ const ADMIN_NAV = [
 
 // Extra nav items unlocked by users.role (see lib/roles.ts). Role is read from
 // the DB, and every privileged API re-checks it server-side — hiding nav items
-// is a convenience, not the security boundary.
+// is a convenience, not the security boundary. During a superadmin "View as"
+// preview this is the *previewed* role (see DashboardLayout).
 function roleNav(role?: string) {
     return [
         ...(hasInstructorAccess(role) ? INSTRUCTOR_NAV : []),
@@ -357,6 +361,7 @@ function MobileMoreSheet({ open, onClose, pathname, profile, overflow, primaryHr
 }) {
     const { signOut } = useAuth()
     const router = useRouter()
+    const viewAs = useViewAs() // superadmins only
     // Customise mode lets the cadet pick which 4 tabs sit in the bottom bar.
     const [editing, setEditing] = useState(false)
     // Local draft of the selected bar tabs while editing (committed on "Done").
@@ -473,7 +478,16 @@ function MobileMoreSheet({ open, onClose, pathname, profile, overflow, primaryHr
 
                     <div className="mx-2 my-3 border-t border-border" />
 
-                    {/* Settings & sign out */}
+                    {/* View as (superadmins), settings & sign out */}
+                    {viewAs && (
+                        <button
+                            onClick={() => { onClose(); viewAs.open() }}
+                            className="flex w-full items-center gap-3 px-4 py-3 rounded-2xl text-[14px] font-medium text-foreground hover:bg-muted transition-colors duration-150"
+                        >
+                            <Eye size={18} />
+                            View as…
+                        </button>
+                    )}
                     <Link
                         href="/dashboard/settings"
                         onClick={onClose}
@@ -630,6 +644,7 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
     const { user, signOut } = useAuth()
     const router = useRouter()
     const [userMenuOpen, setUserMenuOpen] = useState(false)
+    const viewAs = useViewAs() // superadmins only
 
     const displayName = profile?.full_name ?? user?.user_metadata?.full_name ?? ''
     const rank = profile?.rank ?? ''
@@ -720,6 +735,9 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
             {/* Divider */}
             <div className="mx-3 border-t border-sidebar-border mt-3 mb-2" />
 
+            {/* "Viewing as …" indicator while a superadmin previews another role */}
+            <ViewAsSidebarCard expanded={expanded} />
+
             {/* User section — click to open popover */}
             <Popover open={userMenuOpen} onOpenChange={setUserMenuOpen}>
                 <PopoverTrigger asChild>
@@ -744,6 +762,14 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
                     </button>
                 </PopoverTrigger>
                 <PopoverContent side="right" align="end" sideOffset={10} className="w-44 p-3 gap-1">
+                    {viewAs && (
+                        <div
+                            onClick={() => { setUserMenuOpen(false); viewAs.open() }}
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-foreground hover:bg-accent transition-colors duration-100 cursor-pointer"
+                        >
+                            <Eye size={15} /> View as…
+                        </div>
+                    )}
                     <Link
                         href="/dashboard/settings"
                         onClick={() => setUserMenuOpen(false)}
@@ -813,7 +839,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }, {
         onSuccess: data => { if (data?.goal_mode) setGoalMode(data.goal_mode as GoalMode) },
     })
-    const profile = profileRow ?? null
+    // Superadmin "View as" (lib/role-preview.ts): nav and role-gated pages use the
+    // previewed role/wing; the real role only decides who may preview.
+    const preview = useRolePreview()
+    const canPreview = isSuperadmin(profileRow?.role)
+    const profile = applyPreview(profileRow ?? null, preview)
+    const previewing = canPreview && !!preview
+    // A preview left in this tab by someone who isn't a superadmin does nothing
+    // (the server ignores it too) — clear it so it doesn't linger.
+    useEffect(() => {
+        if (profileRow && !canPreview && preview) setRolePreview(null)
+    }, [profileRow, canPreview, preview])
 
     if (isLoading || !user) {
         return (
@@ -828,31 +864,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (fixedShell) {
         return (
+            <ViewAsProvider enabled={canPreview} ownWing={profileRow?.wing ?? null}>
             <FabProvider>
                 <div className="bg-background">
                     <style>{`@media (min-width: 768px) { .dash-content { margin-left: ${contentMargin}px; } }`}</style>
                     <div className="hidden md:block">
                         <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} unread={unread} setUnread={setUnread} />
                     </div>
-                    <div className="dash-content h-screen overflow-hidden animate-in fade-in duration-200 pb-28 md:pb-0" style={{ animationFillMode: 'both' }}>
+                    <div className={cn('dash-content h-screen overflow-hidden animate-in fade-in duration-200 pb-28 md:pb-0', previewing && 'pt-14 md:pt-0')} style={{ animationFillMode: 'both' }}>
                         {children}
                     </div>
                     <MobileBell userId={user.id} unread={unread} setUnread={setUnread} />
                     <MobileFab />
                     <MobileBottomNav pathname={pathname} profile={profile} primary={primary} overflow={overflow} primaryHrefs={primaryHrefs} setPrimary={setPrimary} />
+                    <ViewAsMobilePill />
                 </div>
             </FabProvider>
+            </ViewAsProvider>
         )
     }
 
     return (
+        <ViewAsProvider enabled={canPreview} ownWing={profileRow?.wing ?? null}>
         <FabProvider>
             <div className="min-h-screen bg-background">
                 <style>{`@media (min-width: 768px) { .dash-content { margin-left: ${contentMargin}px; transition: margin-left 300ms ease; } }`}</style>
                 <div className="hidden md:block">
                     <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} unread={unread} setUnread={setUnread} />
                 </div>
-                <main className="dash-content min-h-screen overflow-y-auto pb-28 md:pb-0">
+                <main className={cn('dash-content min-h-screen overflow-y-auto pb-28 md:pb-0', previewing && 'pt-14 md:pt-0')}>
                     <div className="animate-in fade-in duration-200" style={{ animationFillMode: 'both' }}>
                         {children}
                     </div>
@@ -860,7 +900,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <MobileBell userId={user.id} unread={unread} setUnread={setUnread} />
                 <MobileFab />
                 <MobileBottomNav pathname={pathname} profile={profile} primary={primary} overflow={overflow} primaryHrefs={primaryHrefs} setPrimary={setPrimary} />
+                <ViewAsMobilePill />
             </div>
         </FabProvider>
+        </ViewAsProvider>
     )
 }

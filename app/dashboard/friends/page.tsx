@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
+import { applyPreview } from '@/lib/role-preview'
+import { useRolePreview } from '@/lib/use-role-preview'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -685,11 +687,14 @@ export default function FriendsPage() {
     // Loaded through the shared cache (lib/use-data.ts): each tab/period is cached
     // separately, so switching back and forth (or returning to this page) is
     // instant after the first load; the cache refreshes in the background.
-    const { data: profile = null, isLoading: profileLoading } = useData<{ rank: string; wing: string; section?: string } | null>('profile:friends', async uid => {
-        const { data, error } = await supabase.from('users').select('rank, wing, section').eq('id', uid).single()
+    const { data: profileRow = null, isLoading: profileLoading } = useData<{ rank: string; wing: string; role: string; section?: string } | null>('profile:friends', async uid => {
+        const { data, error } = await supabase.from('users').select('rank, wing, role, section').eq('id', uid).single()
         if (error) throw error
         return data
     })
+    // Superadmin "View as" shows the previewed wing (lib/role-preview.ts).
+    const preview = useRolePreview()
+    const profile = useMemo(() => applyPreview(profileRow, preview), [profileRow, preview])
 
     const { data: friendships, mutate: refreshFriends } = useApi<FriendshipsData>('/api/friendships')
     const friends = useMemo(() => friendships?.friends ?? [], [friendships])

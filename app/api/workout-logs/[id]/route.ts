@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { canViewUser } from '@/app/api/_lib/access'
+import { readPreview } from '@/app/api/_lib/preview'
 import { verifyAuth } from '@/app/api/_lib/auth'
 import { fetchPolar } from '@/lib/polar'
 
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     if (error || !log) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     // 404 rather than 403 so workout ids can't be probed
-    if (!(await canViewUser(auth.user.id, log.user_id))) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!(await canViewUser(auth.user.id, log.user_id, readPreview(req)))) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     // Fetch tagged users
     const { data: tags } = await supabaseAdmin

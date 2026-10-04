@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { canViewUser } from '@/app/api/_lib/access'
+import { readPreview } from '@/app/api/_lib/preview'
 import { verifyAuth } from '@/app/api/_lib/auth'
 
 const supabaseAdmin = createClient(
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
     const auth = await verifyAuth(req)
     if (auth.error) return auth.error
     const userId = req.nextUrl.searchParams.get('userId') || auth.user.id
-    if (!(await canViewUser(auth.user.id, userId))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!(await canViewUser(auth.user.id, userId, readPreview(req)))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const { data, error } = await supabaseAdmin
         .from('ippt_results')
