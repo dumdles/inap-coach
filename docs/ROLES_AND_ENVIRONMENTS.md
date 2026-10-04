@@ -46,6 +46,8 @@ Flow: feature branch → PR into `staging` → demo/pilot → PR `staging` → `
 
 ## Password reset (Supabase Auth emails)
 
+> Step-by-step, non-technical setup guide (Resend, domain, Gmail stop-gap): `docs/EMAIL_SETUP_RESEND.md`.
+
 Flow: **Forgot password?** on the login page → `/auth/forgot-password` sends
 `supabase.auth.resetPasswordForEmail(email, { redirectTo: <site>/auth/reset-password })`
 → the email link opens `/auth/reset-password`, which checks the link and calls
