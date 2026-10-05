@@ -20,7 +20,7 @@ editing `users.role`. Hiding nav items in the UI is cosmetic only.
 
 ### "View as" — superadmin role preview
 Superadmins can see FitRep exactly as a **cadet** or an **instructor of a chosen wing**
-would, without a second account: **View as…** in the sidebar user menu (phone: More),
+would, without a second account: the **View as…** button above your profile in the sidebar (phone: More),
 or the button at the top of the Admin console. While previewing, a "Viewing as" card
 (sidebar) / pill (phone) shows the role with **Switch** and **Exit**.
 

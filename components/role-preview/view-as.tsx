@@ -138,11 +138,27 @@ function previewLabel(p: RolePreview) {
     return `${PREVIEW_ROLE_LABEL[p.role]}${p.wing ? ` · ${p.wing}` : ''}`
 }
 
-/** Desktop sidebar indicator while previewing: what you're viewing as + Switch / Exit. */
+/**
+ * Desktop sidebar slot just above the profile tag (superadmins only):
+ * a one-click "View as…" button, or — while previewing — what you're viewing
+ * as with Switch / Exit.
+ */
 export function ViewAsSidebarCard({ expanded }: { expanded: boolean }) {
     const preview = useRolePreview()
     const viewAs = useViewAs()
-    if (!preview || !viewAs) return null
+    if (!viewAs) return null
+
+    if (!preview) return (
+        <button onClick={viewAs.open} title={!expanded ? 'View as…' : undefined}
+            className={cn(
+                'mb-2 h-9 rounded-xl inline-flex items-center gap-2.5 text-[13px] font-medium transition-colors',
+                'text-sidebar-foreground/60 hover:text-sidebar-foreground ring-1 ring-sidebar-border hover:bg-sidebar-accent/60',
+                expanded ? 'mx-2.5 px-3' : 'mx-2 justify-center',
+            )}>
+            <Eye size={16} className="shrink-0" />
+            {expanded && <span className="whitespace-nowrap">View as…</span>}
+        </button>
+    )
 
     if (!expanded) return (
         <button onClick={viewAs.open} title={`Viewing as ${previewLabel(preview)} — click to switch or exit`}

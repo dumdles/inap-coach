@@ -644,7 +644,6 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
     const { user, signOut } = useAuth()
     const router = useRouter()
     const [userMenuOpen, setUserMenuOpen] = useState(false)
-    const viewAs = useViewAs() // superadmins only
 
     const displayName = profile?.full_name ?? user?.user_metadata?.full_name ?? ''
     const rank = profile?.rank ?? ''
@@ -735,7 +734,7 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
             {/* Divider */}
             <div className="mx-3 border-t border-sidebar-border mt-3 mb-2" />
 
-            {/* "Viewing as …" indicator while a superadmin previews another role */}
+            {/* Superadmins: "View as…" button, or the "Viewing as …" card while previewing */}
             <ViewAsSidebarCard expanded={expanded} />
 
             {/* User section — click to open popover */}
@@ -762,14 +761,6 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
                     </button>
                 </PopoverTrigger>
                 <PopoverContent side="right" align="end" sideOffset={10} className="w-44 p-3 gap-1">
-                    {viewAs && (
-                        <div
-                            onClick={() => { setUserMenuOpen(false); viewAs.open() }}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-foreground hover:bg-accent transition-colors duration-100 cursor-pointer"
-                        >
-                            <Eye size={15} /> View as…
-                        </div>
-                    )}
                     <Link
                         href="/dashboard/settings"
                         onClick={() => setUserMenuOpen(false)}
