@@ -1,13 +1,28 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/app/context/auth-context'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
+import { useData } from '@/lib/use-data'
 import { wingToService, SERVICE_META } from '@/lib/service'
 import { cn } from '@/lib/utils'
+
+// The columns this page displays (the query selects the whole users row).
+type Profile = {
+    full_name: string | null
+    username: string | null
+    created_at: string | null
+    rank: string | null
+    wing: string | null
+    height_cm: number | null
+    weight_kg: number | null
+    gender: string | null
+    date_of_birth: string | null
+    activity_level: string | null
+    goal_mode: string | null
+}
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
     return (
@@ -21,18 +36,18 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
 export default function ProfilePage() {
     const { user, signOut } = useAuth()
     const router = useRouter()
-    const meta = user?.user_metadata ?? {}
-    const [profile, setProfile] = useState<Record<string, any> | null>(null)
 
-    useEffect(() => {                                               
-      if (!user) return                  
-      supabase                                                                     
-          .from('users')
-          .select('*')                                                             
-          .eq('id', user.id)                                      
-          .single()                      
-          .then(({ data }) => setProfile(data))
-  }, [user])
+    // Profile row through the shared cache (lib/use-data.ts) — shows instantly
+    // when you come back to this page, then refreshes in the background.
+    const { data: profile = null } = useData<Profile | null>('profile:profile', async uid => {
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', uid)
+            .single()
+        if (error) throw error
+        return data as Profile
+    })
 
     const handleSignOut = async () => {
         await signOut()

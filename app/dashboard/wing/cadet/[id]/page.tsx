@@ -3,12 +3,12 @@
 import React, { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/app/context/auth-context'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AwardBadge, secondsToRunTime, AWARD_META, type IPPTResult } from '@/components/ippt/log-ippt-dialog'
+import { ApiError, useApi } from '@/lib/use-data'
 
 type DayEntry = { calories: number; protein: number; carbs: number; fat: number; calorie_target: number }
 
@@ -70,53 +70,33 @@ const GOAL_COLOR: Record<string, string> = {
 
 export default function CadetDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id: cadetId } = use(params)
-    const { user } = useAuth()
     const router = useRouter()
-    const [data, setData] = useState<CadetData | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<'nutrition' | 'workouts' | 'ippt' | 'profile'>('nutrition')
-    const [workoutLogs, setWorkoutLogs] = useState<WorkoutLogRow[]>([])
-    const [workoutsLoading, setWorkoutsLoading] = useState(false)
-    const [ipptResults, setIpptResults] = useState<IPPTResult[]>([])
-    const [ipptLoading, setIpptLoading] = useState(false)
 
+    // ── Data ──────────────────────────────────────────────────────────────────
+    // Loaded through the shared cache (lib/use-data.ts): reopening a cadet you've
+    // already viewed shows their data instantly and refreshes it in the background.
+    // The requester is identified server-side from the Bearer token.
+    const { data, error: loadError } = useApi<CadetData>(`/api/cadet?cadetId=${cadetId}`)
+    // 403 = not allowed to view this cadet → send them back to the dashboard.
+    const forbidden = loadError instanceof ApiError && loadError.status === 403
     useEffect(() => {
-        if (!user) return
-        async function load() {
-            try {
-                const res = await fetch(`/api/cadet?cadetId=${cadetId}&requesterId=${user!.id}`)
-                if (res.status === 403) { router.replace('/dashboard'); return }
-                const json = await res.json()
-                if (json?.error) { setError(json.error) } else { setData(json) }
-            } catch {
-                setError('Failed to load cadet data')
-            } finally {
-                setLoading(false)
-            }
-        }
-        load()
-    }, [user, cadetId, router])
+        if (forbidden) router.replace('/dashboard')
+    }, [forbidden, router])
+    // Skeleton until the first response (or error) arrives; a failed background
+    // refresh keeps showing the cached data instead of the error card.
+    const loading = !data && !loadError
+    const error = loadError && !data && !forbidden ? loadError.message : null
 
-    // Fetch workout logs lazily when tab is first opened
-    useEffect(() => {
-        if (activeTab !== 'workouts' || workoutLogs.length > 0) return
-        setWorkoutsLoading(true)
-        fetch(`/api/workout-logs?userId=${cadetId}`)
-            .then(r => r.json())
-            .then(d => setWorkoutLogs(Array.isArray(d) ? d : []))
-            .finally(() => setWorkoutsLoading(false))
-    }, [activeTab, cadetId, workoutLogs.length])
-
-    // Fetch IPPT results lazily
-    useEffect(() => {
-        if (activeTab !== 'ippt' || ipptResults.length > 0) return
-        setIpptLoading(true)
-        fetch(`/api/ippt-results?userId=${cadetId}`)
-            .then(r => r.json())
-            .then(d => setIpptResults(Array.isArray(d) ? d : []))
-            .finally(() => setIpptLoading(false))
-    }, [activeTab, cadetId, ipptResults.length])
+    // Workout logs / IPPT results are fetched lazily — only once their tab is opened.
+    const { data: workoutData, isLoading: workoutsLoading } = useApi<WorkoutLogRow[]>(
+        activeTab === 'workouts' ? `/api/workout-logs?userId=${cadetId}` : null,
+    )
+    const workoutLogs = Array.isArray(workoutData) ? workoutData : []
+    const { data: ipptData, isLoading: ipptLoading } = useApi<IPPTResult[]>(
+        activeTab === 'ippt' ? `/api/ippt-results?userId=${cadetId}` : null,
+    )
+    const ipptResults = Array.isArray(ipptData) ? ipptData : []
 
     if (loading) return (
         <div className="px-4 md:px-8 py-8 max-w-3xl mx-auto space-y-6">

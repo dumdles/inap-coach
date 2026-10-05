@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useAuth } from '@/app/context/auth-context'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import { isInstructor } from '@/lib/scoring'
+import { hasInstructorAccess, isSuperadmin } from '@/lib/roles'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { BottomSheet } from '@/components/ui/bottom-sheet'
 import { FabProvider, useFabEntry } from '@/app/context/fab-context'
@@ -15,10 +15,16 @@ import { useTheme } from '@/app/context/theme-context'
 import type { GoalMode } from '@/app/context/theme-context'
 import {
     Home, Utensils, Dumbbell, Moon, TrendingUp,
-    Trophy, Brain, LayoutGrid, Bell, Settings, LogOut,
+    Trophy, Brain, LayoutGrid, ShieldCheck, Bell, Settings, LogOut,
     ChevronLeft, ChevronRight, Check, SportShoe, MoreHorizontal, Calculator, Sparkles,
-    Pencil, Plus,
+    Pencil, Plus, Flag, Eye,
 } from 'lucide-react'
+import { authFetch } from '@/lib/auth-fetch'
+import { useApi, useData } from '@/lib/use-data'
+import { refreshData } from '@/lib/data-cache'
+import { applyPreview } from '@/lib/role-preview'
+import { setRolePreview, useRolePreview } from '@/lib/use-role-preview'
+import { ViewAsMobilePill, ViewAsProvider, ViewAsSidebarCard, useViewAs } from '@/components/role-preview/view-as'
 
 // ── Notification types ─────────────────────────────────────
 type Notification = {
@@ -45,19 +51,17 @@ function notifTimeAgo(iso: string) {
 // Reused by the desktop anchored popover (NotificationPanel) and the mobile
 // bottom sheet (MobileBell) so both stay in sync. Fetches its own data.
 function NotificationList({ userId, onClose }: { userId: string; onClose: () => void }) {
-    const [items, setItems] = useState<Notification[]>([])
-    const [loading, setLoading] = useState(true)
-
-    useEffect(() => {
-        fetch(`/api/notifications?userId=${userId}`)
-            .then(r => r.json())
-            .then(data => { setItems(data ?? []); setLoading(false) })
-            .catch(() => setLoading(false))
-    }, [userId])
+    // Same cached '/api/notifications' entry as the unread badge (useUnreadCount),
+    // so opening the bell shows the list instantly (shared cache: lib/use-data.ts).
+    const { data, isLoading: loading, mutate } = useApi<Notification[]>(userId ? '/api/notifications' : null)
+    const items = Array.isArray(data) ? data : []
 
     async function markAllRead() {
-        await fetch(`/api/notifications?userId=${userId}`, { method: 'PATCH' })
-        setItems(prev => prev.map(n => ({ ...n, read: true })))
+        await authFetch('/api/notifications', { method: 'PATCH' })
+        // Show them as read straight away, then re-check every notification query
+        // (this list, the badge, and the full notifications page).
+        await mutate(prev => prev?.map(n => ({ ...n, read: true })), { revalidate: false })
+        void refreshData('/api/notifications')
     }
 
     const unread = items.filter(n => !n.read).length
@@ -169,22 +173,23 @@ function NotificationPanel({ userId, anchorRef, onClose }: {
     )
 }
 
-// ── Shared unread count (one fetch, visibility-aware, 5 min poll) ──
+// ── Shared unread count (one cached fetch, 5 min poll) ──
+// Uses the shared data cache (lib/use-data.ts): SWR skips the poll while the tab
+// is hidden and re-checks when it regains focus, like the old visibility listener.
 function useUnreadCount(userId: string) {
-    const [unread, setUnread] = useState(0)
-    const fetch$ = useCallback(() => {
-        if (!userId || document.hidden) return
-        fetch(`/api/notifications?userId=${userId}`)
-            .then(r => r.json())
-            .then((data: Notification[]) => setUnread((data ?? []).filter(n => !n.read).length))
-            .catch(() => {})
-    }, [userId])
-    useEffect(() => {
-        fetch$()
-        const id = setInterval(fetch$, 5 * 60_000)
-        document.addEventListener('visibilitychange', fetch$)
-        return () => { clearInterval(id); document.removeEventListener('visibilitychange', fetch$) }
-    }, [fetch$])
+    const { data } = useApi<Notification[]>(userId ? '/api/notifications' : null, { refreshInterval: 5 * 60_000 })
+    const serverUnread = Array.isArray(data) ? data.filter(n => !n.read).length : 0
+    // Opening the bell clears the badge locally (without marking anything read on
+    // the server). The override is tied to the data it was set against, so it
+    // drops as soon as the server list changes (e.g. a new notification arrives).
+    const [override, setOverride] = useState<{ base: Notification[] | undefined; value: number } | null>(null)
+    const unread = override && override.base === data ? override.value : serverUnread
+    const setUnread = useCallback((n: number | ((prev: number) => number)) => {
+        setOverride(prev => {
+            const current = prev && prev.base === data ? prev.value : serverUnread
+            return { base: data, value: typeof n === 'function' ? n(current) : n }
+        })
+    }, [data, serverUnread])
     return [unread, setUnread] as const
 }
 
@@ -241,6 +246,7 @@ const BASE_NAV = [
     { href: '/dashboard/progress',               label: 'Progress',    Icon: () => <TrendingUp size={18} />,   iconClassName: 'group-hover:-translate-y-0.5' },
     { href: '/dashboard/ippt',                   label: 'IPPT',        Icon: () => <SportShoe size={18} />,    iconClassName: 'group-hover:-translate-y-1' },
     { href: '/dashboard/friends',                label: 'Leaderboard', Icon: () => <Trophy size={18} />,       iconClassName: 'group-hover:scale-110' },
+    { href: '/dashboard/challenges',             label: 'Challenges',  Icon: () => <Flag size={18} />,         iconClassName: 'group-hover:-rotate-6' },
     { href: '/dashboard/insights',               label: 'Insights',    Icon: () => <Brain size={18} />,        iconClassName: 'group-hover:scale-110' },
     { href: '/dashboard/coach',                  label: 'AI Coach',    Icon: () => <Sparkles size={18} />,     iconClassName: 'group-hover:scale-110' },
     { href: '/dashboard/nutrition/calculator',   label: 'Calculator',  Icon: () => <Calculator size={18} />,  iconClassName: 'group-hover:scale-110' },
@@ -249,6 +255,22 @@ const BASE_NAV = [
 const INSTRUCTOR_NAV = [
     { href: '/dashboard/wing', label: 'My Wing', Icon: () => <LayoutGrid size={18} />, iconClassName: 'group-hover:scale-110' },
 ]
+
+// Superadmins (app owner / Comd OCS) additionally get the app-wide Admin console.
+const ADMIN_NAV = [
+    { href: '/dashboard/admin', label: 'Admin', Icon: () => <ShieldCheck size={18} />, iconClassName: 'group-hover:scale-110' },
+]
+
+// Extra nav items unlocked by users.role (see lib/roles.ts). Role is read from
+// the DB, and every privileged API re-checks it server-side — hiding nav items
+// is a convenience, not the security boundary. During a superadmin "View as"
+// preview this is the *previewed* role (see DashboardLayout).
+function roleNav(role?: string) {
+    return [
+        ...(hasInstructorAccess(role) ? INSTRUCTOR_NAV : []),
+        ...(isSuperadmin(role) ? ADMIN_NAV : []),
+    ]
+}
 
 type NavItem = (typeof BASE_NAV)[number]
 
@@ -332,13 +354,14 @@ function MobileMoreSheet({ open, onClose, pathname, profile, overflow, primaryHr
     open: boolean
     onClose: () => void
     pathname: string
-    profile: { rank?: string; full_name?: string; wing?: string } | null
+    profile: { rank?: string; full_name?: string; wing?: string; role?: string } | null
     overflow: NavItem[]
     primaryHrefs: string[]
     setPrimary: (hrefs: string[]) => void
 }) {
     const { signOut } = useAuth()
     const router = useRouter()
+    const viewAs = useViewAs() // superadmins only
     // Customise mode lets the cadet pick which 4 tabs sit in the bottom bar.
     const [editing, setEditing] = useState(false)
     // Local draft of the selected bar tabs while editing (committed on "Done").
@@ -347,11 +370,8 @@ function MobileMoreSheet({ open, onClose, pathname, profile, overflow, primaryHr
     // Reset the draft whenever the sheet (re)opens or the saved set changes.
     useEffect(() => { if (open) { setEditing(false); setDraft(primaryHrefs) } }, [open, primaryHrefs])
 
-    // Instructors get an extra "My Wing" tab pinned in the overflow grid.
-    const overflowNav = [
-        ...overflow,
-        ...(profile?.rank && isInstructor(profile.rank) ? INSTRUCTOR_NAV : []),
-    ]
+    // Instructors get an extra "My Wing" tab (and superadmins "Admin") pinned in the overflow grid.
+    const overflowNav = [...overflow, ...roleNav(profile?.role)]
 
     function toggleDraft(href: string) {
         setDraft(prev => {
@@ -458,7 +478,16 @@ function MobileMoreSheet({ open, onClose, pathname, profile, overflow, primaryHr
 
                     <div className="mx-2 my-3 border-t border-border" />
 
-                    {/* Settings & sign out */}
+                    {/* View as (superadmins), settings & sign out */}
+                    {viewAs && (
+                        <button
+                            onClick={() => { onClose(); viewAs.open() }}
+                            className="flex w-full items-center gap-3 px-4 py-3 rounded-2xl text-[14px] font-medium text-foreground hover:bg-muted transition-colors duration-150"
+                        >
+                            <Eye size={18} />
+                            View as…
+                        </button>
+                    )}
                     <Link
                         href="/dashboard/settings"
                         onClick={onClose}
@@ -492,7 +521,7 @@ function MobileMoreSheet({ open, onClose, pathname, profile, overflow, primaryHr
 // ── Mobile bottom nav ──────────────────────────────────────
 function MobileBottomNav({ pathname, profile, primary, overflow, primaryHrefs, setPrimary }: {
     pathname: string
-    profile: { rank?: string } | null
+    profile: { rank?: string; role?: string } | null
     primary: NavItem[]
     overflow: NavItem[]
     primaryHrefs: string[]
@@ -501,7 +530,7 @@ function MobileBottomNav({ pathname, profile, primary, overflow, primaryHrefs, s
     const [moreOpen, setMoreOpen] = useState(false)
 
     // "More" tab appears active when the current page is in the overflow set
-    const overflowActive = [...overflow, ...INSTRUCTOR_NAV].some(
+    const overflowActive = [...overflow, ...INSTRUCTOR_NAV, ...ADMIN_NAV].some(
         ({ href }) => pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
     )
 
@@ -607,7 +636,7 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
     expanded: boolean
     onToggle: () => void
     pathname: string
-    profile: { rank?: string; full_name?: string; wing?: string } | null
+    profile: { rank?: string; full_name?: string; wing?: string; role?: string } | null
     userId: string
     unread: number
     setUnread: (n: number | ((prev: number) => number)) => void
@@ -692,10 +721,10 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
             {/* Main nav */}
             <nav className={cn('flex flex-col gap-0.5 flex-1 overflow-y-auto overflow-x-hidden', expanded ? 'px-2.5' : 'px-2')}>
                 {BASE_NAV.map(item => <NavItem key={item.href} {...item} />)}
-                {profile?.rank && isInstructor(profile.rank) && (
+                {hasInstructorAccess(profile?.role) && (
                     <>
                         <div className={cn('mx-1 border-t border-sidebar-border my-1.5', !expanded && 'mx-0')} />
-                        {INSTRUCTOR_NAV.map(item => <NavItem key={item.href} {...item} />)}
+                        {roleNav(profile?.role).map(item => <NavItem key={item.href} {...item} />)}
                     </>
                 )}
                 <div className={cn('mx-1 border-t border-sidebar-border my-1.5', !expanded && 'mx-0')} />
@@ -704,6 +733,9 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
 
             {/* Divider */}
             <div className="mx-3 border-t border-sidebar-border mt-3 mb-2" />
+
+            {/* Superadmins: "View as…" button, or the "Viewing as …" card while previewing */}
+            <ViewAsSidebarCard expanded={expanded} />
 
             {/* User section — click to open popover */}
             <Popover open={userMenuOpen} onOpenChange={setUserMenuOpen}>
@@ -765,12 +797,13 @@ function Sidebar({ expanded, onToggle, pathname, profile, userId, unread, setUnr
     )
 }
 
+type LayoutProfile = { rank?: string; full_name?: string; wing?: string; role?: string; goal_mode?: string | null }
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, isLoading } = useAuth()
     const router = useRouter()
     const pathname = usePathname()
     const [expanded, setExpanded] = useState(true)
-    const [profile, setProfile] = useState<{ rank?: string; full_name?: string; wing?: string } | null>(null)
     const { setGoalMode } = useTheme()
     const [unread, setUnread] = useUnreadCount(user?.id ?? '')
     const { primary, overflow, primaryHrefs, setPrimary } = useNavTabs()
@@ -788,16 +821,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (!isLoading && !user) router.replace('/login')
     }, [isLoading, user, router])
 
+    // Sidebar / nav profile, cached across navigations (lib/use-data.ts).
+    // Each time it loads, apply the cadet's saved goal-mode theme.
+    const { data: profileRow } = useData<LayoutProfile>('profile:layout', async uid => {
+        const { data, error } = await supabase.from('users').select('rank, full_name, wing, goal_mode, role').eq('id', uid).single()
+        if (error) throw error
+        return data as LayoutProfile
+    }, {
+        onSuccess: data => { if (data?.goal_mode) setGoalMode(data.goal_mode as GoalMode) },
+    })
+    // Superadmin "View as" (lib/role-preview.ts): nav and role-gated pages use the
+    // previewed role/wing; the real role only decides who may preview.
+    const preview = useRolePreview()
+    const canPreview = isSuperadmin(profileRow?.role)
+    const profile = applyPreview(profileRow ?? null, preview)
+    const previewing = canPreview && !!preview
+    // A preview left in this tab by someone who isn't a superadmin does nothing
+    // (the server ignores it too) — clear it so it doesn't linger.
     useEffect(() => {
-        if (!user) return
-        supabase.from('users').select('rank, full_name, wing, goal_mode').eq('id', user.id).single()
-            .then(({ data }) => {
-                if (data) {
-                    setProfile(data)
-                    if (data.goal_mode) setGoalMode(data.goal_mode as GoalMode)
-                }
-            })
-    }, [user])
+        if (profileRow && !canPreview && preview) setRolePreview(null)
+    }, [profileRow, canPreview, preview])
 
     if (isLoading || !user) {
         return (
@@ -812,31 +855,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (fixedShell) {
         return (
+            <ViewAsProvider enabled={canPreview} ownWing={profileRow?.wing ?? null}>
             <FabProvider>
                 <div className="bg-background">
                     <style>{`@media (min-width: 768px) { .dash-content { margin-left: ${contentMargin}px; } }`}</style>
                     <div className="hidden md:block">
                         <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} unread={unread} setUnread={setUnread} />
                     </div>
-                    <div className="dash-content h-screen overflow-hidden animate-in fade-in duration-200 pb-28 md:pb-0" style={{ animationFillMode: 'both' }}>
+                    <div className={cn('dash-content h-screen overflow-hidden animate-in fade-in duration-200 pb-28 md:pb-0', previewing && 'pt-14 md:pt-0')} style={{ animationFillMode: 'both' }}>
                         {children}
                     </div>
                     <MobileBell userId={user.id} unread={unread} setUnread={setUnread} />
                     <MobileFab />
                     <MobileBottomNav pathname={pathname} profile={profile} primary={primary} overflow={overflow} primaryHrefs={primaryHrefs} setPrimary={setPrimary} />
+                    <ViewAsMobilePill />
                 </div>
             </FabProvider>
+            </ViewAsProvider>
         )
     }
 
     return (
+        <ViewAsProvider enabled={canPreview} ownWing={profileRow?.wing ?? null}>
         <FabProvider>
             <div className="min-h-screen bg-background">
                 <style>{`@media (min-width: 768px) { .dash-content { margin-left: ${contentMargin}px; transition: margin-left 300ms ease; } }`}</style>
                 <div className="hidden md:block">
                     <Sidebar expanded={expanded} onToggle={() => setExpanded(e => !e)} pathname={pathname} profile={profile} userId={user.id} unread={unread} setUnread={setUnread} />
                 </div>
-                <main className="dash-content min-h-screen overflow-y-auto pb-28 md:pb-0">
+                <main className={cn('dash-content min-h-screen overflow-y-auto pb-28 md:pb-0', previewing && 'pt-14 md:pt-0')}>
                     <div className="animate-in fade-in duration-200" style={{ animationFillMode: 'both' }}>
                         {children}
                     </div>
@@ -844,7 +891,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <MobileBell userId={user.id} unread={unread} setUnread={setUnread} />
                 <MobileFab />
                 <MobileBottomNav pathname={pathname} profile={profile} primary={primary} overflow={overflow} primaryHrefs={primaryHrefs} setPrimary={setPrimary} />
+                <ViewAsMobilePill />
             </div>
         </FabProvider>
+        </ViewAsProvider>
     )
 }

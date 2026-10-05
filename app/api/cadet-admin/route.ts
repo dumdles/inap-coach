@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { isInstructor } from '@/lib/scoring'
+import { hasInstructorAccess, isSuperadmin } from '@/lib/roles'
+import { requireRole } from '@/app/api/_lib/roles'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,13 +10,17 @@ const supabaseAdmin = createClient(
 )
 
 // PATCH /api/cadet-admin
-// Body: { requesterId, cadetId, action: 'remove_section' | 'assign_section' | 'transfer_wing', newSection?: string, newWing?: string }
-// Instructor-only. remove_section clears section; assign_section sets section to 1–4; transfer_wing moves cadet to another wing.
+// Body: { cadetId, action: 'remove_section' | 'assign_section' | 'transfer_wing', newSection?: string, newWing?: string }
+// Verified instructors (own wing) or superadmins (any wing). Requester comes from the Bearer token. remove_section clears section; assign_section sets section to 1–4; transfer_wing moves cadet to another wing.
 export async function PATCH(req: NextRequest) {
-    const { requesterId, cadetId, action, newWing, newSection } = await req.json()
+    const auth = await requireRole(req, ['instructor', 'superadmin'])
+    if (auth.error) return auth.error
+    const requester = auth.requester
 
-    if (!requesterId || !cadetId || !['remove_section', 'assign_section', 'transfer_wing'].includes(action))
-        return NextResponse.json({ error: 'requesterId, cadetId, and valid action required' }, { status: 400 })
+    const { cadetId, action, newWing, newSection } = await req.json()
+
+    if (!cadetId || !['remove_section', 'assign_section', 'transfer_wing'].includes(action))
+        return NextResponse.json({ error: 'cadetId and valid action required' }, { status: 400 })
 
     if (action === 'transfer_wing' && !newWing)
         return NextResponse.json({ error: 'newWing required for transfer_wing' }, { status: 400 })
@@ -23,13 +28,12 @@ export async function PATCH(req: NextRequest) {
     if (action === 'assign_section' && !['1', '2', '3', '4'].includes(newSection))
         return NextResponse.json({ error: 'newSection must be 1–4' }, { status: 400 })
 
-    const [{ data: requester }, { data: cadet }] = await Promise.all([
-        supabaseAdmin.from('users').select('rank, wing').eq('id', requesterId).single(),
-        supabaseAdmin.from('users').select('wing').eq('id', cadetId).single(),
-    ])
+    const { data: cadet } = await supabaseAdmin.from('users').select('wing').eq('id', cadetId).single()
+    if (!cadet) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
-    if (!requester || !cadet) return NextResponse.json({ error: 'not found' }, { status: 404 })
-    if (!isInstructor(requester.rank) || requester.wing !== cadet.wing)
+    const allowed = isSuperadmin(requester.role) ||
+        (hasInstructorAccess(requester.role) && requester.wing === cadet.wing)
+    if (!allowed)
         return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
     const update =

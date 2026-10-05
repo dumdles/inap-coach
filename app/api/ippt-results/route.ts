@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { canViewUser } from '@/app/api/_lib/access'
+import { readPreview } from '@/app/api/_lib/preview'
+import { verifyAuth } from '@/app/api/_lib/auth'
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,10 +10,14 @@ const supabaseAdmin = createClient(
     { auth: { autoRefreshToken: false, persistSession: false } },
 )
 
-// GET /api/ippt-results?userId=<uuid>
+// GET /api/ippt-results[?userId=<uuid>]
 export async function GET(req: NextRequest) {
-    const userId = req.nextUrl.searchParams.get('userId')
-    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
+    // Whose data: ?userId= (defaults to the caller). Viewing someone else needs
+    // permission — same-wing instructor, superadmin or accepted friend (see _lib/access).
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+    const userId = req.nextUrl.searchParams.get('userId') || auth.user.id
+    if (!(await canViewUser(auth.user.id, userId, readPreview(req)))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const { data, error } = await supabaseAdmin
         .from('ippt_results')
@@ -23,15 +30,20 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/ippt-results
-// Body: { userId, test_date, pushup_reps?, situp_reps?, run_time_seconds?,
+// Body: { test_date, pushup_reps?, situp_reps?, run_time_seconds?,
 //         pushup_points?, situp_points?, run_points?, total_points, award?, notes? }
+// Always records a result for the caller (Bearer token).
 export async function POST(req: NextRequest) {
-    const body = await req.json()
-    const { userId, test_date, pushup_reps, situp_reps, run_time_seconds,
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
+    const userId = auth.user.id
+
+    const body = await req.json().catch(() => ({}))
+    const { test_date, pushup_reps, situp_reps, run_time_seconds,
             pushup_points, situp_points, run_points, total_points, award, notes } = body
 
-    if (!userId || !test_date || total_points == null)
-        return NextResponse.json({ error: 'userId, test_date, and total_points are required' }, { status: 400 })
+    if (!test_date || total_points == null)
+        return NextResponse.json({ error: 'test_date and total_points are required' }, { status: 400 })
 
     if (typeof total_points !== 'number' || total_points < 0 || total_points > 150)
         return NextResponse.json({ error: 'total_points must be 0–150' }, { status: 400 })

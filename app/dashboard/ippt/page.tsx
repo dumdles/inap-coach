@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState } from 'react'
 import { useAuth } from '@/app/context/auth-context'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -9,6 +9,9 @@ import { LogIPPTDialog, AwardBadge, secondsToRunTime, AWARD_META, type IPPTResul
 import {
     LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid,
 } from 'recharts'
+import { authFetch } from '@/lib/auth-fetch'
+import { useApi } from '@/lib/use-data'
+import { refreshData } from '@/lib/data-cache'
 
 function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -108,28 +111,27 @@ function ResultRow({ result, onDelete }: { result: IPPTResult; onDelete: (id: st
 
 export default function IPPTPage() {
     const { user } = useAuth()
-    const [results, setResults]   = useState<IPPTResult[]>([])
-    const [loading, setLoading]   = useState(true)
     const [logOpen, setLogOpen]   = useState(false)
 
-    const fetchResults = useCallback(async () => {
-        if (!user) return
-        setLoading(true)
-        const res = await fetch(`/api/ippt-results?userId=${user.id}`)
-        const data = await res.json()
-        setResults(Array.isArray(data) ? data : [])
-        setLoading(false)
-    }, [user])
+    // IPPT history through the shared cache (lib/use-data.ts): the first visit
+    // shows the skeleton; coming back shows the last results instantly.
+    const { data, isLoading: loading, mutate } = useApi<IPPTResult[]>('/api/ippt-results')
+    const results = Array.isArray(data) ? data : []
 
-    useEffect(() => { fetchResults() }, [fetchResults])
+    // After a write: update the list straight away, then re-fetch every cached
+    // copy of /api/ippt-results (this page and any other screen showing it).
+    const updateResults = (update: (prev: IPPTResult[]) => IPPTResult[]) => {
+        void mutate(prev => update(Array.isArray(prev) ? prev : []), { revalidate: false })
+        void refreshData('/api/ippt-results')
+    }
 
     const handleDelete = async (id: string) => {
-        await fetch(`/api/ippt-results/${id}?userId=${user!.id}`, { method: 'DELETE' })
-        setResults(prev => prev.filter(r => r.id !== id))
+        await authFetch(`/api/ippt-results/${id}`, { method: 'DELETE' })
+        updateResults(prev => prev.filter(r => r.id !== id))
     }
 
     const handleSaved = (result: IPPTResult) => {
-        setResults(prev => [result, ...prev].sort((a, b) => b.test_date.localeCompare(a.test_date)))
+        updateResults(prev => [result, ...prev].sort((a, b) => b.test_date.localeCompare(a.test_date)))
     }
 
     // Derived stats

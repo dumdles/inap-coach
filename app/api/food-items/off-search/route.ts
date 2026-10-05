@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth } from '@/app/api/_lib/auth'
 
 // Curated Asian/Singapore-relevant categories on Open Food Facts
 const ALLOWED_CATEGORIES = new Set([
@@ -27,7 +28,10 @@ type OFFProduct = {
 }
 
 // GET /api/food-items/off-search?q=...
+// Signed-in users only (proxies Open Food Facts).
 export async function GET(req: NextRequest) {
+    const auth = await verifyAuth(req)
+    if (auth.error) return auth.error
     const q = req.nextUrl.searchParams.get('q')?.trim()
     if (!q) return NextResponse.json([])
 

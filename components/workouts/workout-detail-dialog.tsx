@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { cn } from "@/lib/utils"
 import { ClockIcon, FlameIcon, RouteIcon, HeartIcon, LayersIcon, RepeatIcon } from "lucide-react"
 import { GpxMap } from "./gpx-map"
+import { authFetch } from '@/lib/auth-fetch'
 
 type TaggedUser = { id: string; full_name: string; rank: string }
 
@@ -64,7 +65,7 @@ export function WorkoutDetailDialog({
         if (!open || !workoutId) return
         setDetail(null)
         setLoading(true)
-        fetch(`/api/workout-logs/${workoutId}?userId=${userId}`)
+        authFetch(`/api/workout-logs/${workoutId}`)
             .then(r => r.json())
             .then(setDetail)
             .finally(() => setLoading(false))

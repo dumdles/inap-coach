@@ -52,12 +52,27 @@ Scopes: **Wing** (same wing as the viewer) or **Friends** (accepted friendships 
 
 ---
 
+## Challenge bonus
+
+Instructors and superadmins can run time-boxed **challenges** (Challenges tab; logic in `lib/challenges.ts`). When a challenge ends, places 1–3 earn a share of its bonus (set per challenge, 0–200 pts):
+
+| Place | Share of bonus |
+|---|---|
+| 1st | 100% |
+| 2nd | 60% |
+| 3rd | 30% |
+
+- Ties share a place (two cadets tied 1st both get 100%).
+- **Team challenges** (section / platoon / wing) rank teams by their members' *average* score; every member of a top-3 team with a score above zero gets that place's points.
+- Cadets who scored zero are never paid.
+- Awards are stored in `challenge_awards` and added to the leaderboard score for any period that includes the `awarded_at` time (so a win shows up in that week's and month's totals).
+
 ## Summary formula
 
 ```
 daily_pts(day) = (meal_pts + workout_pts) × (1.5 if consistency else 1)
 period_score   = Σ daily_pts(day) for each day in period
-total_score    = period_score + (streak_days × 5)
+total_score    = period_score + (streak_days × 5) + challenge_bonus
 ```
 
 ---
