@@ -181,6 +181,13 @@ Dashboard pages load data through `useApi(path)` / `useData(name, loader)` from 
 ### Wing / leaderboard (`app/dashboard/wing/`)
 - Cadets compete in wings. Points from IPPT scores, workout logs, nutrition adherence.
 - Scoring logic in `lib/scoring.ts` and `SCORING_SYSTEM.md`.
+- **My Wing** (instructors/superadmins) is built for 100–200 cadets — summarise, group, then list; never render one chart mark per cadet in a long list. Tabs:
+  - **Overview**: stat tiles, the wing map (`components/wing/section-map.tsx` — a tile per platoon/section, a square per cadet, "colour by" today / last 7 days / score / goal; click → section pop-up) and a capped **Needs attention** list (silent 3+ days, patchy, no section).
+  - **Roster** (`components/wing/roster.tsx`): one line per cadet, search (`p2 s3` works), quick views, filters, group-by-section (`content-visibility: auto` keeps 150+ rows smooth).
+  - **Trends** (`components/wing/trends.tsx`): sections compared, score histogram + top/bottom 5, goal mix, streaks.
+  - Maths in `lib/wing-overview.ts` (pure). Data: `/api/leaderboard?scope=wing`, whose rows carry `last7` (meals per day, oldest → today).
+  - Superadmins get a **Demo wing** toggle (`lib/wing-demo.ts`, ~150 fake cadets in the browser, nothing saved).
+  - Goal-mode chart colours are the validated `--viz-goal-*` tokens; sequential encodings use `--viz-heat-*`.
 
 ### Cron jobs (`app/api/cron/`)
 - All secured with `CRON_SECRET` header check.

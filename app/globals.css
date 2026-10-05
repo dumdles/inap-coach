@@ -40,6 +40,10 @@
   --color-medal-silver: var(--medal-silver);
   --color-medal-bronze: var(--medal-bronze);
   --color-viz-muted:  var(--viz-muted);
+  --color-viz-goal-bulk:     var(--viz-goal-bulk);
+  --color-viz-goal-cut:      var(--viz-goal-cut);
+  --color-viz-goal-maintain: var(--viz-goal-maintain);
+  --color-viz-goal-ippt:     var(--viz-goal-ippt);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
@@ -168,6 +172,13 @@
   --medal-bronze: #8B4A2B;
   --viz-accent: #2a78d6;
   --viz-muted:  #C1C7D0;
+  /* Goal-mode categorical hues for charts (My Wing). Fixed order bulk → cut →
+     maintain → ippt; validated with the dataviz palette script (CVD-safe on
+     the card surface). Always shown with a legend or label, never colour alone. */
+  --viz-goal-bulk:     #2684FF;
+  --viz-goal-cut:      #E5492A;
+  --viz-goal-maintain: #2E9E6E;
+  --viz-goal-ippt:     #C98500;
   --viz-grid:   #EBECF0;
   --viz-tier-1: #1c5cab;
   --viz-tier-2: #3987e5;
@@ -334,6 +345,10 @@
   --medal-bronze: #B86A3A;
   --viz-accent: #3987e5;
   --viz-muted:  #505F79;
+  --viz-goal-bulk:     #4A8DEB;
+  --viz-goal-cut:      #E4593C;
+  --viz-goal-maintain: #2EA06F;
+  --viz-goal-ippt:     #C28700;
   --viz-grid:   #253858;
   --viz-tier-1: #b7d3f6;
   --viz-tier-2: #5598e7;

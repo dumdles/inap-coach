@@ -21,6 +21,19 @@ function windowStart(period: string): Date {
     return d
 }
 
+/** Only the days on/after `startDay` ('YYYY-MM-DD' keys compare as strings). */
+function inPeriod<T>(byDay: Record<string, T>, startDay: string): Record<string, T> {
+    const out: Record<string, T> = {}
+    for (const [day, v] of Object.entries(byDay)) if (day >= startDay) out[day] = v
+    return out
+}
+
+/** The last n UTC dates, oldest first, ending today (same day keys as leaderboard_inputs). */
+function lastNDays(n: number): string[] {
+    const now = Date.now()
+    return Array.from({ length: n }, (_, i) => new Date(now - (n - 1 - i) * 86400_000).toISOString().slice(0, 10))
+}
+
 // GET /api/leaderboard?scope=wing|section|friends&wing=Alpha&period=week|month
 // The caller comes from the Bearer token. Wing boards are limited to the
 // caller's own wing (superadmins may pass any ?wing=).
@@ -84,6 +97,12 @@ export async function GET(req: NextRequest) {
 
     const userIds = users.map(u => u.id)
     const start = windowStart(period)
+    // Always load at least the last 7 days, so every row can carry its 7-day
+    // log history (`last7`, used by My Wing) even early in a "month" period.
+    // Scoring below only counts days inside the period itself.
+    const sevenDaysAgo = windowStart('week')
+    const loadFrom = start < sevenDaysAgo ? start : sevenDaysAgo
+    const startDay = start.toISOString().slice(0, 10)
 
     // Both are independent → fetch in parallel. Activity is pre-aggregated in
     // Postgres (see app/api/_lib/leaderboard-inputs.ts); challenge bonus points
@@ -92,7 +111,7 @@ export async function GET(req: NextRequest) {
     let bonusByUser: Map<string, number>
     try {
         [activity, bonusByUser] = await Promise.all([
-            loadUserActivity(userIds, start),
+            loadUserActivity(userIds, loadFrom),
             challengeBonusSince(start.toISOString()),
         ])
     } catch (e) {
@@ -101,14 +120,21 @@ export async function GET(req: NextRequest) {
     }
 
     const today = new Date().toISOString().slice(0, 10)
+    const last7Days = lastNDays(7)
     const ranked = users
         .map(u => {
             const a = activity.get(u.id)!
             const streak = a.streak
             const challengeBonus = bonusByUser.get(u.id) ?? 0
-            const score = computeScore(a.mealsByDay, streak, a.workoutKcalByDay, a.sleepByDay) + challengeBonus
+            const score = computeScore(
+                inPeriod(a.mealsByDay, startDay), streak,
+                inPeriod(a.workoutKcalByDay, startDay), inPeriod(a.sleepByDay, startDay),
+            ) + challengeBonus
             const mealsToday = a.mealsByDay[today] ?? 0
-            return { ...u, score, streak, mealsToday, challengeBonus }
+            // Meals logged on each of the last 7 days (oldest → today), for My Wing's
+            // "last 7 days" strips and "silent for N days" flags (lib/wing-overview.ts).
+            const last7 = last7Days.map(d => a.mealsByDay[d] ?? 0)
+            return { ...u, score, streak, mealsToday, last7, challengeBonus }
         })
         .sort((a, b) => b.score - a.score)
         .map((u, i) => ({ ...u, position: i + 1 }))
